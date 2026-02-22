@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/utils/firebase_options.dart';
 import 'features/auth/domain/entities/user_entity.dart';
@@ -14,6 +15,8 @@ import 'features/transactions/presentation/screens/transactions_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialise pt_BR locale data required by DateFormat in CurrencyFormatter.
+  await initializeDateFormatting('pt_BR', null);
   // ProviderScope wraps the entire tree so Riverpod providers are available
   // from the very first frame — including inside FirebaseInitializer.
   runApp(const ProviderScope(child: FirebaseInitializer()));
