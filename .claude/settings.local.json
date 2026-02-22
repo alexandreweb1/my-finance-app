@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter create:*)",
+      "Bash(cmd.exe /c \"where flutter 2>&1\")",
+      "Bash(cmd.exe /c \"flutter --version 2>&1\")",
+      "Bash(cmd.exe /c \"echo %PATH%\")",
+      "Bash(tr:*)",
+      "Bash(cmd.exe /c \"dir C:\\\\flutter\\\\bin\\\\flutter.bat 2>&1\")",
+      "Bash(cmd.exe /c \"dir C:\\\\development\\\\flutter\\\\bin\\\\flutter.bat 2>&1\")",
+      "Bash(cmd.exe /c:*)"
+    ]
+  }
+}
