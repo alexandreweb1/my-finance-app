@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../features/transactions/presentation/screens/transactions_screen.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -39,14 +38,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
 
-    ref.listen<AuthState>(authNotifierProvider, (_, next) {
-      if (next.user != null) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const TransactionsScreen()),
-          (_) => false,
-        );
-      }
-    });
+    // Navigation on auth success is handled by AppRouter in main.dart.
 
     return Scaffold(
       appBar: AppBar(title: const Text('Criar Conta')),

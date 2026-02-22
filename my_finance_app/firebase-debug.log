@@ -1,0 +1,15 @@
+[debug] [2026-02-22T10:12:52.126Z] ----------------------------------------------------------------------
+[debug] [2026-02-22T10:12:52.128Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\alexa\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js apps:create IOS My Finance App iOS --bundle-id com.example.myFinanceApp --project my-finance-app-flutter
+[debug] [2026-02-22T10:12:52.129Z] CLI Version:   15.7.0
+[debug] [2026-02-22T10:12:52.129Z] Platform:      win32
+[debug] [2026-02-22T10:12:52.129Z] Node Version:  v22.20.0
+[debug] [2026-02-22T10:12:52.129Z] Time:          Sun Feb 22 2026 07:12:52 GMT-0300 (Horário Padrão de Brasília)
+[debug] [2026-02-22T10:12:52.129Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-22T10:12:52.159Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-22T10:12:52.159Z] > authorizing via signed-in user (alexandreweb2@gmail.com)
+[info] Create your IOS app in project my-finance-app-flutter:
+[debug] [2026-02-22T10:12:52.163Z] Checked if tokens are valid: true, expires at: 1771756123011
+[debug] [2026-02-22T10:12:52.164Z] Checked if tokens are valid: true, expires at: 1771756123011
+[debug] [2026-02-22T10:12:52.165Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1beta1/projects/my-finance-app-flutter/iosApps [none]
+[debug] [2026-02-22T10:12:52.165Z] >>> [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/my-finance-app-flutter/iosApps {"displayName":"My Finance App iOS","bundleId":"com.example.myFinanceApp"}

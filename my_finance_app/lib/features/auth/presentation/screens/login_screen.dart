@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../features/transactions/presentation/screens/transactions_screen.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -37,13 +36,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
 
-    ref.listen<AuthState>(authNotifierProvider, (_, next) {
-      if (next.user != null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const TransactionsScreen()),
-        );
-      }
-    });
+    // Navigation on auth success is handled by AppRouter in main.dart,
+    // which watches authStateProvider and rebuilds the root widget.
 
     return Scaffold(
       body: Center(

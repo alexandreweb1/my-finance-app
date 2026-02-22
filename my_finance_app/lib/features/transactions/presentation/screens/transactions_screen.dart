@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../auth/presentation/screens/login_screen.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/add_transaction_dialog.dart';
@@ -19,14 +18,8 @@ class TransactionsScreen extends ConsumerWidget {
     final income = ref.watch(totalIncomeProvider);
     final expense = ref.watch(totalExpenseProvider);
 
-    ref.listen<AsyncValue<UserEntity?>>(authStateProvider, (_, next) {
-      if (next.value == null) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (_) => false,
-        );
-      }
-    });
+    // Navigation on sign-out is handled by AppRouter in main.dart,
+    // which watches authStateProvider and rebuilds the root widget.
 
     return Scaffold(
       appBar: AppBar(
