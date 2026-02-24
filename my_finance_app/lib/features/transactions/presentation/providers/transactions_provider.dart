@@ -8,6 +8,7 @@ import '../../domain/repositories/transaction_repository.dart';
 import '../../domain/usecases/add_transaction_usecase.dart';
 import '../../domain/usecases/delete_transaction_usecase.dart';
 import '../../domain/usecases/get_transactions_usecase.dart';
+import '../../domain/usecases/update_transaction_usecase.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 // --- Infrastructure ---
@@ -32,6 +33,10 @@ final addTransactionUseCaseProvider = Provider(
 
 final deleteTransactionUseCaseProvider = Provider(
   (ref) => DeleteTransactionUseCase(ref.watch(transactionRepositoryProvider)),
+);
+
+final updateTransactionUseCaseProvider = Provider(
+  (ref) => UpdateTransactionUseCase(ref.watch(transactionRepositoryProvider)),
 );
 
 // --- Stream Providers ---
@@ -80,11 +85,13 @@ final totalExpenseProvider = Provider<double>((ref) {
 class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
   final AddTransactionUseCase _addTransaction;
   final DeleteTransactionUseCase _deleteTransaction;
+  final UpdateTransactionUseCase _updateTransaction;
   final String _userId;
 
   TransactionsNotifier(
     this._addTransaction,
     this._deleteTransaction,
+    this._updateTransaction,
     this._userId,
   ) : super(const AsyncValue.data(null));
 
@@ -121,6 +128,22 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
     );
   }
 
+  Future<bool> update(TransactionEntity updated) async {
+    state = const AsyncValue.loading();
+    final result = await _updateTransaction(
+        UpdateTransactionParams(transaction: updated));
+    return result.fold(
+      (failure) {
+        state = AsyncValue.error(failure.message, StackTrace.current);
+        return false;
+      },
+      (_) {
+        state = const AsyncValue.data(null);
+        return true;
+      },
+    );
+  }
+
   Future<bool> delete(String transactionId) async {
     state = const AsyncValue.loading();
     final result = await _deleteTransaction(
@@ -144,6 +167,7 @@ final transactionsNotifierProvider =
   return TransactionsNotifier(
     ref.watch(addTransactionUseCaseProvider),
     ref.watch(deleteTransactionUseCaseProvider),
+    ref.watch(updateTransactionUseCaseProvider),
     user?.id ?? '',
   );
 });

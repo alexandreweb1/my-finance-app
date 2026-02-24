@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/providers/app_settings_provider.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categories/domain/entities/category_entity.dart';
@@ -11,7 +13,9 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final user = ref.watch(authStateProvider).value;
+    final settings = ref.watch(appSettingsProvider);
     final incomeCategories = ref.watch(incomeCategoriesProvider);
     final expenseCategories = ref.watch(expenseCategoriesProvider);
 
@@ -19,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configurações'),
+        title: Text(l10n.settings),
         centerTitle: false,
       ),
       body: ListView(
@@ -37,16 +41,58 @@ class SettingsScreen extends ConsumerWidget {
           // Change password
           ListTile(
             leading: const Icon(Icons.lock_outline),
-            title: const Text('Alterar senha'),
+            title: Text(l10n.changePassword),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showChangePasswordDialog(context, ref),
           ),
 
           const Divider(height: 1),
 
+          // Currency
+          ListTile(
+            leading: const Icon(Icons.currency_exchange),
+            title: Text(l10n.currency),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  settings.currency.label,
+                  style: TextStyle(
+                      color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () => _showCurrencyDialog(context, ref, l10n),
+          ),
+
+          const Divider(height: 1),
+
+          // Language
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: Text(l10n.language),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  settings.language.nativeLabel,
+                  style: TextStyle(
+                      color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () => _showLanguageDialog(context, ref, l10n),
+          ),
+
+          const Divider(height: 1),
+
           // Expense categories
           _CategorySection(
-            title: 'Categorias de Despesa',
+            title: l10n.expenseCategories,
             type: CategoryType.expense,
             categories: expenseCategories,
           ),
@@ -55,7 +101,7 @@ class SettingsScreen extends ConsumerWidget {
 
           // Income categories
           _CategorySection(
-            title: 'Categorias de Receita',
+            title: l10n.incomeCategories,
             type: CategoryType.income,
             categories: incomeCategories,
           ),
@@ -65,7 +111,7 @@ class SettingsScreen extends ConsumerWidget {
           // Logout
           ListTile(
             leading: Icon(Icons.logout, color: Colors.red.shade600),
-            title: Text('Sair',
+            title: Text(l10n.logout,
                 style: TextStyle(color: Colors.red.shade600)),
             onTap: () =>
                 ref.read(authNotifierProvider.notifier).signOut(),
@@ -88,6 +134,120 @@ class SettingsScreen extends ConsumerWidget {
       builder: (_) => const _ChangePasswordDialog(),
     );
   }
+
+  void _showCurrencyDialog(
+      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _CurrencyDialog(l10n: l10n),
+    );
+  }
+
+  void _showLanguageDialog(
+      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _LanguageDialog(l10n: l10n),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Currency Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CurrencyDialog extends ConsumerWidget {
+  final AppLocalizations l10n;
+  const _CurrencyDialog({required this.l10n});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(appSettingsProvider).currency;
+
+    return AlertDialog(
+      title: Text(l10n.currencyTitle),
+      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      content: SizedBox(
+        width: 320,
+        child: RadioGroup<AppCurrency>(
+          groupValue: current,
+          onChanged: (v) {
+            if (v != null) {
+              ref.read(appSettingsProvider.notifier).setCurrency(v);
+              Navigator.of(context).pop();
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: AppCurrency.values
+                .map((currency) => RadioListTile<AppCurrency>(
+                      value: currency,
+                      title: Text(currency.label),
+                      subtitle: Text(currency.symbol,
+                          style:
+                              TextStyle(color: Colors.grey.shade600)),
+                    ))
+                .toList(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Language Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LanguageDialog extends ConsumerWidget {
+  final AppLocalizations l10n;
+  const _LanguageDialog({required this.l10n});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(appSettingsProvider).language;
+
+    return AlertDialog(
+      title: Text(l10n.languageTitle),
+      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      content: SizedBox(
+        width: 320,
+        child: RadioGroup<AppLanguage>(
+          groupValue: current,
+          onChanged: (v) {
+            if (v != null) {
+              ref.read(appSettingsProvider.notifier).setLanguage(v);
+              Navigator.of(context).pop();
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: AppLanguage.values
+                .map((lang) => RadioListTile<AppLanguage>(
+                      value: lang,
+                      title: Text(lang.nativeLabel),
+                      subtitle: Text(lang.label,
+                          style:
+                              TextStyle(color: Colors.grey.shade600)),
+                    ))
+                .toList(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,6 +267,7 @@ class _ProfileCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -130,7 +291,7 @@ class _ProfileCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  displayName.isNotEmpty ? displayName : 'Sem nome',
+                  displayName.isNotEmpty ? displayName : l10n.noName,
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 16),
                 ),
@@ -142,7 +303,7 @@ class _ProfileCard extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Editar perfil',
+            tooltip: l10n.editProfile,
             onPressed: () => _showEditProfileDialog(context, ref),
           ),
         ],
@@ -208,21 +369,22 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     return AlertDialog(
-      title: const Text('Editar perfil'),
+      title: Text(l10n.editProfile),
       content: TextField(
         controller: _nameController,
-        decoration: const InputDecoration(
-          labelText: 'Nome',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l10n.nameField,
+          border: const OutlineInputBorder(),
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: isLoading ? null : _submit,
@@ -231,7 +393,7 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
                   height: 18,
                   width: 18,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Salvar'),
+              : Text(l10n.save),
         ),
       ],
     );
@@ -277,7 +439,9 @@ class _ChangePasswordDialogState
     if (success) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Senha alterada com sucesso!')),
+        SnackBar(
+            content:
+                Text(AppLocalizations.of(context).passwordChanged)),
       );
     } else {
       final err = ref.read(authNotifierProvider).errorMessage;
@@ -291,10 +455,11 @@ class _ChangePasswordDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     return AlertDialog(
-      title: const Text('Alterar senha'),
+      title: Text(l10n.changePassword),
       content: SizedBox(
         width: 360,
         child: Form(
@@ -306,7 +471,7 @@ class _ChangePasswordDialogState
                 controller: _currentPwController,
                 obscureText: _obscureCurrent,
                 decoration: InputDecoration(
-                  labelText: 'Senha atual',
+                  labelText: l10n.currentPassword,
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(_obscureCurrent
@@ -317,14 +482,14 @@ class _ChangePasswordDialogState
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? 'Informe a senha atual' : null,
+                    v == null || v.isEmpty ? l10n.enterCurrentPassword : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _newPwController,
                 obscureText: _obscureNew,
                 decoration: InputDecoration(
-                  labelText: 'Nova senha',
+                  labelText: l10n.newPassword,
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(_obscureNew
@@ -335,8 +500,8 @@ class _ChangePasswordDialogState
                   ),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Informe a nova senha';
-                  if (v.length < 6) return 'Mínimo 6 caracteres';
+                  if (v == null || v.isEmpty) return l10n.enterNewPassword;
+                  if (v.length < 6) return l10n.minChars;
                   return null;
                 },
               ),
@@ -347,7 +512,7 @@ class _ChangePasswordDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: isLoading ? null : _submit,
@@ -356,7 +521,7 @@ class _ChangePasswordDialogState
                   height: 18,
                   width: 18,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Salvar'),
+              : Text(l10n.save),
         ),
       ],
     );
@@ -380,6 +545,7 @@ class _CategorySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     return ExpansionTile(
       title: Text(title,
           style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -396,9 +562,9 @@ class _CategorySection extends ConsumerWidget {
             ),
             title: Text(cat.name),
             trailing: cat.isDefault
-                ? const Tooltip(
-                    message: 'Categoria padrão',
-                    child: Icon(Icons.lock_outline,
+                ? Tooltip(
+                    message: l10n.defaultCategory,
+                    child: const Icon(Icons.lock_outline,
                         size: 16, color: Colors.grey),
                   )
                 : IconButton(
@@ -413,7 +579,9 @@ class _CategorySection extends ConsumerWidget {
         ListTile(
           leading: const Icon(Icons.add),
           title: Text(
-              'Adicionar ${type == CategoryType.expense ? 'despesa' : 'receita'}'),
+              type == CategoryType.expense
+                  ? l10n.addExpenseCategory
+                  : l10n.addIncomeCategory),
           onTap: () => _showAddCategoryDialog(context, ref),
         ),
       ],
@@ -462,8 +630,8 @@ class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
               userId: user.id,
               name: name,
               type: widget.type,
-              iconCodePoint: 0xe574, // Icons.category
-              colorValue: 0xFF616161, // Colors.grey.shade700
+              iconCodePoint: 0xe574,
+              colorValue: 0xFF616161,
             );
     if (!mounted) return;
     if (success) Navigator.of(context).pop();
@@ -471,23 +639,24 @@ class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isLoading = ref.watch(categoriesNotifierProvider).isLoading;
     final typeLabel =
-        widget.type == CategoryType.expense ? 'Despesa' : 'Receita';
+        widget.type == CategoryType.expense ? l10n.expense : l10n.incomeType;
 
     return AlertDialog(
-      title: Text('Nova categoria – $typeLabel'),
+      title: Text('${l10n.newCategoryTitle} – $typeLabel'),
       content: TextField(
         controller: _nameController,
-        decoration: const InputDecoration(
-          labelText: 'Nome da categoria',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l10n.categoryName,
+          border: const OutlineInputBorder(),
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: isLoading ? null : _submit,
@@ -496,7 +665,7 @@ class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
                   height: 18,
                   width: 18,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Salvar'),
+              : Text(l10n.save),
         ),
       ],
     );

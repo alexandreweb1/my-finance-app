@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/l10n/app_localizations.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
 import '../../../transactions/presentation/widgets/add_transaction_dialog.dart';
 import 'dashboard_screen.dart';
+
+const _kNavy = Color(0xFF1A2B4A);
+const _kGreen = Color(0xFF00D887);
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -25,15 +29,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     SettingsScreen(),
   ];
 
-  void _onNavTap(int index) {
-    setState(() => _currentIndex = index);
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Keep the seed provider alive so it can react when the categories
-    // stream first returns empty and auto-create the default categories.
     ref.watch(categoriesSeedProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       body: IndexedStack(
@@ -45,49 +44,52 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           context: context,
           builder: (_) => const AddTransactionDialog(),
         ),
-        tooltip: 'Nova Transação',
-        child: const Icon(Icons.add),
+        backgroundColor: _kGreen,
+        tooltip: l10n.newTransaction,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
+        color: Colors.white,
+        elevation: 12,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(
-              icon: Icons.dashboard_outlined,
-              activeIcon: Icons.dashboard,
-              label: 'Início',
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home_rounded,
+              label: l10n.navHome,
               index: 0,
               currentIndex: _currentIndex,
-              onTap: _onNavTap,
+              onTap: (i) => setState(() => _currentIndex = i),
             ),
             _NavItem(
               icon: Icons.receipt_long_outlined,
-              activeIcon: Icons.receipt_long,
-              label: 'Extrato',
+              activeIcon: Icons.receipt_long_rounded,
+              label: l10n.navStatement,
               index: 1,
               currentIndex: _currentIndex,
-              onTap: _onNavTap,
+              onTap: (i) => setState(() => _currentIndex = i),
             ),
-            // Gap for FAB
             const SizedBox(width: 56),
             _NavItem(
               icon: Icons.pie_chart_outline,
-              activeIcon: Icons.pie_chart,
-              label: 'Planejamento',
+              activeIcon: Icons.pie_chart_rounded,
+              label: l10n.navPlanning,
               index: 2,
               currentIndex: _currentIndex,
-              onTap: _onNavTap,
+              onTap: (i) => setState(() => _currentIndex = i),
             ),
             _NavItem(
-              icon: Icons.settings_outlined,
-              activeIcon: Icons.settings,
-              label: 'Ajustes',
+              icon: Icons.person_outline_rounded,
+              activeIcon: Icons.person_rounded,
+              label: l10n.navProfile,
               index: 3,
               currentIndex: _currentIndex,
-              onTap: _onNavTap,
+              onTap: (i) => setState(() => _currentIndex = i),
             ),
           ],
         ),
@@ -116,26 +118,46 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
-    final colorScheme = Theme.of(context).colorScheme;
-    final color = isActive ? colorScheme.primary : Colors.grey.shade600;
+    final color = isActive ? _kNavy : Colors.grey.shade400;
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 360;
 
     return InkWell(
       onTap: () => onTap(index),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 14, vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(isActive ? activeIcon : icon, color: color, size: 22),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                isActive ? activeIcon : icon,
+                key: ValueKey(isActive),
                 color: color,
-                fontWeight:
-                    isActive ? FontWeight.w600 : FontWeight.normal,
+                size: compact ? 20 : 24,
+              ),
+            ),
+            const SizedBox(height: 2),
+            if (!compact)
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+                ),
+              ),
+            const SizedBox(height: 2),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              width: isActive ? 16 : 0,
+              decoration: BoxDecoration(
+                color: _kGreen,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
           ],

@@ -1,8 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'core/l10n/app_localizations.dart';
+import 'core/providers/app_settings_provider.dart';
 import 'core/utils/firebase_options.dart';
 import 'features/auth/domain/entities/user_entity.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
@@ -15,19 +18,29 @@ import 'features/home/presentation/screens/main_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialise pt_BR locale data required by DateFormat in CurrencyFormatter.
-  await initializeDateFormatting('pt_BR', null);
-  // ProviderScope wraps the entire tree so Riverpod providers are available
-  // from the very first frame — including inside FirebaseInitializer.
-  runApp(const ProviderScope(child: FirebaseInitializer()));
+
+  // Initialise date formatting for all supported locales.
+  await Future.wait([
+    initializeDateFormatting('pt_BR', null),
+    initializeDateFormatting('en_US', null),
+    initializeDateFormatting('es_ES', null),
+  ]);
+
+  // Load persisted settings (currency + language) before first frame.
+  final settings = await AppSettingsNotifier.load();
+
+  runApp(ProviderScope(
+    overrides: [
+      appSettingsProvider.overrideWith(
+        (ref) => AppSettingsNotifier(settings),
+      ),
+    ],
+    child: const FirebaseInitializer(),
+  ));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Firebase initializer
-// Runs Firebase.initializeApp() once and shows the appropriate child:
-//   • loading  → _SplashScreen
-//   • error    → _FirebaseErrorScreen  (bad config / missing google-services)
-//   • success  → MyFinanceApp
 // ─────────────────────────────────────────────────────────────────────────────
 
 class FirebaseInitializer extends StatefulWidget {
@@ -38,7 +51,6 @@ class FirebaseInitializer extends StatefulWidget {
 }
 
 class _FirebaseInitializerState extends State<FirebaseInitializer> {
-  // Store the future so it isn't re-created on every rebuild.
   late final Future<FirebaseApp> _initFuture;
 
   @override
@@ -54,20 +66,15 @@ class _FirebaseInitializerState extends State<FirebaseInitializer> {
     return FutureBuilder<FirebaseApp>(
       future: _initFuture,
       builder: (context, snapshot) {
-        // Firebase is ready — hand off to the main app.
         if (snapshot.connectionState == ConnectionState.done &&
             !snapshot.hasError) {
           return const MyFinanceApp();
         }
-
-        // Wrap error/loading screens in a minimal MaterialApp so they can
-        // use Scaffold, Theme, etc. before the main app is mounted.
         if (snapshot.hasError) {
           return _AppShell(
             child: _FirebaseErrorScreen(error: snapshot.error.toString()),
           );
         }
-
         return const _AppShell(child: _SplashScreen());
       },
     );
@@ -75,20 +82,28 @@ class _FirebaseInitializerState extends State<FirebaseInitializer> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main app — only mounted after Firebase.initializeApp() succeeds.
+// Main app — watches locale reactively so language changes take effect live.
 // ─────────────────────────────────────────────────────────────────────────────
 
-class MyFinanceApp extends StatelessWidget {
+class MyFinanceApp extends ConsumerWidget {
   const MyFinanceApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(appSettingsProvider).language.locale;
+
     return MaterialApp(
       title: 'My Finance App',
       debugShowCheckedModeBanner: false,
       theme: _appTheme,
-      // AppRouter is the single source of truth for navigation.
-      // Individual screens do NOT push/pop based on auth state.
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: const AppRouter(),
     );
   }
@@ -96,15 +111,6 @@ class MyFinanceApp extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AppRouter
-// Watches the Firebase auth stream via authStateProvider and rebuilds
-// the root widget whenever the auth state changes.
-//
-//   authStateProvider value │ Screen rendered
-//   ─────────────────────────┼───────────────────
-//   loading                  │ _SplashScreen
-//   data(null)               │ LoginScreen
-//   data(UserEntity)         │ MainScreen
-//   error                    │ _FirebaseErrorScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppRouter extends ConsumerWidget {
@@ -124,7 +130,7 @@ class AppRouter extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared theme — used by both _AppShell and MyFinanceApp.
+// Theme
 // ─────────────────────────────────────────────────────────────────────────────
 
 final _appTheme = ThemeData(
@@ -136,7 +142,7 @@ final _appTheme = ThemeData(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Minimal MaterialApp wrapper for screens shown before Firebase is ready.
+// Shell / Splash / Error
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _AppShell extends StatelessWidget {
@@ -152,10 +158,6 @@ class _AppShell extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Splash screen — shown while Firebase initialises or auth stream loads.
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
@@ -188,14 +190,6 @@ class _SplashScreen extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Firebase error screen — shown when Firebase.initializeApp() fails.
-// Most common causes:
-//   • firebase_options.dart still contains placeholder values
-//   • google-services.json / GoogleService-Info.plist missing
-//   • No internet connection on first launch (web)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _FirebaseErrorScreen extends StatelessWidget {
   final String error;

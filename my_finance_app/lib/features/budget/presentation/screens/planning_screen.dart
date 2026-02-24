@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
@@ -13,13 +14,14 @@ class PlanningScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final selectedMonth = ref.watch(selectedMonthProvider);
     final summaries = ref.watch(budgetSummaryProvider);
     final budgetsAsync = ref.watch(budgetsStreamProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Planejamento'),
+        title: Text(l10n.planning),
         centerTitle: false,
       ),
       body: Column(
@@ -43,18 +45,13 @@ class PlanningScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddBudgetDialog(context, ref, selectedMonth),
+        onPressed: () => showDialog(
+          context: context,
+          builder: (_) => _AddBudgetDialog(month: selectedMonth),
+        ),
         icon: const Icon(Icons.add),
-        label: const Text('Orçamento'),
+        label: Text(l10n.budget),
       ),
-    );
-  }
-
-  void _showAddBudgetDialog(
-      BuildContext context, WidgetRef ref, DateTime month) {
-    showDialog(
-      context: context,
-      builder: (_) => _AddBudgetDialog(month: month),
     );
   }
 }
@@ -66,7 +63,8 @@ class _MonthSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final label = DateFormat('MMMM yyyy', 'pt_BR').format(month);
+    final dateLoc = ref.watch(dateLocaleProvider);
+    final label = DateFormat('MMMM yyyy', dateLoc).format(month);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
@@ -102,6 +100,8 @@ class _BudgetCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final fmt = ref.watch(currencyFormatterProvider);
     final budget = summary.budget;
     final colorScheme = Theme.of(context).colorScheme;
     final progressColor = summary.isOverBudget
@@ -134,6 +134,20 @@ class _BudgetCard extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
+                  icon: Icon(Icons.edit_outlined,
+                      color: colorScheme.primary, size: 20),
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => _AddBudgetDialog(
+                      month: budget.month,
+                      budget: budget,
+                    ),
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
                   icon: Icon(Icons.delete_outline,
                       color: colorScheme.error, size: 20),
                   onPressed: () =>
@@ -156,11 +170,11 @@ class _BudgetCard extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Gasto: ${CurrencyFormatter.formatBRL(summary.spentAmount)}',
+                  '${l10n.spent}: ${fmt(summary.spentAmount)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 Text(
-                  'Limite: ${CurrencyFormatter.formatBRL(budget.limitAmount)}',
+                  '${l10n.limitLabel}: ${fmt(budget.limitAmount)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -172,13 +186,22 @@ class _BudgetCard extends ConsumerWidget {
   }
 }
 
-class _EmptyBudgets extends StatelessWidget {
+class _EmptyBudgets extends ConsumerWidget {
   final DateTime month;
 
   const _EmptyBudgets({required this.month});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final dateLoc = ref.watch(dateLocaleProvider);
+    final prevBudgets =
+        ref.watch(previousMonthBudgetsProvider).value ?? [];
+    final isLoading = ref.watch(budgetNotifierProvider).isLoading;
+    final prevMonth = DateTime(month.year, month.month - 1, 1);
+    final prevMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(prevMonth);
+    final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -187,29 +210,95 @@ class _EmptyBudgets extends StatelessWidget {
               size: 64, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text(
-            'Nenhum orçamento para\n${DateFormat('MMMM yyyy', 'pt_BR').format(month)}',
+            '${l10n.noBudgetsForMonth}\n$currentMonthLabel',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade500),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Toque em "+ Orçamento" para começar.',
-            style: TextStyle(fontSize: 13),
+          Text(
+            l10n.tapToStart,
+            style: const TextStyle(fontSize: 13),
           ),
+          if (prevBudgets.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              icon: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.copy_outlined, size: 18),
+              label: Text('${l10n.replicateFrom} $prevMonthLabel'),
+              onPressed: isLoading
+                  ? null
+                  : () => _confirmCopy(context, ref, prevBudgets, l10n,
+                        prevMonthLabel, currentMonthLabel),
+            ),
+          ],
         ],
       ),
     );
   }
+
+  Future<void> _confirmCopy(
+    BuildContext context,
+    WidgetRef ref,
+    List<BudgetEntity> prevBudgets,
+    AppLocalizations l10n,
+    String prevMonthLabel,
+    String currentMonthLabel,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.replicateBudgets),
+        content: Text(
+          '${l10n.replicate} ${prevBudgets.length} ${l10n.replicateConfirm} '
+          '$prevMonthLabel ${l10n.replicateConfirmTo} $currentMonthLabel?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.replicate),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final success = await ref
+        .read(budgetNotifierProvider.notifier)
+        .copyFromPreviousMonth(
+          previousBudgets: prevBudgets,
+          targetMonth: month,
+        );
+
+    if (!context.mounted) return;
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorReplicating)),
+      );
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Add Budget Dialog
+// Add / Edit Budget Dialog
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _AddBudgetDialog extends ConsumerStatefulWidget {
   final DateTime month;
 
-  const _AddBudgetDialog({required this.month});
+  /// When provided the dialog opens in edit mode pre-filled with this budget.
+  final BudgetEntity? budget;
+
+  const _AddBudgetDialog({required this.month, this.budget});
 
   @override
   ConsumerState<_AddBudgetDialog> createState() => _AddBudgetDialogState();
@@ -220,6 +309,16 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
   final _amountController = TextEditingController();
   CategoryEntity? _selectedCategory;
 
+  bool get _isEditing => widget.budget != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      _amountController.text = widget.budget!.limitAmount.toString();
+    }
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -227,10 +326,11 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione uma categoria.')),
+        SnackBar(content: Text(l10n.selectCategory)),
       );
       return;
     }
@@ -239,28 +339,59 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
     );
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valor inválido.')),
+        SnackBar(content: Text(l10n.invalidAmount)),
       );
       return;
     }
-    final success = await ref.read(budgetNotifierProvider.notifier).set(
-          categoryId: _selectedCategory!.id,
-          categoryName: _selectedCategory!.name,
-          limitAmount: amount,
-          month: widget.month,
-        );
+
+    final notifier = ref.read(budgetNotifierProvider.notifier);
+    bool success;
+
+    if (_isEditing &&
+        _selectedCategory!.id != widget.budget!.categoryId) {
+      // Category changed — delete old budget then create new one.
+      await notifier.delete(widget.budget!.id);
+      success = await notifier.set(
+        categoryId: _selectedCategory!.id,
+        categoryName: _selectedCategory!.name,
+        limitAmount: amount,
+        month: widget.month,
+      );
+    } else {
+      // Create or update (upsert by categoryId+month key).
+      success = await notifier.set(
+        categoryId: _selectedCategory!.id,
+        categoryName: _selectedCategory!.name,
+        limitAmount: amount,
+        month: widget.month,
+      );
+    }
+
     if (!mounted) return;
     if (success) Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final dateLoc = ref.watch(dateLocaleProvider);
     final expenseCategories = ref.watch(expenseCategoriesProvider);
     final isLoading = ref.watch(budgetNotifierProvider).isLoading;
 
+    // Pre-select the matching category when editing.
+    if (_isEditing && _selectedCategory == null && expenseCategories.isNotEmpty) {
+      _selectedCategory = expenseCategories.firstWhere(
+        (c) => c.id == widget.budget!.categoryId,
+        orElse: () => expenseCategories.first,
+      );
+    }
+
+    final title = _isEditing
+        ? l10n.editBudget
+        : '${l10n.newBudget}${DateFormat('MMM yyyy', dateLoc).format(widget.month)}';
+
     return AlertDialog(
-      title: Text(
-          'Orçamento – ${DateFormat('MMM yyyy', 'pt_BR').format(widget.month)}'),
+      title: Text(title),
       content: SizedBox(
         width: 360,
         child: Form(
@@ -269,10 +400,11 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<CategoryEntity>(
-                value: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Categoria',
-                  border: OutlineInputBorder(),
+                key: ValueKey(_selectedCategory?.id),
+                initialValue: _selectedCategory,
+                decoration: InputDecoration(
+                  labelText: l10n.categoryField,
+                  border: const OutlineInputBorder(),
                 ),
                 items: expenseCategories
                     .map((c) => DropdownMenuItem(
@@ -282,20 +414,19 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
                     .toList(),
                 onChanged: (v) => setState(() => _selectedCategory = v),
                 validator: (v) =>
-                    v == null ? 'Selecione uma categoria' : null,
+                    v == null ? l10n.selectCategory : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _amountController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Limite (R\$)',
-                  border: OutlineInputBorder(),
-                  prefixText: 'R\$ ',
+                decoration: InputDecoration(
+                  labelText: l10n.limit,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? 'Informe o valor' : null,
+                    v == null || v.isEmpty ? l10n.enterAmount : null,
               ),
             ],
           ),
@@ -304,7 +435,7 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: isLoading ? null : _submit,
@@ -314,7 +445,7 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
                   width: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Salvar'),
+              : Text(l10n.save),
         ),
       ],
     );
