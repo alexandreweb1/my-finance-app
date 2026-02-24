@@ -77,7 +77,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'photoUrl': '',
         'createdAt': FieldValue.serverTimestamp(),
       }).timeout(_kTimeout);
-      return UserModel.fromFirebaseUser(user);
+      // Usa displayName diretamente — currentUser.displayName pode estar
+      // desatualizado imediatamente após updateDisplayName + reload()
+      return UserModel(
+        id: user.uid,
+        email: user.email ?? '',
+        displayName: displayName ?? user.displayName,
+        photoUrl: user.photoURL,
+      );
     } on FirebaseAuthException catch (e) {
       throw AuthException(e.message ?? 'Erro ao criar conta.');
     }

@@ -7,6 +7,8 @@
 .pub/
 build/
 *.iml
+ios/
+android/
 
 # Firebase
 google-services.json

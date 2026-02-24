@@ -32,13 +32,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           _passwordController.text,
           _nameController.text.trim(),
         );
+
+    if (!mounted) return;
+
+    final authState = ref.read(authNotifierProvider);
+    if (authState.errorMessage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conta criada com sucesso! Bem-vindo(a)!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      // Limpa a pilha de navegação para o AppRouter redirecionar corretamente
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
-
-    // Navigation on auth success is handled by AppRouter in main.dart.
 
     return Scaffold(
       appBar: AppBar(title: const Text('Criar Conta')),
