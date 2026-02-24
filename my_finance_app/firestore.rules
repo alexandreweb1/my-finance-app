@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True when the document being written declares the caller as owner.
+    function isCreatingOwnDoc() {
+      return request.resource.data.userId == request.auth.uid;
+    }
+
+    // True when the existing document belongs to the caller.
+    function isOwnerOfExistingDoc() {
+      return resource.data.userId == request.auth.uid;
+    }
+
+    // ── /users/{userId} ───────────────────────────────────────────────────────
+    // Each user can only read / write their own profile document.
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ── /transactions/{transactionId} ─────────────────────────────────────────
+    // A user may create a transaction that belongs to them,
+    // and read / update / delete only their own transactions.
+    match /transactions/{transactionId} {
+      allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
+      allow create:               if isSignedIn() && isCreatingOwnDoc();
+    }
+
+    // ── /categories/{categoryId} ──────────────────────────────────────────────
+    match /categories/{categoryId} {
+      allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
+      allow create:               if isSignedIn() && isCreatingOwnDoc();
+    }
+
+    // ── /budgets/{budgetId} ───────────────────────────────────────────────────
+    match /budgets/{budgetId} {
+      allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
+      allow create:               if isSignedIn() && isCreatingOwnDoc();
+    }
+  }
+}

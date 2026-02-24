@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
-import '../widgets/add_transaction_dialog.dart';
 import '../widgets/transaction_list_tile.dart';
 
 class TransactionsScreen extends ConsumerWidget {
@@ -18,20 +15,10 @@ class TransactionsScreen extends ConsumerWidget {
     final income = ref.watch(totalIncomeProvider);
     final expense = ref.watch(totalExpenseProvider);
 
-    // Navigation on sign-out is handled by AppRouter in main.dart,
-    // which watches authStateProvider and rebuilds the root widget.
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Minhas Finanças'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sair',
-            onPressed: () =>
-                ref.read(authNotifierProvider.notifier).signOut(),
-          ),
-        ],
+        title: const Text('Extrato'),
+        centerTitle: false,
       ),
       body: Column(
         children: [
@@ -43,6 +30,7 @@ class TransactionsScreen extends ConsumerWidget {
                       child: Text('Nenhuma transação encontrada.'),
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
                       itemCount: transactions.length,
                       itemBuilder: (ctx, i) =>
                           TransactionListTile(transaction: transactions[i]),
@@ -53,14 +41,6 @@ class TransactionsScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => const AddTransactionDialog(),
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Nova Transação'),
       ),
     );
   }
@@ -92,7 +72,9 @@ class _SummaryCard extends StatelessWidget {
               CurrencyFormatter.formatBRL(balance),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+                    color: isPositive
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
                   ),
             ),
             const SizedBox(height: 16),

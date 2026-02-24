@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 
@@ -19,19 +20,31 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _descriptionController = TextEditingController();
 
   TransactionType _type = TransactionType.expense;
-  String _category = 'Alimentação';
+  String? _category;
   DateTime _date = DateTime.now();
 
-  static const _incomeCategories = [
-    'Salário', 'Freelance', 'Investimentos', 'Outros'
+  // Fallback static lists when Firestore categories haven't loaded yet.
+  static const _staticIncomeCategories = [
+    'Salário', 'Freelance', 'Investimentos', 'Outros',
   ];
-  static const _expenseCategories = [
+  static const _staticExpenseCategories = [
     'Alimentação', 'Moradia', 'Transporte', 'Saúde',
-    'Educação', 'Lazer', 'Vestuário', 'Outros'
+    'Educação', 'Lazer', 'Vestuário', 'Outros',
   ];
 
-  List<String> get _categories =>
-      _type == TransactionType.income ? _incomeCategories : _expenseCategories;
+  List<String> _categoryNames() {
+    if (_type == TransactionType.income) {
+      final cats = ref.watch(incomeCategoriesProvider);
+      return cats.isNotEmpty
+          ? cats.map((c) => c.name).toList()
+          : _staticIncomeCategories;
+    } else {
+      final cats = ref.watch(expenseCategoriesProvider);
+      return cats.isNotEmpty
+          ? cats.map((c) => c.name).toList()
+          : _staticExpenseCategories;
+    }
+  }
 
   @override
   void dispose() {
@@ -66,19 +79,39 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           title: _titleController.text.trim(),
           amount: amount,
           type: _type,
-          category: _category,
+          category: _category!,
           date: _date,
           description: _descriptionController.text.trim().isEmpty
               ? null
               : _descriptionController.text.trim(),
         );
-    if (success && mounted) Navigator.of(context).pop();
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pop();
+    } else {
+      final errorMsg = ref.read(transactionsNotifierProvider).error?.toString()
+          ?? 'Erro ao salvar transação. Verifique se o Firestore está habilitado.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLoading =
-        ref.watch(transactionsNotifierProvider).isLoading;
+    final isLoading = ref.watch(transactionsNotifierProvider).isLoading;
+    final categories = _categoryNames();
+
+    // Keep _category valid across type changes and async loads.
+    if (_category == null || !categories.contains(_category)) {
+      _category = categories.first;
+    }
 
     return AlertDialog(
       title: const Text('Nova Transação'),
@@ -106,7 +139,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   selected: {_type},
                   onSelectionChanged: (v) => setState(() {
                     _type = v.first;
-                    _category = _categories.first;
+                    _category = null; // reset so build picks first in new list
                   }),
                 ),
                 const SizedBox(height: 16),
@@ -139,10 +172,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     labelText: 'Categoria',
                     border: OutlineInputBorder(),
                   ),
-                  items: _categories
+                  items: categories
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
-                  onChanged: (v) => setState(() => _category = v!),
+                  onChanged: (v) => setState(() => _category = v),
                 ),
                 const SizedBox(height: 12),
                 InkWell(

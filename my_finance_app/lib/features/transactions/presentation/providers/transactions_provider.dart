@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,10 +11,6 @@ import '../../domain/usecases/get_transactions_usecase.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 // --- Infrastructure ---
-
-final firestoreProvider = Provider<FirebaseFirestore>(
-  (_) => FirebaseFirestore.instance,
-);
 
 final transactionDataSourceProvider = Provider<TransactionRemoteDataSource>(
   (ref) => TransactionRemoteDataSourceImpl(ref.watch(firestoreProvider)),

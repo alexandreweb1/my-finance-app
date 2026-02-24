@@ -7,7 +7,7 @@ import 'core/utils/firebase_options.dart';
 import 'features/auth/domain/entities/user_entity.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
-import 'features/transactions/presentation/screens/transactions_screen.dart';
+import 'features/home/presentation/screens/main_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Entry point
@@ -103,7 +103,7 @@ class MyFinanceApp extends StatelessWidget {
 //   ─────────────────────────┼───────────────────
 //   loading                  │ _SplashScreen
 //   data(null)               │ LoginScreen
-//   data(UserEntity)         │ TransactionsScreen
+//   data(UserEntity)         │ MainScreen
 //   error                    │ _FirebaseErrorScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ class AppRouter extends ConsumerWidget {
 
     return authAsync.when(
       data: (UserEntity? user) =>
-          user != null ? const TransactionsScreen() : const LoginScreen(),
+          user != null ? const MainScreen() : const LoginScreen(),
       loading: () => const _SplashScreen(),
       error: (error, _) => _FirebaseErrorScreen(error: error.toString()),
     );

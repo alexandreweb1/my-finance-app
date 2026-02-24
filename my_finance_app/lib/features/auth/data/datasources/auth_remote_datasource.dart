@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -20,12 +21,19 @@ abstract class AuthRemoteDataSource {
   Stream<UserModel?> get authStateChanges;
 
   UserModel? getCurrentUser();
+
+  Future<void> updateProfile({String? displayName});
+
+  Future<void> updatePassword(String currentPassword, String newPassword);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth _firebaseAuth;
+  final FirebaseFirestore _firestore;
 
-  AuthRemoteDataSourceImpl(this._firebaseAuth);
+  static const _kTimeout = Duration(seconds: 12);
+
+  AuthRemoteDataSourceImpl(this._firebaseAuth, this._firestore);
 
   @override
   Future<UserModel> signInWithEmailAndPassword({
@@ -60,7 +68,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         await credential.user!.updateDisplayName(displayName);
         await credential.user!.reload();
       }
-      return UserModel.fromFirebaseUser(credential.user!);
+      final user = _firebaseAuth.currentUser!;
+      // Save user profile to Firestore
+      await _firestore.collection('users').doc(user.uid).set({
+        'userId': user.uid,
+        'email': user.email,
+        'displayName': displayName ?? '',
+        'photoUrl': '',
+        'createdAt': FieldValue.serverTimestamp(),
+      }).timeout(_kTimeout);
+      return UserModel.fromFirebaseUser(user);
     } on FirebaseAuthException catch (e) {
       throw AuthException(e.message ?? 'Erro ao criar conta.');
     }
@@ -86,5 +103,53 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   UserModel? getCurrentUser() {
     final user = _firebaseAuth.currentUser;
     return user != null ? UserModel.fromFirebaseUser(user) : null;
+  }
+
+  @override
+  Future<void> updateProfile({String? displayName}) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw const AuthException('Usuário não autenticado.');
+      if (displayName != null) {
+        await user.updateDisplayName(displayName);
+        await user.reload();
+      }
+      await _firestore.collection('users').doc(user.uid).set({
+        'userId': user.uid,
+        'email': user.email,
+        'displayName': displayName ?? user.displayName ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)).timeout(_kTimeout);
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(e.message ?? 'Erro ao atualizar perfil.');
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      throw AuthException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updatePassword(
+      String currentPassword, String newPassword) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null || user.email == null) {
+        throw const AuthException('Usuário não autenticado.');
+      }
+      // Re-authenticate before changing password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(e.message ?? 'Erro ao alterar senha.');
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      throw AuthException(e.toString());
+    }
   }
 }

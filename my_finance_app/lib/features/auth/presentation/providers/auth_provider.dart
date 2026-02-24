@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,8 +17,16 @@ final firebaseAuthProvider = Provider<FirebaseAuth>(
   (_) => FirebaseAuth.instance,
 );
 
+/// Shared Firestore instance used across all features.
+final firestoreProvider = Provider<FirebaseFirestore>(
+  (_) => FirebaseFirestore.instance,
+);
+
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>(
-  (ref) => AuthRemoteDataSourceImpl(ref.watch(firebaseAuthProvider)),
+  (ref) => AuthRemoteDataSourceImpl(
+    ref.watch(firebaseAuthProvider),
+    ref.watch(firestoreProvider),
+  ),
 );
 
 final authRepositoryProvider = Provider<AuthRepository>(
@@ -74,8 +83,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final SignInUseCase _signIn;
   final SignUpUseCase _signUp;
   final SignOutUseCase _signOut;
+  final AuthRepository _authRepository;
 
-  AuthNotifier(this._signIn, this._signUp, this._signOut)
+  AuthNotifier(this._signIn, this._signUp, this._signOut, this._authRepository)
       : super(const AuthState());
 
   Future<void> signIn(String email, String password) async {
@@ -102,6 +112,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _signOut(const NoParams());
     state = const AuthState();
   }
+
+  Future<bool> updateProfile({String? displayName}) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    final result =
+        await _authRepository.updateProfile(displayName: displayName);
+    return result.fold(
+      (failure) {
+        state = AuthState(errorMessage: failure.message);
+        return false;
+      },
+      (_) {
+        state = const AuthState();
+        return true;
+      },
+    );
+  }
+
+  Future<bool> updatePassword(
+      String currentPassword, String newPassword) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    final result =
+        await _authRepository.updatePassword(currentPassword, newPassword);
+    return result.fold(
+      (failure) {
+        state = AuthState(errorMessage: failure.message);
+        return false;
+      },
+      (_) {
+        state = const AuthState();
+        return true;
+      },
+    );
+  }
 }
 
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>(
@@ -109,5 +152,6 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>(
     ref.watch(signInUseCaseProvider),
     ref.watch(signUpUseCaseProvider),
     ref.watch(signOutUseCaseProvider),
+    ref.watch(authRepositoryProvider),
   ),
 );

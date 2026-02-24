@@ -29,12 +29,20 @@ class TransactionRemoteDataSourceImpl implements TransactionRemoteDataSource {
             .toList());
   }
 
+  static const _kTimeout = Duration(seconds: 12);
+
   @override
   Future<TransactionModel> addTransaction(TransactionModel transaction) async {
     try {
-      final docRef = await _collection.add(transaction.toFirestore());
-      final doc = await docRef.get();
+      final docRef = await _collection
+          .add(transaction.toFirestore())
+          .timeout(_kTimeout, onTimeout: () => throw const ServerException(
+              'Tempo limite excedido. Verifique se o Firestore está habilitado '
+              'no Firebase Console.'));
+      final doc = await docRef.get().timeout(_kTimeout);
       return TransactionModel.fromFirestore(doc);
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -43,7 +51,10 @@ class TransactionRemoteDataSourceImpl implements TransactionRemoteDataSource {
   @override
   Future<void> updateTransaction(TransactionModel transaction) async {
     try {
-      await _collection.doc(transaction.id).update(transaction.toFirestore());
+      await _collection
+          .doc(transaction.id)
+          .update(transaction.toFirestore())
+          .timeout(_kTimeout);
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -52,7 +63,10 @@ class TransactionRemoteDataSourceImpl implements TransactionRemoteDataSource {
   @override
   Future<void> deleteTransaction(String transactionId) async {
     try {
-      await _collection.doc(transactionId).delete();
+      await _collection
+          .doc(transactionId)
+          .delete()
+          .timeout(_kTimeout);
     } catch (e) {
       throw ServerException(e.toString());
     }

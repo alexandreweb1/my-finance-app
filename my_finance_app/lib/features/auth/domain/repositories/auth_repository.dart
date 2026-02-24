@@ -20,4 +20,9 @@ abstract class AuthRepository {
   Stream<UserEntity?> get authStateChanges;
 
   Future<Either<Failure, UserEntity?>> getCurrentUser();
+
+  Future<Either<Failure, void>> updateProfile({String? displayName});
+
+  Future<Either<Failure, void>> updatePassword(
+      String currentPassword, String newPassword);
 }
