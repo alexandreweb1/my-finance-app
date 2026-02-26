@@ -90,13 +90,15 @@ class MyFinanceApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final locale = ref.watch(appSettingsProvider).language.locale;
+    final settings = ref.watch(appSettingsProvider);
 
     return MaterialApp(
       title: 'My Finance App',
       debugShowCheckedModeBanner: false,
-      theme: _appTheme,
-      locale: locale,
+      theme: _lightTheme,
+      darkTheme: _darkTheme,
+      themeMode: settings.themeMode.flutterThemeMode,
+      locale: settings.language.locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -133,8 +135,19 @@ class AppRouter extends ConsumerWidget {
 // Theme
 // ─────────────────────────────────────────────────────────────────────────────
 
-final _appTheme = ThemeData(
+final _lightTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E88E5)),
+  useMaterial3: true,
+  inputDecorationTheme: const InputDecorationTheme(
+    border: OutlineInputBorder(),
+  ),
+);
+
+final _darkTheme = ThemeData(
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: const Color(0xFF1E88E5),
+    brightness: Brightness.dark,
+  ),
   useMaterial3: true,
   inputDecorationTheme: const InputDecorationTheme(
     border: OutlineInputBorder(),
@@ -153,7 +166,7 @@ class _AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: _appTheme,
+      theme: _lightTheme,
       home: child,
     );
   }

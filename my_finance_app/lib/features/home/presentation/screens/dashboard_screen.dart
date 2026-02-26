@@ -8,15 +8,19 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../budget/domain/entities/budget_entity.dart';
-import '../../../budget/presentation/providers/budget_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../transactions/presentation/widgets/transaction_list_tile.dart';
+import '../providers/dashboard_provider.dart';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const _kNavy = Color(0xFF1A2B4A);
 const _kGreen = Color(0xFF00D887);
 const _kLightBg = Color(0xFFF4F6FA);
+
+// ─── Number of months shown in the chart ─────────────────────────────────────
+const _kChartMonths = 12;
+const _kMonthColWidth = 56.0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 class DashboardScreen extends ConsumerWidget {
@@ -26,18 +30,33 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).value;
     final balance = ref.watch(balanceProvider);
-    final income = ref.watch(totalIncomeProvider);
-    final expense = ref.watch(totalExpenseProvider);
+    final income = ref.watch(dashboardMonthIncomeProvider);
+    final expense = ref.watch(dashboardMonthExpenseProvider);
     final transactionsAsync = ref.watch(transactionsStreamProvider);
-    final budgetSummaries = ref.watch(budgetSummaryProvider);
+    final budgetSummaries = ref.watch(dashboardBudgetSummaryProvider);
+    final selectedMonth = ref.watch(dashboardSelectedMonthProvider);
 
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.watch(dateLocaleProvider);
     final name = user?.displayName?.split(' ').first ?? l10n.hello;
     final greeting = _greeting(l10n);
 
+    // Transactions filtered to the selected month
+    final monthTxs = (transactionsAsync.value ?? [])
+        .where((t) =>
+            t.date.year == selectedMonth.year &&
+            t.date.month == selectedMonth.month)
+        .toList();
+
+    final monthLabel =
+        DateFormat('MMM yyyy', dateLoc).format(selectedMonth);
+
+    // Use theme-aware surface color so dark mode works correctly.
+    // _kLightBg is kept for the light-mode tinted background via
+    // a surfaceTint-aware overlay instead of a hardcoded constant.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: _kLightBg,
+      backgroundColor: isDark ? null : _kLightBg,
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -45,8 +64,6 @@ class DashboardScreen extends ConsumerWidget {
             name: name,
             greeting: greeting,
             balance: balance,
-            income: income,
-            expense: expense,
             transactions: transactionsAsync.value ?? [],
           ),
 
@@ -59,7 +76,7 @@ class DashboardScreen extends ConsumerWidget {
           if (budgetSummaries.isNotEmpty) ...[
             _SectionHeader(
               title: l10n.budgets,
-              subtitle: DateFormat('MMM yyyy', dateLoc).format(DateTime.now()),
+              subtitle: monthLabel,
             ),
             const SizedBox(height: 8),
             ...budgetSummaries.take(3).map((s) => _BudgetCard(summary: s)),
@@ -68,13 +85,11 @@ class DashboardScreen extends ConsumerWidget {
 
           _SectionHeader(
             title: l10n.recentTransactions,
-            subtitle: transactionsAsync.value != null
-                ? '${transactionsAsync.value!.length} ${l10n.thisMonth}'
-                : '',
+            subtitle: monthLabel,
           ),
           const SizedBox(height: 8),
           transactionsAsync.when(
-            data: (txs) => txs.isEmpty
+            data: (_) => monthTxs.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Center(
@@ -85,7 +100,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   )
                 : Column(
-                    children: txs
+                    children: monthTxs
                         .take(5)
                         .map((t) => TransactionListTile(transaction: t))
                         .toList(),
@@ -125,16 +140,12 @@ class _DarkHeader extends ConsumerWidget {
   final String name;
   final String greeting;
   final double balance;
-  final double income;
-  final double expense;
   final List<TransactionEntity> transactions;
 
   const _DarkHeader({
     required this.name,
     required this.greeting,
     required this.balance,
-    required this.income,
-    required this.expense,
     required this.transactions,
   });
 
@@ -224,34 +235,9 @@ class _DarkHeader extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 8),
-
-          // Trend indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: _kGreen.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.arrow_upward, color: _kGreen, size: 13),
-                const SizedBox(width: 4),
-                Text(
-                  '+ ${fmt(income)} ${l10n.income}',
-                  style: const TextStyle(
-                      color: _kGreen,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-
           SizedBox(height: compact ? 12 : 20),
 
-          // Chart — oculto em telas muito estreitas para evitar distorção
+          // Chart — hidden on very narrow screens
           if (screenW >= 300) _SparklineChart(transactions: transactions),
 
           SizedBox(height: compact ? 12 : 20),
@@ -261,65 +247,147 @@ class _DarkHeader extends ConsumerWidget {
   }
 }
 
-// ─── Sparkline Chart ──────────────────────────────────────────────────────────
-class _SparklineChart extends ConsumerWidget {
+// ─── Sparkline Chart (scrollable, 12 months, selectable) ─────────────────────
+class _SparklineChart extends ConsumerStatefulWidget {
   final List<TransactionEntity> transactions;
 
   const _SparklineChart({required this.transactions});
 
-  List<double> _monthlyBalances() {
+  @override
+  ConsumerState<_SparklineChart> createState() => _SparklineChartState();
+}
+
+class _SparklineChartState extends ConsumerState<_SparklineChart> {
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-scroll to the rightmost (most-recent) month after first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Returns the list of months shown in the chart (oldest → newest).
+  List<DateTime> _months() {
     final now = DateTime.now();
-    return List.generate(6, (i) {
-      final month = DateTime(now.year, now.month - (5 - i));
+    return List.generate(_kChartMonths, (i) {
+      return DateTime(now.year, now.month - (_kChartMonths - 1 - i));
+    });
+  }
+
+  List<double> _monthlyBalances(List<DateTime> months) {
+    return months.map((month) {
       double bal = 0;
-      for (final t in transactions) {
+      for (final t in widget.transactions) {
         if (t.date.year == month.year && t.date.month == month.month) {
           bal += t.isIncome ? t.amount : -t.amount;
         }
       }
       return bal;
-    });
-  }
-
-  List<String> _monthLabels(String locale) {
-    final now = DateTime.now();
-    return List.generate(6, (i) {
-      final month = DateTime(now.year, now.month - (5 - i));
-      return DateFormat('MMM', locale).format(month);
-    });
+    }).toList();
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final dateLoc = ref.watch(dateLocaleProvider);
-    final rawData = _monthlyBalances();
+    final selectedMonth = ref.watch(dashboardSelectedMonthProvider);
+    final months = _months();
+    final rawData = _monthlyBalances(months);
     final allZero = rawData.every((v) => v == 0);
-    final data =
-        allZero ? [0.0, 120.0, 80.0, 250.0, 200.0, 400.0] : rawData;
-    final labels = _monthLabels(dateLoc);
+    final data = allZero
+        ? [0.0, 40.0, 80.0, 60.0, 120.0, 100.0, 200.0, 180.0, 250.0, 220.0, 300.0, 400.0]
+        : rawData;
+
+    // Index of the selected month within our months list (-1 if not found).
+    final selectedIdx = months.indexWhere((m) =>
+        m.year == selectedMonth.year && m.month == selectedMonth.month);
+
+    const totalWidth = _kChartMonths * _kMonthColWidth;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 80,
-            child: CustomPaint(
-              painter: _SparklinePainter(data: data),
-              size: Size.infinite,
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SingleChildScrollView(
+        controller: _scrollCtrl,
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: totalWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Chart area
+              SizedBox(
+                height: 80,
+                width: totalWidth,
+                child: CustomPaint(
+                  painter: _SparklinePainter(
+                    data: data,
+                    selectedIndex: selectedIdx,
+                  ),
+                  size: const Size(totalWidth, 80),
+                ),
+              ),
+              const SizedBox(height: 6),
+              // Month labels row — each tappable
+              Row(
+                children: List.generate(months.length, (i) {
+                  final month = months[i];
+                  final isSelected = i == selectedIdx;
+                  final label = DateFormat('MMM', dateLoc).format(month);
+                  return GestureDetector(
+                    onTap: () {
+                      ref
+                          .read(dashboardSelectedMonthProvider.notifier)
+                          .state = month;
+                    },
+                    child: SizedBox(
+                      width: _kMonthColWidth,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.45),
+                              fontSize: 11,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? _kGreen
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: labels
-                .map((l) => Text(l,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.45),
-                        fontSize: 11)))
-                .toList(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -327,8 +395,12 @@ class _SparklineChart extends ConsumerWidget {
 
 class _SparklinePainter extends CustomPainter {
   final List<double> data;
+  final int selectedIndex;
 
-  const _SparklinePainter({required this.data});
+  const _SparklinePainter({
+    required this.data,
+    required this.selectedIndex,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -341,11 +413,23 @@ class _SparklinePainter extends CustomPainter {
 
     final points = List.generate(data.length, (i) {
       final x = i / (data.length - 1) * size.width;
-      final norm =
-          range < 1 ? 0.5 : (data[i] - minV) / effectiveRange;
+      final norm = range < 1 ? 0.5 : (data[i] - minV) / effectiveRange;
       final y = size.height - (norm * size.height * 0.75) - size.height * 0.1;
       return Offset(x, y);
     });
+
+    // Selected month highlight column
+    if (selectedIndex >= 0 && selectedIndex < data.length) {
+      final colW = size.width / data.length;
+      final colX = selectedIndex * colW;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(colX, 0, colW, size.height),
+          const Radius.circular(4),
+        ),
+        Paint()..color = Colors.white.withValues(alpha: 0.08),
+      );
+    }
 
     // Area fill
     final fill = Path()..moveTo(0, size.height);
@@ -386,13 +470,18 @@ class _SparklinePainter extends CustomPainter {
           ..strokeWidth = 2.5
           ..strokeCap = StrokeCap.round);
 
-    // Dot
-    canvas.drawCircle(points.last, 5, Paint()..color = _kGreen);
-    canvas.drawCircle(points.last, 3, Paint()..color = Colors.white);
+    // Dot on the selected month (or last point if nothing selected)
+    final dotIdx =
+        selectedIndex >= 0 && selectedIndex < points.length
+            ? selectedIndex
+            : points.length - 1;
+    canvas.drawCircle(points[dotIdx], 5, Paint()..color = _kGreen);
+    canvas.drawCircle(points[dotIdx], 3, Paint()..color = Colors.white);
   }
 
   @override
-  bool shouldRepaint(_SparklinePainter old) => old.data != data;
+  bool shouldRepaint(_SparklinePainter old) =>
+      old.data != data || old.selectedIndex != selectedIndex;
 }
 
 // ─── Income / Expense Row ─────────────────────────────────────────────────────
@@ -415,7 +504,6 @@ class _IncomeExpenseRow extends ConsumerWidget {
               label: l10n.income,
               value: fmt(income),
               icon: Icons.arrow_downward_rounded,
-              iconBg: const Color(0xFFE8FBF3),
               iconColor: _kGreen,
               valueColor: _kGreen,
             ),
@@ -426,7 +514,6 @@ class _IncomeExpenseRow extends ConsumerWidget {
               label: l10n.expenses,
               value: fmt(expense),
               icon: Icons.arrow_upward_rounded,
-              iconBg: const Color(0xFFFFEEEE),
               iconColor: const Color(0xFFE05252),
               valueColor: const Color(0xFFE05252),
             ),
@@ -441,7 +528,6 @@ class _MiniStatCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  final Color iconBg;
   final Color iconColor;
   final Color valueColor;
 
@@ -449,17 +535,17 @@ class _MiniStatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    required this.iconBg,
     required this.iconColor,
     required this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -475,7 +561,7 @@ class _MiniStatCard extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: iconBg,
+              color: iconColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: iconColor, size: 18),
@@ -527,14 +613,16 @@ class _SectionHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: _kNavy,
+                color: Theme.of(context).colorScheme.onSurface,
               )),
           if (subtitle.isNotEmpty)
             Text(subtitle,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -556,11 +644,12 @@ class _BudgetCard extends ConsumerWidget {
             ? Colors.orange.shade600
             : _kGreen;
 
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -580,10 +669,10 @@ class _BudgetCard extends ConsumerWidget {
                 child: Text(
                   summary.budget.categoryName,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: _kNavy),
+                      color: colorScheme.onSurface),
                 ),
               ),
               const SizedBox(width: 8),
@@ -597,7 +686,8 @@ class _BudgetCard extends ConsumerWidget {
           const SizedBox(height: 10),
           LinearProgressIndicator(
             value: summary.progress,
-            backgroundColor: Colors.grey.shade100,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             color: progressColor,
             minHeight: 6,
             borderRadius: BorderRadius.circular(3),

@@ -9,6 +9,7 @@ import '../../domain/repositories/category_repository.dart';
 import '../../domain/usecases/add_category_usecase.dart';
 import '../../domain/usecases/delete_category_usecase.dart';
 import '../../domain/usecases/get_categories_usecase.dart';
+import '../../domain/usecases/update_category_usecase.dart';
 
 // --- Infrastructure ---
 
@@ -29,6 +30,10 @@ final getCategoriesUseCaseProvider = Provider(
 
 final addCategoryUseCaseProvider = Provider(
   (ref) => AddCategoryUseCase(ref.watch(categoryRepositoryProvider)),
+);
+
+final updateCategoryUseCaseProvider = Provider(
+  (ref) => UpdateCategoryUseCase(ref.watch(categoryRepositoryProvider)),
 );
 
 final deleteCategoryUseCaseProvider = Provider(
@@ -85,11 +90,13 @@ final categoriesSeedProvider = Provider<void>((ref) {
 
 class CategoriesNotifier extends StateNotifier<AsyncValue<void>> {
   final AddCategoryUseCase _addCategory;
+  final UpdateCategoryUseCase _updateCategory;
   final DeleteCategoryUseCase _deleteCategory;
   final CategoryRepository _repository;
 
   CategoriesNotifier(
     this._addCategory,
+    this._updateCategory,
     this._deleteCategory,
     this._repository,
   ) : super(const AsyncValue.data(null));
@@ -111,6 +118,22 @@ class CategoriesNotifier extends StateNotifier<AsyncValue<void>> {
       colorValue: colorValue,
     );
     final result = await _addCategory(AddCategoryParams(category: category));
+    return result.fold(
+      (failure) {
+        state = AsyncValue.error(failure.message, StackTrace.current);
+        return false;
+      },
+      (_) {
+        state = const AsyncValue.data(null);
+        return true;
+      },
+    );
+  }
+
+  Future<bool> update(CategoryEntity category) async {
+    state = const AsyncValue.loading();
+    final result =
+        await _updateCategory(UpdateCategoryParams(category: category));
     return result.fold(
       (failure) {
         state = AsyncValue.error(failure.message, StackTrace.current);
@@ -153,6 +176,7 @@ final categoriesNotifierProvider =
     StateNotifierProvider<CategoriesNotifier, AsyncValue<void>>((ref) {
   return CategoriesNotifier(
     ref.watch(addCategoryUseCaseProvider),
+    ref.watch(updateCategoryUseCaseProvider),
     ref.watch(deleteCategoryUseCaseProvider),
     ref.watch(categoryRepositoryProvider),
   );

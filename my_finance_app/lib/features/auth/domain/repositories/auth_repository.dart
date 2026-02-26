@@ -15,6 +15,9 @@ abstract class AuthRepository {
     String? displayName,
   });
 
+  /// Returns null if the user cancelled the Google sign-in flow.
+  Future<Either<Failure, UserEntity?>> signInWithGoogle();
+
   Future<Either<Failure, void>> signOut();
 
   Stream<UserEntity?> get authStateChanges;

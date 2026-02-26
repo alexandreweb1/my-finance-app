@@ -8,6 +8,7 @@ import '../../domain/entities/category_entity.dart';
 abstract class CategoryRemoteDataSource {
   Stream<List<CategoryModel>> watchCategories(String userId);
   Future<CategoryModel> addCategory(CategoryModel category);
+  Future<void> updateCategory(CategoryModel category);
   Future<void> deleteCategory(String categoryId);
   Future<void> seedDefaults(String userId);
 }
@@ -44,6 +45,18 @@ class CategoryRemoteDataSourceImpl implements CategoryRemoteDataSource {
       return CategoryModel.fromFirestore(doc);
     } on ServerException {
       rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateCategory(CategoryModel category) async {
+    try {
+      await _collection
+          .doc(category.id)
+          .update(category.toFirestore())
+          .timeout(_kTimeout);
     } catch (e) {
       throw ServerException(e.toString());
     }

@@ -160,7 +160,8 @@ class _BudgetCard extends ConsumerWidget {
             const SizedBox(height: 8),
             LinearProgressIndicator(
               value: summary.progress,
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
               color: progressColor,
               minHeight: 8,
               borderRadius: BorderRadius.circular(4),
@@ -207,7 +208,8 @@ class _EmptyBudgets extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.pie_chart_outline,
-              size: 64, color: Colors.grey.shade300),
+              size: 64,
+              color: Theme.of(context).colorScheme.outlineVariant),
           const SizedBox(height: 16),
           Text(
             '${l10n.noBudgetsForMonth}\n$currentMonthLabel',

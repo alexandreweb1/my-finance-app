@@ -11,6 +11,8 @@ class TransactionEntity extends Equatable {
   final String category;
   final DateTime date;
   final String? description;
+  /// ID of the wallet this transaction belongs to. Empty string = "Geral".
+  final String walletId;
 
   const TransactionEntity({
     required this.id,
@@ -21,6 +23,7 @@ class TransactionEntity extends Equatable {
     required this.category,
     required this.date,
     this.description,
+    this.walletId = '',
   });
 
   bool get isIncome => type == TransactionType.income;
@@ -28,5 +31,5 @@ class TransactionEntity extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, userId, title, amount, type, category, date, description];
+      [id, userId, title, amount, type, category, date, description, walletId];
 }

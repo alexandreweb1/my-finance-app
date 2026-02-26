@@ -44,5 +44,11 @@ service cloud.firestore {
       allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
       allow create:               if isSignedIn() && isCreatingOwnDoc();
     }
+
+    // ── /wallets/{walletId} ───────────────────────────────────────────────────
+    match /wallets/{walletId} {
+      allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
+      allow create:               if isSignedIn() && isCreatingOwnDoc();
+    }
   }
 }

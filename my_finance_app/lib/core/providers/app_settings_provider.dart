@@ -60,22 +60,56 @@ enum AppLanguage {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Theme mode
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AppThemeMode {
+  system,
+  light,
+  dark;
+
+  ThemeMode get flutterThemeMode {
+    switch (this) {
+      case AppThemeMode.system:
+        return ThemeMode.system;
+      case AppThemeMode.light:
+        return ThemeMode.light;
+      case AppThemeMode.dark:
+        return ThemeMode.dark;
+    }
+  }
+
+  static AppThemeMode fromString(String value) =>
+      AppThemeMode.values.firstWhere(
+        (m) => m.name == value,
+        orElse: () => AppThemeMode.system,
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Settings state
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppSettings {
   final AppCurrency currency;
   final AppLanguage language;
+  final AppThemeMode themeMode;
 
   const AppSettings({
     this.currency = AppCurrency.brl,
     this.language = AppLanguage.portuguese,
+    this.themeMode = AppThemeMode.system,
   });
 
-  AppSettings copyWith({AppCurrency? currency, AppLanguage? language}) =>
+  AppSettings copyWith({
+    AppCurrency? currency,
+    AppLanguage? language,
+    AppThemeMode? themeMode,
+  }) =>
       AppSettings(
         currency: currency ?? this.currency,
         language: language ?? this.language,
+        themeMode: themeMode ?? this.themeMode,
       );
 }
 
@@ -86,6 +120,7 @@ class AppSettings {
 class AppSettingsNotifier extends StateNotifier<AppSettings> {
   static const _keyCurrency = 'app_currency';
   static const _keyLanguage = 'app_language';
+  static const _keyThemeMode = 'app_theme_mode';
 
   AppSettingsNotifier(AppSettings initial) : super(initial);
 
@@ -101,13 +136,21 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     await prefs.setString(_keyLanguage, language.locale.languageCode);
   }
 
+  Future<void> setThemeMode(AppThemeMode themeMode) async {
+    state = state.copyWith(themeMode: themeMode);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyThemeMode, themeMode.name);
+  }
+
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     final currencyCode = prefs.getString(_keyCurrency) ?? 'BRL';
     final languageCode = prefs.getString(_keyLanguage) ?? 'pt';
+    final themeModeStr = prefs.getString(_keyThemeMode) ?? 'system';
     return AppSettings(
       currency: AppCurrency.fromCode(currencyCode),
       language: AppLanguage.fromCode(languageCode),
+      themeMode: AppThemeMode.fromString(themeModeStr),
     );
   }
 }

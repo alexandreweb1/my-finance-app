@@ -108,6 +108,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  Future<void> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    final result = await _authRepository.signInWithGoogle();
+    result.fold(
+      (failure) => state = AuthState(errorMessage: failure.message),
+      (user) {
+        // null means user cancelled — just reset loading, no error
+        if (user == null) {
+          state = const AuthState();
+        } else {
+          state = AuthState(user: user);
+        }
+      },
+    );
+  }
+
   Future<void> signOut() async {
     await _signOut(const NoParams());
     state = const AuthState();

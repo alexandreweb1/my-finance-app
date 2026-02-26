@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../models/user_model.dart';
@@ -16,6 +17,8 @@ abstract class AuthRemoteDataSource {
     String? displayName,
   });
 
+  Future<UserModel?> signInWithGoogle();
+
   Future<void> signOut();
 
   Stream<UserModel?> get authStateChanges;
@@ -30,6 +33,7 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   static const _kTimeout = Duration(seconds: 12);
 
@@ -91,9 +95,54 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      // User cancelled the sign-in picker
+      if (googleUser == null) return null;
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _firebaseAuth
+          .signInWithCredential(credential)
+          .timeout(_kTimeout);
+      final fbUser = userCredential.user!;
+
+      // Sync profile to Firestore (merge so existing data is preserved)
+      await _firestore.collection('users').doc(fbUser.uid).set({
+        'userId': fbUser.uid,
+        'email': fbUser.email ?? '',
+        'displayName': fbUser.displayName ?? '',
+        'photoUrl': fbUser.photoURL ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)).timeout(_kTimeout);
+
+      return UserModel(
+        id: fbUser.uid,
+        email: fbUser.email ?? '',
+        displayName: fbUser.displayName,
+        photoUrl: fbUser.photoURL,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(e.message ?? 'Erro de autenticação com Google.');
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      throw AuthException(e.toString());
+    }
+  }
+
+  @override
   Future<void> signOut() async {
     try {
-      await _firebaseAuth.signOut();
+      await Future.wait([
+        _firebaseAuth.signOut(),
+        _googleSignIn.signOut(),
+      ]);
     } catch (e) {
       throw const AuthException('Erro ao sair da conta.');
     }

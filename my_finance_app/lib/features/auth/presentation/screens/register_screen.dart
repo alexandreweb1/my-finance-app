@@ -133,6 +133,60 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           )
                         : const Text('Criar Conta'),
                   ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'OU',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 50,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: authState.isLoading
+                          ? null
+                          : () => ref
+                              .read(authNotifierProvider.notifier)
+                              .signInWithGoogle(),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _googleLogo(),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Continuar com Google',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -141,4 +195,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
     );
   }
+}
+
+Widget _googleLogo() {
+  return const Text.rich(
+    TextSpan(
+      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      children: [
+        TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
+        TextSpan(text: 'o', style: TextStyle(color: Color(0xFFEA4335))),
+        TextSpan(text: 'o', style: TextStyle(color: Color(0xFFFBBC05))),
+        TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
+        TextSpan(text: 'l', style: TextStyle(color: Color(0xFF34A853))),
+        TextSpan(text: 'e', style: TextStyle(color: Color(0xFFEA4335))),
+      ],
+    ),
+  );
 }

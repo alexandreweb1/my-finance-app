@@ -6,7 +6,6 @@ import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import 'add_transaction_dialog.dart';
 
-const _kNavy = Color(0xFF1A2B4A);
 const _kGreen = Color(0xFF00D887);
 const _kRed = Color(0xFFE05252);
 
@@ -20,11 +19,14 @@ class TransactionListTile extends ConsumerWidget {
     final isIncome = transaction.isIncome;
     final color = isIncome ? _kGreen : _kRed;
     final sign = isIncome ? '+' : '-';
-    final iconBg = isIncome
-        ? const Color(0xFFE8FBF3)
-        : const Color(0xFFFFEEEE);
     final fmt = ref.watch(currencyFormatterProvider);
     final dateLoc = ref.watch(dateLocaleProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Theme-aware icon background: tinted surface in both light and dark mode
+    final iconBg = isIncome
+        ? _kGreen.withValues(alpha: 0.15)
+        : _kRed.withValues(alpha: 0.15);
 
     return Dismissible(
       key: Key(transaction.id),
@@ -32,13 +34,13 @@ class TransactionListTile extends ConsumerWidget {
       background: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
         decoration: BoxDecoration(
-          color: Colors.red.shade100,
+          color: Colors.red.shade700.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         child: Icon(Icons.delete_outline_rounded,
-            color: Colors.red.shade600, size: 22),
+            color: Colors.red.shade400, size: 22),
       ),
       onDismissed: (_) {
         ref
@@ -54,7 +56,7 @@ class TransactionListTile extends ConsumerWidget {
           margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -88,10 +90,10 @@ class TransactionListTile extends ConsumerWidget {
                   children: [
                     Text(
                       transaction.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        color: _kNavy,
+                        color: colorScheme.onSurface,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -101,7 +103,7 @@ class TransactionListTile extends ConsumerWidget {
                       '${CurrencyFormatter.formatDate(transaction.date, dateLoc)}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade500,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],

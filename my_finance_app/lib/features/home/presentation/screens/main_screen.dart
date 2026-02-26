@@ -5,11 +5,11 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
 import '../../../transactions/presentation/widgets/add_transaction_dialog.dart';
 import 'dashboard_screen.dart';
 
-const _kNavy = Color(0xFF1A2B4A);
 const _kGreen = Color(0xFF00D887);
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -32,6 +32,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(categoriesSeedProvider);
+    ref.watch(walletsSeedProvider);
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
@@ -52,7 +53,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         elevation: 12,
         shadowColor: Colors.black.withValues(alpha: 0.08),
         child: Row(
@@ -118,7 +119,8 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
-    final color = isActive ? _kNavy : Colors.grey.shade400;
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = isActive ? colorScheme.primary : colorScheme.onSurfaceVariant;
     final screenW = MediaQuery.of(context).size.width;
     final compact = screenW < 360;
 

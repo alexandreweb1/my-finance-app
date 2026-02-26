@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -13,12 +15,14 @@ class CategoryRepositoryImpl implements CategoryRepository {
   CategoryRepositoryImpl(this.remoteDataSource);
 
   @override
-  Stream<Either<Failure, List<CategoryEntity>>> watchCategories(
-      String userId) {
-    return remoteDataSource.watchCategories(userId).map<Either<Failure, List<CategoryEntity>>>(
-      (models) => Right(models),
-    ).handleError(
-      (e) => Left(ServerFailure(e.toString())),
+  Stream<Either<Failure, List<CategoryEntity>>> watchCategories(String userId) {
+    return remoteDataSource.watchCategories(userId).transform(
+      StreamTransformer.fromHandlers(
+        handleData: (models, sink) =>
+            sink.add(Right(List<CategoryEntity>.from(models))),
+        handleError: (error, _, sink) =>
+            sink.add(Left(ServerFailure(error.toString()))),
+      ),
     );
   }
 
@@ -29,6 +33,18 @@ class CategoryRepositoryImpl implements CategoryRepository {
       final model = CategoryModel.fromEntity(category);
       final result = await remoteDataSource.addCategory(model);
       return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateCategory(
+      CategoryEntity category) async {
+    try {
+      final model = CategoryModel.fromEntity(category);
+      await remoteDataSource.updateCategory(model);
+      return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

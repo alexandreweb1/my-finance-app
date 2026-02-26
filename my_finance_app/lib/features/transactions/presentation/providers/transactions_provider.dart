@@ -57,7 +57,13 @@ final transactionsStreamProvider =
   );
 });
 
-// --- Summary Providers ---
+// --- Selected month for the statement screen ---
+
+final transactionsSelectedMonthProvider = StateProvider<DateTime>(
+  (ref) => DateTime(DateTime.now().year, DateTime.now().month, 1),
+);
+
+// --- All-time summary (used by dashboard balance) ---
 
 final balanceProvider = Provider<double>((ref) {
   final transactions = ref.watch(transactionsStreamProvider).value ?? [];
@@ -77,6 +83,69 @@ final totalExpenseProvider = Provider<double>((ref) {
   final transactions = ref.watch(transactionsStreamProvider).value ?? [];
   return transactions
       .where((t) => t.isExpense)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+// --- Per-month summary for the statement screen ---
+
+final statementMonthIncomeProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final month = ref.watch(transactionsSelectedMonthProvider);
+  return transactions
+      .where((t) =>
+          t.isIncome &&
+          t.date.year == month.year &&
+          t.date.month == month.month)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+final statementMonthExpenseProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final month = ref.watch(transactionsSelectedMonthProvider);
+  return transactions
+      .where((t) =>
+          t.isExpense &&
+          t.date.year == month.year &&
+          t.date.month == month.month)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+final statementMonthTransactionsProvider =
+    Provider<List<TransactionEntity>>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final month = ref.watch(transactionsSelectedMonthProvider);
+  return transactions
+      .where((t) =>
+          t.date.year == month.year && t.date.month == month.month)
+      .toList();
+});
+
+// --- Annual toggle ---
+
+final statementIsAnnualProvider = StateProvider<bool>((ref) => false);
+
+final statementAnnualTransactionsProvider =
+    Provider<List<TransactionEntity>>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final month = ref.watch(transactionsSelectedMonthProvider);
+  return transactions
+      .where((t) => t.date.year == month.year)
+      .toList();
+});
+
+final statementAnnualIncomeProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final month = ref.watch(transactionsSelectedMonthProvider);
+  return transactions
+      .where((t) => t.isIncome && t.date.year == month.year)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+final statementAnnualExpenseProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final month = ref.watch(transactionsSelectedMonthProvider);
+  return transactions
+      .where((t) => t.isExpense && t.date.year == month.year)
       .fold(0.0, (sum, t) => sum + t.amount);
 });
 
@@ -102,6 +171,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
     required String category,
     required DateTime date,
     String? description,
+    String walletId = '',
   }) async {
     state = const AsyncValue.loading();
     final transaction = TransactionEntity(
@@ -113,6 +183,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
       category: category,
       date: date,
       description: description,
+      walletId: walletId,
     );
     final result = await _addTransaction(
         AddTransactionParams(transaction: transaction));

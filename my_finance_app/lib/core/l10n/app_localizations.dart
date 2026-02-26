@@ -84,6 +84,24 @@ class AppLocalizations {
   String get errorCreatingCategory => _t('Erro ao criar categoria.', 'Error creating category.', 'Error al crear categoría.');
   String get editTransaction => _t('Editar Transação', 'Edit Transaction', 'Editar Transacción');
   String get editBudget => _t('Editar Orçamento', 'Edit Budget', 'Editar Presupuesto');
+  String get selectMonth => _t('Selecionar mês', 'Select month', 'Seleccionar mes');
+  String get annualView => _t('Visão anual', 'Annual view', 'Vista anual');
+  String get monthlyView => _t('Visão mensal', 'Monthly view', 'Vista mensual');
+  String get expenseByCategory => _t('Gastos por categoria', 'Expenses by category', 'Gastos por categoría');
+
+  // ── Wallets ───────────────────────────────────────────────────────────────
+  String get wallet => _t('Carteira', 'Wallet', 'Billetera');
+  String get wallets => _t('Carteiras', 'Wallets', 'Billeteras');
+  String get newWallet => _t('Nova carteira...', 'New wallet...', 'Nueva billetera...');
+  String get walletField => _t('Carteira', 'Wallet', 'Billetera');
+  String get walletName => _t('Nome da carteira', 'Wallet name', 'Nombre de la billetera');
+  String get manageWallets => _t('Gerenciar carteiras', 'Manage wallets', 'Gestionar billeteras');
+  String get noWallets => _t('Nenhuma carteira cadastrada.', 'No wallets found.', 'No hay billeteras.');
+  String get errorCreatingWallet => _t('Erro ao criar carteira.', 'Error creating wallet.', 'Error al crear billetera.');
+  String get appearance => _t('Aparência', 'Appearance', 'Apariencia');
+  String get themeModeSystem => _t('Padrão do sistema', 'System default', 'Predeterminado del sistema');
+  String get themeModeLight => _t('Claro', 'Light', 'Claro');
+  String get themeModeDark => _t('Escuro', 'Dark', 'Oscuro');
 
   // ── Planning ─────────────────────────────────────────────────────────────
   String get planning => _t('Planejamento', 'Planning', 'Planificación');
@@ -118,6 +136,11 @@ class AppLocalizations {
   String get defaultCategory => _t('Categoria padrão', 'Default category', 'Categoría predeterminada');
   String get addExpenseCategory => _t('Adicionar despesa', 'Add expense', 'Agregar gasto');
   String get addIncomeCategory => _t('Adicionar receita', 'Add income', 'Agregar ingreso');
+  String get editCategory => _t('Editar categoria', 'Edit category', 'Editar categoría');
+  String get editWallet => _t('Editar carteira', 'Edit wallet', 'Editar billetera');
+  String get selectIcon => _t('Selecionar ícone', 'Select icon', 'Seleccionar ícono');
+  String get selectColor => _t('Selecionar cor', 'Select color', 'Seleccionar color');
+  String get defaultWallet => _t('Carteira padrão', 'Default wallet', 'Billetera predeterminada');
   String get currency => _t('Moeda', 'Currency', 'Moneda');
   String get language => _t('Idioma', 'Language', 'Idioma');
   String get currencyTitle => _t('Selecionar moeda', 'Select currency', 'Seleccionar moneda');

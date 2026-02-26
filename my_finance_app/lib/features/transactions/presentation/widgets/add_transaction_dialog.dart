@@ -5,11 +5,12 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
+import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 
 const _kNewCategory = '__new__';
-const _kNavy = Color(0xFF1A2B4A);
+const _kNewWallet = '__new_wallet__';
 const _kGreen = Color(0xFF00D887);
 
 class AddTransactionDialog extends ConsumerStatefulWidget {
@@ -33,10 +34,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   String? _category;
   DateTime _date = DateTime.now();
   String? _suggestedCategory;
+  String _walletId = '';
 
   bool get _isEditing => widget.transaction != null;
 
-  // Fallback static lists when Firestore categories haven't loaded yet.
   static const _staticIncomeCategories = [
     'Salário', 'Freelance', 'Investimentos', 'Outros',
   ];
@@ -59,41 +60,33 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     }
   }
 
-  // --- Auto-suggest by title similarity ---
+  // --- Auto-suggest ---
 
   String? _computeSuggestion(String input) {
-    if (_isEditing) return null; // no suggestion in edit mode
+    if (_isEditing) return null;
     final query = input.toLowerCase().trim();
     if (query.length < 3) return null;
     final transactions = ref.read(transactionsStreamProvider).value ?? [];
     if (transactions.isEmpty) return null;
 
-    final queryWords = query
-        .split(RegExp(r'\s+'))
-        .where((w) => w.length >= 3)
-        .toSet();
-
+    final queryWords =
+        query.split(RegExp(r'\s+')).where((w) => w.length >= 3).toSet();
     String? bestCategory;
     int bestScore = 0;
 
     for (final t in transactions) {
       final titleLower = t.title.toLowerCase();
-      final titleWords = titleLower
-          .split(RegExp(r'\s+'))
-          .where((w) => w.length >= 3)
-          .toSet();
-
+      final titleWords =
+          titleLower.split(RegExp(r'\s+')).where((w) => w.length >= 3).toSet();
       final wordOverlap = queryWords.intersection(titleWords).length;
       final substringMatch =
           (titleLower.contains(query) || query.contains(titleLower)) ? 1 : 0;
       final score = wordOverlap + substringMatch;
-
       if (score > bestScore) {
         bestScore = score;
         bestCategory = t.category;
       }
     }
-
     return bestScore > 0 ? bestCategory : null;
   }
 
@@ -168,7 +161,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         );
 
     if (!mounted) return;
-
     if (success) {
       setState(() => _category = created);
     } else {
@@ -178,10 +170,64 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     }
   }
 
+  // --- New wallet dialog ---
+
+  Future<void> _showNewWalletDialog() async {
+    final l10n = AppLocalizations.of(context);
+    final nameCtrl = TextEditingController();
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+
+    final created = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.wallet),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: l10n.walletName,
+            border: const OutlineInputBorder(),
+          ),
+          textCapitalization: TextCapitalization.words,
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(nameCtrl.text.trim()),
+            child: Text(l10n.create),
+          ),
+        ],
+      ),
+    );
+
+    nameCtrl.dispose();
+    if (created == null || created.isEmpty) return;
+    if (!mounted) return;
+
+    final success = await ref.read(walletsNotifierProvider.notifier).add(
+          userId: user.id,
+          name: created,
+          iconCodePoint: Icons.account_balance_wallet_outlined.codePoint,
+          colorValue: 0xFF607D8B,
+        );
+
+    if (!mounted) return;
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorCreatingWallet)),
+      );
+    }
+    // walletId stays unchanged — user picks from dropdown after creation
+  }
+
   @override
   void initState() {
     super.initState();
-    // Pre-fill fields when editing an existing transaction.
     if (_isEditing) {
       final t = widget.transaction!;
       _titleController.text = t.title;
@@ -190,6 +236,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       _type = t.type;
       _category = t.category;
       _date = t.date;
+      _walletId = t.walletId;
     }
     _titleController.addListener(() => _onTitleChanged(_titleController.text));
   }
@@ -239,6 +286,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
+        walletId: _walletId,
       );
       success = await notifier.update(updated);
     } else {
@@ -251,16 +299,17 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
+        walletId: _walletId,
       );
     }
 
     if (!mounted) return;
-
     if (success) {
       Navigator.of(context).pop();
     } else {
-      final errorMsg = ref.read(transactionsNotifierProvider).error?.toString()
-          ?? 'Erro ao salvar transação. Verifique se o Firestore está habilitado.';
+      final errorMsg =
+          ref.read(transactionsNotifierProvider).error?.toString() ??
+              'Erro ao salvar transação.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMsg),
@@ -276,11 +325,16 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final l10n = AppLocalizations.of(context);
     final isLoading = ref.watch(transactionsNotifierProvider).isLoading;
     final categories = _categoryNames();
+    final wallets = ref.watch(walletsStreamProvider).value ?? [];
 
-    // Auto-reset only when null (type changes set _category = null explicitly).
+    // Default category
     _category ??= categories.isNotEmpty ? categories.first : null;
 
-    // Only show suggestion when it's a valid category and not already selected.
+    // Default wallet to first available
+    if (_walletId.isEmpty && wallets.isNotEmpty) {
+      _walletId = wallets.first.id;
+    }
+
     final showSuggestion = _suggestedCategory != null &&
         categories.contains(_suggestedCategory) &&
         _suggestedCategory != _category;
@@ -326,7 +380,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       v == null || v.isEmpty ? l10n.enterTitle : null,
                 ),
 
-                // Auto-suggest banner (only in create mode)
+                // Auto-suggest banner
                 AnimatedSize(
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeInOut,
@@ -337,7 +391,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE8FBF3),
+                              color: _kGreen.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                   color: _kGreen.withValues(alpha: 0.4)),
@@ -350,9 +404,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                                 Expanded(
                                   child: Text(
                                     '${l10n.suggestCategory}: $_suggestedCategory',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: _kNavy,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -459,6 +515,53 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       '${_date.year}',
                     ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                // Wallet dropdown
+                DropdownButtonFormField<String>(
+                  key: ValueKey('wallet_$_walletId'),
+                  initialValue: wallets.any((w) => w.id == _walletId)
+                      ? _walletId
+                      : (wallets.isNotEmpty ? wallets.first.id : null),
+                  decoration: InputDecoration(
+                    labelText: l10n.walletField,
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 20),
+                  ),
+                  items: [
+                    ...wallets.map(
+                      (w) => DropdownMenuItem(
+                        value: w.id,
+                        child: Text(w.name),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: _kNewWallet,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.add_circle_outline,
+                              size: 18, color: _kGreen),
+                          const SizedBox(width: 8),
+                          Text(
+                            l10n.newWallet,
+                            style: const TextStyle(
+                              color: _kGreen,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == _kNewWallet) {
+                      _showNewWalletDialog();
+                    } else if (v != null) {
+                      setState(() => _walletId = v);
+                    }
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
