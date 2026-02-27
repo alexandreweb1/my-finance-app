@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/transactions/presentation/providers/transactions_provider.dart';
 import '../../data/datasources/budget_remote_datasource.dart';
@@ -44,13 +45,14 @@ final selectedMonthProvider = StateProvider<DateTime>(
 
 final budgetsStreamProvider = StreamProvider<List<BudgetEntity>>((ref) {
   final authState = ref.watch(authStateProvider);
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   final month = ref.watch(selectedMonthProvider);
   return authState.when(
     data: (user) {
-      if (user == null) return const Stream.empty();
+      if (user == null || effectiveUserId.isEmpty) return const Stream.empty();
       return ref
           .watch(getBudgetsUseCaseProvider)
-          .call(GetBudgetsParams(userId: user.id, month: month))
+          .call(GetBudgetsParams(userId: effectiveUserId, month: month))
           .map((either) => either.getOrElse(() => []));
     },
     loading: () => const Stream.empty(),
@@ -61,14 +63,15 @@ final budgetsStreamProvider = StreamProvider<List<BudgetEntity>>((ref) {
 /// Budgets from the month immediately before [selectedMonthProvider].
 final previousMonthBudgetsProvider = StreamProvider<List<BudgetEntity>>((ref) {
   final authState = ref.watch(authStateProvider);
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   final month = ref.watch(selectedMonthProvider);
   final prevMonth = DateTime(month.year, month.month - 1, 1);
   return authState.when(
     data: (user) {
-      if (user == null) return const Stream.empty();
+      if (user == null || effectiveUserId.isEmpty) return const Stream.empty();
       return ref
           .watch(getBudgetsUseCaseProvider)
-          .call(GetBudgetsParams(userId: user.id, month: prevMonth))
+          .call(GetBudgetsParams(userId: effectiveUserId, month: prevMonth))
           .map((either) => either.getOrElse(() => []));
     },
     loading: () => const Stream.empty(),
@@ -76,11 +79,11 @@ final previousMonthBudgetsProvider = StreamProvider<List<BudgetEntity>>((ref) {
   );
 });
 
-// --- Budget Summary Provider (joins budgets + transactions) ---
+// --- Budget Summary Provider (joins budgets + visible transactions) ---
 
 final budgetSummaryProvider = Provider<List<BudgetSummary>>((ref) {
   final budgets = ref.watch(budgetsStreamProvider).value ?? [];
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(visibleTransactionsProvider);
   final month = ref.watch(selectedMonthProvider);
 
   return budgets.map((budget) {
@@ -185,10 +188,10 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
 
 final budgetNotifierProvider =
     StateNotifierProvider<BudgetNotifier, AsyncValue<void>>((ref) {
-  final user = ref.watch(authStateProvider).value;
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   return BudgetNotifier(
     ref.watch(setBudgetUseCaseProvider),
     ref.watch(deleteBudgetUseCaseProvider),
-    user?.id ?? '',
+    effectiveUserId,
   );
 });

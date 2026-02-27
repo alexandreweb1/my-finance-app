@@ -94,22 +94,26 @@ class AppSettings {
   final AppCurrency currency;
   final AppLanguage language;
   final AppThemeMode themeMode;
+  final Set<String> hiddenWalletIds;
 
   const AppSettings({
     this.currency = AppCurrency.brl,
     this.language = AppLanguage.portuguese,
     this.themeMode = AppThemeMode.system,
+    this.hiddenWalletIds = const {},
   });
 
   AppSettings copyWith({
     AppCurrency? currency,
     AppLanguage? language,
     AppThemeMode? themeMode,
+    Set<String>? hiddenWalletIds,
   }) =>
       AppSettings(
         currency: currency ?? this.currency,
         language: language ?? this.language,
         themeMode: themeMode ?? this.themeMode,
+        hiddenWalletIds: hiddenWalletIds ?? this.hiddenWalletIds,
       );
 }
 
@@ -121,6 +125,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
   static const _keyCurrency = 'app_currency';
   static const _keyLanguage = 'app_language';
   static const _keyThemeMode = 'app_theme_mode';
+  static const _keyHiddenWallets = 'hidden_wallet_ids';
 
   AppSettingsNotifier(AppSettings initial) : super(initial);
 
@@ -142,15 +147,29 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     await prefs.setString(_keyThemeMode, themeMode.name);
   }
 
+  Future<void> toggleWalletVisibility(String walletId) async {
+    final hidden = Set<String>.from(state.hiddenWalletIds);
+    if (hidden.contains(walletId)) {
+      hidden.remove(walletId);
+    } else {
+      hidden.add(walletId);
+    }
+    state = state.copyWith(hiddenWalletIds: hidden);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyHiddenWallets, hidden.toList());
+  }
+
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     final currencyCode = prefs.getString(_keyCurrency) ?? 'BRL';
     final languageCode = prefs.getString(_keyLanguage) ?? 'pt';
     final themeModeStr = prefs.getString(_keyThemeMode) ?? 'system';
+    final hiddenList = prefs.getStringList(_keyHiddenWallets) ?? [];
     return AppSettings(
       currency: AppCurrency.fromCode(currencyCode),
       language: AppLanguage.fromCode(languageCode),
       themeMode: AppThemeMode.fromString(themeModeStr),
+      hiddenWalletIds: Set<String>.from(hiddenList),
     );
   }
 }

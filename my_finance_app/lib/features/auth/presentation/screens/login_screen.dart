@@ -284,40 +284,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                // Google sign-in button
-                                SizedBox(
-                                  height: 50,
-                                  child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      backgroundColor: Colors.white,
-                                      foregroundColor: Colors.black87,
-                                      side: BorderSide(
-                                          color: Colors.grey.shade300),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    onPressed: authState.isLoading
-                                        ? null
-                                        : () => ref
-                                            .read(authNotifierProvider
-                                                .notifier)
-                                            .signInWithGoogle(),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        _GoogleLogo(),
-                                        SizedBox(width: 10),
-                                        Text(
-                                          'Continuar com Google',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                // Google sign-in button (minimalist)
+                                Center(
+                                  child: SizedBox(
+                                    width: 52,
+                                    height: 52,
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.black87,
+                                        padding: EdgeInsets.zero,
+                                        side: BorderSide(
+                                            color: Colors.grey.shade300),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
                                         ),
-                                      ],
+                                      ),
+                                      onPressed: authState.isLoading
+                                          ? null
+                                          : () => ref
+                                              .read(authNotifierProvider
+                                                  .notifier)
+                                              .signInWithGoogle(),
+                                      child: const _GoogleLogo(),
                                     ),
                                   ),
                                 ),
@@ -370,23 +360,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-// Google "G" logo rendered with colored text segments
+// Google "G" logo — single letter, minimalist style
 class _GoogleLogo extends StatelessWidget {
   const _GoogleLogo();
 
   @override
   Widget build(BuildContext context) {
-    return const Text.rich(
-      TextSpan(
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        children: [
-          TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
-          TextSpan(text: 'o', style: TextStyle(color: Color(0xFFEA4335))),
-          TextSpan(text: 'o', style: TextStyle(color: Color(0xFFFBBC05))),
-          TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
-          TextSpan(text: 'l', style: TextStyle(color: Color(0xFF34A853))),
-          TextSpan(text: 'e', style: TextStyle(color: Color(0xFFEA4335))),
-        ],
+    return const Text(
+      'G',
+      style: TextStyle(
+        fontSize: 26,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF4285F4),
       ),
     );
   }

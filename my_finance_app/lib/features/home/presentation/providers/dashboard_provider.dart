@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/providers/effective_user_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../budget/domain/entities/budget_entity.dart';
 import '../../../budget/domain/usecases/get_budgets_usecase.dart';
@@ -15,13 +16,14 @@ final dashboardSelectedMonthProvider = StateProvider<DateTime>(
 final dashboardBudgetsStreamProvider =
     StreamProvider<List<BudgetEntity>>((ref) {
   final authState = ref.watch(authStateProvider);
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   final month = ref.watch(dashboardSelectedMonthProvider);
   return authState.when(
     data: (user) {
-      if (user == null) return const Stream.empty();
+      if (user == null || effectiveUserId.isEmpty) return const Stream.empty();
       return ref
           .watch(getBudgetsUseCaseProvider)
-          .call(GetBudgetsParams(userId: user.id, month: month))
+          .call(GetBudgetsParams(userId: effectiveUserId, month: month))
           .map((either) => either.getOrElse(() => []));
     },
     loading: () => const Stream.empty(),
@@ -32,7 +34,7 @@ final dashboardBudgetsStreamProvider =
 // ─── Budget summaries (budgets + transaction spending) for the dashboard month ─
 final dashboardBudgetSummaryProvider = Provider<List<BudgetSummary>>((ref) {
   final budgets = ref.watch(dashboardBudgetsStreamProvider).value ?? [];
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(visibleTransactionsProvider);
   final month = ref.watch(dashboardSelectedMonthProvider);
 
   return budgets.map((budget) {
@@ -49,7 +51,7 @@ final dashboardBudgetSummaryProvider = Provider<List<BudgetSummary>>((ref) {
 
 // ─── Per-month income / expense for the dashboard selected month ──────────────
 final dashboardMonthIncomeProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(visibleTransactionsProvider);
   final month = ref.watch(dashboardSelectedMonthProvider);
   return transactions
       .where((t) =>
@@ -60,7 +62,7 @@ final dashboardMonthIncomeProvider = Provider<double>((ref) {
 });
 
 final dashboardMonthExpenseProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(visibleTransactionsProvider);
   final month = ref.watch(dashboardSelectedMonthProvider);
   return transactions
       .where((t) =>

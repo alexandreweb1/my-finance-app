@@ -19,7 +19,7 @@ const _kGreen = Color(0xFF00D887);
 const _kLightBg = Color(0xFFF4F6FA);
 
 // ─── Number of months shown in the chart ─────────────────────────────────────
-const _kChartMonths = 12;
+const _kChartMonths = 24;
 const _kMonthColWidth = 56.0;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ class DashboardScreen extends ConsumerWidget {
     final income = ref.watch(dashboardMonthIncomeProvider);
     final expense = ref.watch(dashboardMonthExpenseProvider);
     final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final visibleTxs = ref.watch(visibleTransactionsProvider);
     final budgetSummaries = ref.watch(dashboardBudgetSummaryProvider);
     final selectedMonth = ref.watch(dashboardSelectedMonthProvider);
 
@@ -41,8 +42,8 @@ class DashboardScreen extends ConsumerWidget {
     final name = user?.displayName?.split(' ').first ?? l10n.hello;
     final greeting = _greeting(l10n);
 
-    // Transactions filtered to the selected month
-    final monthTxs = (transactionsAsync.value ?? [])
+    // Transactions filtered to the selected month (visible wallets only)
+    final monthTxs = visibleTxs
         .where((t) =>
             t.date.year == selectedMonth.year &&
             t.date.month == selectedMonth.month)
@@ -64,7 +65,7 @@ class DashboardScreen extends ConsumerWidget {
             name: name,
             greeting: greeting,
             balance: balance,
-            transactions: transactionsAsync.value ?? [],
+            transactions: visibleTxs,
           ),
 
           const SizedBox(height: 20),
@@ -314,78 +315,92 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
 
     const totalWidth = _kChartMonths * _kMonthColWidth;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SingleChildScrollView(
-        controller: _scrollCtrl,
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: totalWidth,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Chart area
-              SizedBox(
-                height: 80,
-                width: totalWidth,
-                child: CustomPaint(
-                  painter: _SparklinePainter(
-                    data: data,
-                    selectedIndex: selectedIdx,
-                  ),
-                  size: const Size(totalWidth, 80),
-                ),
-              ),
-              const SizedBox(height: 6),
-              // Month labels row — each tappable
-              Row(
-                children: List.generate(months.length, (i) {
-                  final month = months[i];
-                  final isSelected = i == selectedIdx;
-                  final label = DateFormat('MMM', dateLoc).format(month);
-                  return GestureDetector(
-                    onTap: () {
-                      ref
-                          .read(dashboardSelectedMonthProvider.notifier)
-                          .state = month;
-                    },
-                    child: SizedBox(
-                      width: _kMonthColWidth,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            label,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.45),
-                              fontSize: 11,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? _kGreen
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Colors.transparent,
+          Colors.white,
+          Colors.white,
+          Colors.transparent,
+        ],
+        stops: [0.0, 0.08, 0.92, 1.0],
+      ).createShader(bounds),
+      blendMode: BlendMode.dstIn,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: SingleChildScrollView(
+          controller: _scrollCtrl,
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: totalWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Chart area
+                SizedBox(
+                  height: 80,
+                  width: totalWidth,
+                  child: CustomPaint(
+                    painter: _SparklinePainter(
+                      data: data,
+                      selectedIndex: selectedIdx,
                     ),
-                  );
-                }),
-              ),
-            ],
+                    size: const Size(totalWidth, 80),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Month labels row — each tappable
+                Row(
+                  children: List.generate(months.length, (i) {
+                    final month = months[i];
+                    final isSelected = i == selectedIdx;
+                    final label = DateFormat('MMM', dateLoc).format(month);
+                    return GestureDetector(
+                      onTap: () {
+                        ref
+                            .read(dashboardSelectedMonthProvider.notifier)
+                            .state = month;
+                      },
+                      child: SizedBox(
+                        width: _kMonthColWidth,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.45),
+                                fontSize: 11,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? _kGreen
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         ),
       ),

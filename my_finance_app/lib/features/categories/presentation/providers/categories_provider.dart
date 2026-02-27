@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/providers/effective_user_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/category_remote_datasource.dart';
 import '../../data/repositories/category_repository_impl.dart';
@@ -45,12 +46,13 @@ final deleteCategoryUseCaseProvider = Provider(
 final categoriesStreamProvider =
     StreamProvider<List<CategoryEntity>>((ref) {
   final authState = ref.watch(authStateProvider);
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   return authState.when(
     data: (user) {
-      if (user == null) return const Stream.empty();
+      if (user == null || effectiveUserId.isEmpty) return const Stream.empty();
       return ref
           .watch(getCategoriesUseCaseProvider)
-          .call(GetCategoriesParams(userId: user.id))
+          .call(GetCategoriesParams(userId: effectiveUserId))
           .map((either) => either.getOrElse(() => []));
     },
     loading: () => const Stream.empty(),
@@ -71,15 +73,13 @@ final expenseCategoriesProvider = Provider<List<CategoryEntity>>((ref) {
 // --- Seed initializer (activate in MainScreen) ---
 
 final categoriesSeedProvider = Provider<void>((ref) {
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   ref.listen<AsyncValue<List<CategoryEntity>>>(
     categoriesStreamProvider,
     (_, next) {
       next.whenData((categories) {
-        if (categories.isEmpty) {
-          final user = ref.read(authStateProvider).value;
-          if (user != null) {
-            ref.read(categoriesNotifierProvider.notifier).seedDefaults(user.id);
-          }
+        if (categories.isEmpty && effectiveUserId.isNotEmpty) {
+          ref.read(categoriesNotifierProvider.notifier).seedDefaults(effectiveUserId);
         }
       });
     },

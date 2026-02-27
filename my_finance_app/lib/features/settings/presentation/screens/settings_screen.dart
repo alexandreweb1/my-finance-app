@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/app_settings_provider.dart';
+import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
+import '../../../sharing/presentation/providers/sharing_provider.dart';
 import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 
@@ -371,6 +373,10 @@ class SettingsScreen extends ConsumerWidget {
                     categories: incomeCategories,
                   ),
                 ]),
+                const SizedBox(height: 12),
+
+                // Sharing
+                const _SharingSection(),
                 const SizedBox(height: 12),
 
                 // Logout
@@ -991,6 +997,303 @@ class _EditCategoryDialogState extends ConsumerState<_EditCategoryDialog> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sharing Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SharingSection extends ConsumerStatefulWidget {
+  const _SharingSection();
+
+  @override
+  ConsumerState<_SharingSection> createState() => _SharingSectionState();
+}
+
+class _SharingSectionState extends ConsumerState<_SharingSection> {
+  final _emailCtrl = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendInvite() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) return;
+    setState(() => _sending = true);
+    final error = await ref
+        .read(sharingNotifierProvider.notifier)
+        .sendInvitation(email);
+    if (!mounted) return;
+    setState(() => _sending = false);
+    if (error == null) {
+      _emailCtrl.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Convite enviado com sucesso!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmLeave() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sair da conta compartilhada'),
+        content: const Text(
+            'Você perderá acesso aos dados desta conta. Deseja continuar?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final error = await ref
+        .read(sharingNotifierProvider.notifier)
+        .leaveSharedAccount();
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error), backgroundColor: Colors.red.shade700),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isMaster = ref.watch(isMasterProvider);
+    final pendingAsync = ref.watch(pendingInvitationsProvider);
+    final collaboratorsAsync = ref.watch(myCollaboratorsProvider);
+    final pendingInvites = pendingAsync.value ?? [];
+    final collaborators = collaboratorsAsync.value ?? [];
+    final profileAsync = ref.watch(userProfileStreamProvider);
+    final profile = profileAsync.value;
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Pending received invitations (amber banner) ──────────────────
+        if (pendingInvites.isNotEmpty) ...[
+          Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: Colors.amber.shade600.withValues(alpha: 0.6),
+                  width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.mail_outline,
+                          color: Colors.amber.shade700, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Convites recebidos',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.amber.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ...pendingInvites.map((inv) => ListTile(
+                      dense: true,
+                      leading: CircleAvatar(
+                        radius: 18,
+                        backgroundColor:
+                            colorScheme.primaryContainer,
+                        child: Text(
+                          (inv.masterName.isNotEmpty
+                                  ? inv.masterName[0]
+                                  : inv.masterEmail[0])
+                              .toUpperCase(),
+                          style: TextStyle(
+                              color: colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      title: Text(inv.masterName.isNotEmpty
+                          ? inv.masterName
+                          : inv.masterEmail),
+                      subtitle: Text(inv.masterEmail,
+                          style: const TextStyle(fontSize: 11)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton(
+                            style: TextButton.styleFrom(
+                                foregroundColor: Colors.red.shade600),
+                            onPressed: () => ref
+                                .read(sharingNotifierProvider.notifier)
+                                .declineInvitation(inv.id),
+                            child: const Text('Recusar'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact),
+                            onPressed: () => ref
+                                .read(sharingNotifierProvider.notifier)
+                                .acceptInvitation(inv),
+                            child: const Text('Aceitar'),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Collaborator view: "you are on someone else's account" ───────
+        if (!isMaster) ...[
+          _SettingsCard(children: [
+            ListTile(
+              leading: const _IconBadge(Icons.people_alt_outlined,
+                  color: Color(0xFF7E57C2)),
+              title: const Text('Conta compartilhada'),
+              subtitle: Text(
+                profile?['masterUserId'] != null
+                    ? 'Você está usando uma conta compartilhada'
+                    : 'Conta compartilhada',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade50,
+                  foregroundColor: Colors.red.shade700,
+                ),
+                onPressed: _confirmLeave,
+                child: const Text('Sair da conta compartilhada'),
+              ),
+            ),
+          ]),
+        ],
+
+        // ── Master view: invite + collaborator list ───────────────────────
+        if (isMaster) ...[
+          _SettingsCard(children: [
+            ExpansionTile(
+              leading: const _IconBadge(Icons.people_outline,
+                  color: Color(0xFF7E57C2)),
+              title: const Text('Compartilhamento',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              children: [
+                // Invite field
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'Email do colaborador',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onSubmitted: (_) => _sendInvite(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _sending ? null : _sendInvite,
+                        child: _sending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white))
+                            : const Text('Convidar'),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Active collaborators
+                if (collaborators.isNotEmpty) ...[
+                  const Divider(height: 1, indent: 16),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                    child: Text('Colaboradores ativos',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant)),
+                  ),
+                  ...collaborators.map((inv) => ListTile(
+                        dense: true,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor:
+                              const Color(0xFF7E57C2).withValues(alpha: 0.15),
+                          child: Text(
+                            inv.inviteeEmail[0].toUpperCase(),
+                            style: const TextStyle(
+                                color: Color(0xFF7E57C2),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
+                          ),
+                        ),
+                        title: Text(inv.inviteeEmail,
+                            style: const TextStyle(fontSize: 13)),
+                        trailing: IconButton(
+                          icon: Icon(Icons.person_remove_outlined,
+                              color: Colors.red.shade400, size: 20),
+                          tooltip: 'Remover colaborador',
+                          onPressed: inv.collaboratorUserId == null
+                              ? null
+                              : () => ref
+                                  .read(sharingNotifierProvider.notifier)
+                                  .removeCollaborator(
+                                    invitationId: inv.id,
+                                    collaboratorUserId:
+                                        inv.collaboratorUserId!,
+                                  ),
+                        ),
+                      )),
+                ],
+
+                const SizedBox(height: 8),
+              ],
+            ),
+          ]),
+        ],
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Wallet Section
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1001,47 +1304,70 @@ class _WalletSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final walletsAsync = ref.watch(walletsStreamProvider);
+    final hiddenWalletIds = ref.watch(appSettingsProvider).hiddenWalletIds;
 
     final walletTiles = walletsAsync.when(
-      data: (wallets) => wallets
-          .map(
-            (w) => ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Color(w.colorValue).withValues(alpha: 0.15),
-                child: Icon(categoryIcon(w.iconCodePoint),
-                    color: Color(w.colorValue), size: 20),
-              ),
-              title: Text(w.name),
-              trailing: w.isDefault
-                  ? Tooltip(
-                      message: l10n.defaultWallet,
-                      child: const Icon(Icons.lock_outline,
-                          size: 16, color: Colors.grey),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.edit_outlined,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 20),
-                          onPressed: () => showDialog(
-                            context: context,
-                            builder: (_) => _EditWalletDialog(wallet: w),
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline,
-                              color: Colors.red.shade400, size: 20),
-                          onPressed: () => ref
-                              .read(walletsNotifierProvider.notifier)
-                              .delete(w.id),
-                        ),
-                      ],
-                    ),
+      data: (wallets) => wallets.map((w) {
+        final isVisible = !hiddenWalletIds.contains(w.id);
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Color(w.colorValue)
+                .withValues(alpha: isVisible ? 0.15 : 0.06),
+            child: Icon(
+              categoryIcon(w.iconCodePoint),
+              color: Color(w.colorValue)
+                  .withValues(alpha: isVisible ? 1.0 : 0.35),
+              size: 20,
             ),
-          )
-          .toList(),
+          ),
+          title: Text(
+            w.name,
+            style: TextStyle(
+              color: isVisible
+                  ? null
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.4),
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Checkbox(
+                value: isVisible,
+                onChanged: (_) => ref
+                    .read(appSettingsProvider.notifier)
+                    .toggleWalletVisibility(w.id),
+              ),
+              if (w.isDefault)
+                Tooltip(
+                  message: l10n.defaultWallet,
+                  child: const Icon(Icons.lock_outline,
+                      size: 16, color: Colors.grey),
+                )
+              else ...[
+                IconButton(
+                  icon: Icon(Icons.edit_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20),
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => _EditWalletDialog(wallet: w),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline,
+                      color: Colors.red.shade400, size: 20),
+                  onPressed: () => ref
+                      .read(walletsNotifierProvider.notifier)
+                      .delete(w.id),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
       loading: () => [
         const ListTile(title: Center(child: CircularProgressIndicator()))
       ],

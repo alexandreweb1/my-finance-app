@@ -33,7 +33,12 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  // Web Client ID from google-services.json (oauth_client type 3)
+  // Required on Android to resolve ApiException:10 (DEVELOPER_ERROR)
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId:
+        '53669256636-ebovakj9raemrpkmj7hl5j32i4h357t7.apps.googleusercontent.com',
+  );
 
   static const _kTimeout = Duration(seconds: 12);
 

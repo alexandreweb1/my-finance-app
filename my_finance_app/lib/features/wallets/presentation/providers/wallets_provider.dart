@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/wallet_remote_datasource.dart';
 import '../../data/repositories/wallet_repository_impl.dart';
@@ -43,12 +44,13 @@ final deleteWalletUseCaseProvider = Provider(
 
 final walletsStreamProvider = StreamProvider<List<WalletEntity>>((ref) {
   final authState = ref.watch(authStateProvider);
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   return authState.when(
     data: (user) {
-      if (user == null) return const Stream.empty();
+      if (user == null || effectiveUserId.isEmpty) return const Stream.empty();
       return ref
           .watch(getWalletsUseCaseProvider)
-          .call(GetWalletsParams(userId: user.id))
+          .call(GetWalletsParams(userId: effectiveUserId))
           .map((either) => either.getOrElse(() => []));
     },
     loading: () => const Stream.empty(),
@@ -59,15 +61,13 @@ final walletsStreamProvider = StreamProvider<List<WalletEntity>>((ref) {
 // --- Seed provider (auto-creates "Conta corrente" on first load) ---
 
 final walletsSeedProvider = Provider<void>((ref) {
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
   ref.listen<AsyncValue<List<WalletEntity>>>(
     walletsStreamProvider,
     (_, next) {
       next.whenData((wallets) {
-        if (wallets.isEmpty) {
-          final user = ref.read(authStateProvider).value;
-          if (user != null) {
-            ref.read(walletsNotifierProvider.notifier).seedDefaults(user.id);
-          }
+        if (wallets.isEmpty && effectiveUserId.isNotEmpty) {
+          ref.read(walletsNotifierProvider.notifier).seedDefaults(effectiveUserId);
         }
       });
     },
