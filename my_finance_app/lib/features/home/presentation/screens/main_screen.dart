@@ -5,6 +5,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
 import '../../../transactions/presentation/widgets/add_transaction_dialog.dart';
@@ -33,6 +34,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   Widget build(BuildContext context) {
     ref.watch(categoriesSeedProvider);
     ref.watch(walletsSeedProvider);
+    ref.watch(iapInitProvider); // inicializa IAP e restaura compras ao logar
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(

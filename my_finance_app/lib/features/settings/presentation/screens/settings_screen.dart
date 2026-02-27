@@ -9,6 +9,10 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../sharing/presentation/providers/sharing_provider.dart';
+import '../../../subscription/presentation/providers/subscription_provider.dart';
+import '../../../subscription/presentation/screens/pro_screen.dart';
+import '../../../subscription/presentation/widgets/pro_badge_widget.dart';
+import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 
@@ -282,6 +286,10 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
             sliver: SliverList.list(
               children: [
+                // ── Banner Pro ───────────────────────────────────────────────
+                const _ProBannerCard(),
+                const SizedBox(height: 12),
+
                 // Account
                 _SettingsCard(children: [
                   ListTile(
@@ -1203,41 +1211,73 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
             ExpansionTile(
               leading: const _IconBadge(Icons.people_outline,
                   color: Color(0xFF7E57C2)),
-              title: const Text('Compartilhamento',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              title: Row(
+                children: [
+                  const Text('Compartilhamento',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
+                  if (!ref.watch(isProProvider)) const ProBadgeWidget(),
+                ],
+              ),
               children: [
-                // Invite field
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email do colaborador',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          onSubmitted: (_) => _sendInvite(),
+                // Invite field (bloqueado para usuários free)
+                if (!ref.watch(isProProvider))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => showProGateBottomSheet(
+                          context,
+                          featureName: 'Compartilhamento',
+                          featureDescription:
+                              'Convide colaboradores para gerenciar suas finanças juntos.',
+                          featureIcon: Icons.people_rounded,
                         ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D887),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.lock_outline, size: 18),
+                        label: const Text('Disponível no plano Pro',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _sending ? null : _sendInvite,
-                        child: _sending
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white))
-                            : const Text('Convidar'),
-                      ),
-                    ],
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Email do colaborador',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            onSubmitted: (_) => _sendInvite(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: _sending ? null : _sendInvite,
+                          child: _sending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white))
+                              : const Text('Convidar'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
                 // Active collaborators
                 if (collaborators.isNotEmpty) ...[
@@ -1379,14 +1419,31 @@ class _WalletSection extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.w600)),
       children: [
         ...walletTiles,
-        ListTile(
-          leading: const Icon(Icons.add),
-          title: Text(l10n.newWallet),
-          onTap: () => showDialog(
-            context: context,
-            builder: (_) => const _AddWalletDialog(),
-          ),
-        ),
+        // Gate: free users só podem ter 1 carteira
+        Builder(builder: (context) {
+          final canAdd = ref.watch(canAddWalletProvider);
+          return ListTile(
+            leading: Icon(canAdd ? Icons.add : Icons.lock_outline,
+                color: canAdd ? null : const Color(0xFF00D887)),
+            title: Text(l10n.newWallet),
+            onTap: () {
+              if (!canAdd) {
+                showProGateBottomSheet(
+                  context,
+                  featureName: 'Múltiplas Carteiras',
+                  featureDescription:
+                      'Crie quantas carteiras quiser para organizar seu dinheiro.',
+                  featureIcon: Icons.account_balance_wallet_rounded,
+                );
+                return;
+              }
+              showDialog(
+                context: context,
+                builder: (_) => const _AddWalletDialog(),
+              );
+            },
+          );
+        }),
       ],
     );
   }
@@ -1648,5 +1705,152 @@ class _AppearanceDialog extends ConsumerWidget {
             child: Text(l10n.cancel)),
       ],
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pro Banner Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _kGreen = Color(0xFF00D887);
+const _kGreenDark = Color(0xFF00A86B);
+
+class _ProBannerCard extends ConsumerWidget {
+  const _ProBannerCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPro = ref.watch(isProProvider);
+    final subscription = ref.watch(subscriptionStreamProvider).value;
+
+    if (isPro) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_kGreen, _kGreenDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.workspace_premium_rounded,
+                  color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Plano Pro Ativo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    subscription?.expiryDate != null
+                        ? 'Renova em ${_formatDate(subscription!.expiryDate!)}'
+                        : 'Acesso vitalício',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.check_circle_rounded,
+                color: Colors.white, size: 22),
+          ],
+        ),
+      );
+    }
+
+    // Não é Pro — card de upgrade
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_kGreen, _kGreenDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.workspace_premium_rounded,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Upgrade para Pro',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '✓ Múltiplas carteiras  ✓ Categorias  ✓ Visão anual  ✓ Compartilhamento',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProScreen()),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Ver Planos',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 }

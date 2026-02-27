@@ -2,7 +2,7 @@ name: my_finance_app
 description: Personal finance management app with Clean Architecture.
 publish_to: 'none'
 
-version: 1.0.3+16
+version: 1.0.3+22
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -33,6 +33,9 @@ dependencies:
   equatable: ^2.0.5
   dartz: ^0.10.1
   uuid: ^4.4.2
+
+  # In-App Purchases (Google Play + App Store)
+  in_app_purchase: ^3.2.0
 
   cupertino_icons: ^1.0.8
 

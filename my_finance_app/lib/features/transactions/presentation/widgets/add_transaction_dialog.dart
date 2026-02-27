@@ -5,6 +5,8 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
+import '../../../subscription/presentation/providers/subscription_provider.dart';
+import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
@@ -494,6 +496,16 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
                   onChanged: (v) {
                     if (v == _kNewCategory) {
+                      if (!ref.read(isProProvider)) {
+                        showProGateBottomSheet(
+                          context,
+                          featureName: 'Categorias Personalizadas',
+                          featureDescription:
+                              'Crie categorias ilimitadas do seu jeito.',
+                          featureIcon: Icons.category_rounded,
+                        );
+                        return;
+                      }
                       _showNewCategoryDialog();
                     } else {
                       setState(() => _category = v);
@@ -557,6 +569,16 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
                   onChanged: (v) {
                     if (v == _kNewWallet) {
+                      if (!ref.read(canAddWalletProvider)) {
+                        showProGateBottomSheet(
+                          context,
+                          featureName: 'Múltiplas Carteiras',
+                          featureDescription:
+                              'Crie quantas carteiras quiser para organizar seu dinheiro.',
+                          featureIcon: Icons.account_balance_wallet_rounded,
+                        );
+                        return;
+                      }
                       _showNewWalletDialog();
                     } else if (v != null) {
                       setState(() => _walletId = v);

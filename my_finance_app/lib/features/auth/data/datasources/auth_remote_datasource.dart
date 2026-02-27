@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -33,11 +34,13 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
-  // Web Client ID from google-services.json (oauth_client type 3)
-  // Required on Android to resolve ApiException:10 (DEVELOPER_ERROR)
+  // Web client ID (OAuth type 3) — used as clientId on Web, serverClientId on Android
+  static const _webClientId =
+      '53669256636-ebovakj9raemrpkmj7hl5j32i4h357t7.apps.googleusercontent.com';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId:
-        '53669256636-ebovakj9raemrpkmj7hl5j32i4h357t7.apps.googleusercontent.com',
+    clientId: kIsWeb ? _webClientId : null,
+    serverClientId: kIsWeb ? null : _webClientId,
   );
 
   static const _kTimeout = Duration(seconds: 12);

@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../subscription/presentation/providers/subscription_provider.dart';
+import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/transaction_list_tile.dart';
@@ -62,9 +64,20 @@ class TransactionsScreen extends ConsumerWidget {
             icon: Icon(isAnnual
                 ? Icons.calendar_view_day_outlined
                 : Icons.calendar_month_outlined),
-            onPressed: () => ref
-                .read(statementIsAnnualProvider.notifier)
-                .state = !isAnnual,
+            onPressed: () {
+              // Tentando ativar a visão anual — recurso Pro
+              if (!isAnnual && !ref.read(isProProvider)) {
+                showProGateBottomSheet(
+                  context,
+                  featureName: 'Visão Anual',
+                  featureDescription:
+                      'Analise todas as suas transações do ano de uma vez.',
+                  featureIcon: Icons.calendar_month_rounded,
+                );
+                return;
+              }
+              ref.read(statementIsAnnualProvider.notifier).state = !isAnnual;
+            },
           ),
         ],
       ),
