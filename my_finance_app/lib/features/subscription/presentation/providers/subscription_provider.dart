@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
@@ -18,9 +19,8 @@ import '../../domain/usecases/watch_subscription_usecase.dart';
 
 const kIapMonthly = 'pro_monthly';
 const kIapAnnual = 'pro_annual';
-const kIapLifetime = 'pro_lifetime';
 
-const _kProductIds = {kIapMonthly, kIapAnnual, kIapLifetime};
+const _kProductIds = {kIapMonthly, kIapAnnual};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Infraestrutura
@@ -136,6 +136,7 @@ class IAPNotifier extends StateNotifier<IAPState> {
   }
 
   Future<void> initialize() async {
+    if (kIsWeb) return;
     if (state.isLoading) return;
     state = state.copyWith(isLoading: true, clearError: true);
 
@@ -156,6 +157,9 @@ class IAPNotifier extends StateNotifier<IAPState> {
     // Busca detalhes dos produtos
     final response =
         await InAppPurchase.instance.queryProductDetails(_kProductIds);
+    print('[IAP] encontrados: ${response.productDetails.map((p) => p.id).toList()}');
+    print('[IAP] não encontrados: ${response.notFoundIDs}');
+    print('[IAP] erro: ${response.error}');
     state = state.copyWith(
       isLoading: false,
       isAvailable: true,
@@ -215,8 +219,6 @@ class IAPNotifier extends StateNotifier<IAPState> {
         return SubscriptionType.monthly;
       case kIapAnnual:
         return SubscriptionType.annual;
-      case kIapLifetime:
-        return SubscriptionType.lifetime;
       default:
         return SubscriptionType.none;
     }
@@ -229,8 +231,6 @@ class IAPNotifier extends StateNotifier<IAPState> {
         return now.add(const Duration(days: 32));
       case SubscriptionType.annual:
         return now.add(const Duration(days: 366));
-      case SubscriptionType.lifetime:
-        return null;
       default:
         return null;
     }
@@ -238,9 +238,13 @@ class IAPNotifier extends StateNotifier<IAPState> {
 
   Future<void> buyMonthly() => _buy(kIapMonthly);
   Future<void> buyAnnual() => _buy(kIapAnnual);
-  Future<void> buyLifetime() => _buy(kIapLifetime);
 
   Future<void> _buy(String productId) async {
+    if (kIsWeb) {
+      state = state.copyWith(
+          errorMessage: 'Compras não disponíveis na versão web.');
+      return;
+    }
     final product =
         state.products.where((p) => p.id == productId).firstOrNull;
     if (product == null) {
@@ -261,6 +265,7 @@ class IAPNotifier extends StateNotifier<IAPState> {
   }
 
   Future<void> restorePurchases() async {
+    if (kIsWeb) return;
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       await InAppPurchase.instance.restorePurchases();

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
-import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
@@ -27,7 +27,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     DashboardScreen(),
     TransactionsScreen(),
     PlanningScreen(),
-    SettingsScreen(),
+    ReportsScreen(),
   ];
 
   @override
@@ -87,9 +87,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               onTap: (i) => setState(() => _currentIndex = i),
             ),
             _NavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: l10n.navProfile,
+              icon: Icons.bar_chart_outlined,
+              activeIcon: Icons.bar_chart_rounded,
+              label: l10n.navReports,
               index: 3,
               currentIndex: _currentIndex,
               onTap: (i) => setState(() => _currentIndex = i),

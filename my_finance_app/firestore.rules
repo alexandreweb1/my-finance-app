@@ -50,5 +50,30 @@ service cloud.firestore {
       allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
       allow create:               if isSignedIn() && isCreatingOwnDoc();
     }
+
+    // ── /subscriptions/{userId} ───────────────────────────────────────────────
+    // Document ID == userId; only the owner can read/write their subscription.
+    match /subscriptions/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ── /invitations/{invitationId} ───────────────────────────────────────────
+    // Master: can create, read, update and delete their own invitations.
+    // Invitee: can read and update (accept/decline) invitations sent to their email.
+    match /invitations/{invitationId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.masterUserId == request.auth.uid;
+
+      allow read:   if isSignedIn()
+                    && (resource.data.masterUserId == request.auth.uid
+                        || resource.data.inviteeEmail == request.auth.token.email);
+
+      allow update: if isSignedIn()
+                    && (resource.data.masterUserId == request.auth.uid
+                        || resource.data.inviteeEmail == request.auth.token.email);
+
+      allow delete: if isSignedIn()
+                    && resource.data.masterUserId == request.auth.uid;
+    }
   }
 }

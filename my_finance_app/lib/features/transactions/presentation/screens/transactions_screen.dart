@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -8,24 +6,11 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
-import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/transaction_list_tile.dart';
 
 // Number of months to show in the quick picker
 const _kPickerMonths = 24;
-
-// Pie-chart slice colours (8 distinct)
-const _kPieColors = [
-  Color(0xFF2196F3),
-  Color(0xFFF44336),
-  Color(0xFF4CAF50),
-  Color(0xFFFF9800),
-  Color(0xFF9C27B0),
-  Color(0xFF00BCD4),
-  Color(0xFFFFEB3B),
-  Color(0xFF795548),
-];
 
 class TransactionsScreen extends ConsumerWidget {
   const TransactionsScreen({super.key});
@@ -129,19 +114,9 @@ class TransactionsScreen extends ConsumerWidget {
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: txs.length + 1, // +1 for pie chart footer
-                    itemBuilder: (ctx, i) {
-                      if (i < txs.length) {
-                        return TransactionListTile(transaction: txs[i]);
-                      }
-                      // Pie chart footer
-                      final expenses = txs
-                          .where((t) => t.type == TransactionType.expense)
-                          .toList();
-                      if (expenses.isEmpty) return const SizedBox.shrink();
-                      return _ExpensePieChart(
-                          transactions: expenses, fmt: fmt);
-                    },
+                    itemCount: txs.length,
+                    itemBuilder: (ctx, i) =>
+                        TransactionListTile(transaction: txs[i]),
                   ),
           ),
         ],
@@ -545,141 +520,3 @@ class _SummaryItem extends StatelessWidget {
   }
 }
 
-// ─── Expense Pie Chart ────────────────────────────────────────────────────────
-
-class _ExpensePieChart extends StatelessWidget {
-  final List<TransactionEntity> transactions;
-  final String Function(double) fmt;
-
-  const _ExpensePieChart({
-    required this.transactions,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    // Aggregate by category
-    final Map<String, double> byCategory = {};
-    for (final t in transactions) {
-      byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount;
-    }
-
-    // Sort descending so largest slice is first
-    final entries = byCategory.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final total = entries.fold<double>(0, (sum, e) => sum + e.value);
-    if (total == 0) return const SizedBox.shrink();
-
-    // Assign colours (cycle if more than 8 categories)
-    final slices = entries.asMap().entries.map((entry) {
-      final idx = entry.key;
-      final e = entry.value;
-      return _PieSlice(
-        category: e.key,
-        amount: e.value,
-        percentage: e.value / total,
-        color: _kPieColors[idx % _kPieColors.length],
-      );
-    }).toList();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Divider(),
-          const SizedBox(height: 8),
-          Text(
-            l10n.expenseByCategory,
-            style: const TextStyle(
-                fontWeight: FontWeight.w700, fontSize: 15),
-          ),
-          const SizedBox(height: 16),
-          // Pie
-          Center(
-            child: SizedBox(
-              width: 200,
-              height: 200,
-              child: CustomPaint(
-                painter: _PieChartPainter(slices: slices),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Legend
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: slices.map((s) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: s.color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${s.category} · ${(s.percentage * 100).toStringAsFixed(1)}%',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PieSlice {
-  final String category;
-  final double amount;
-  final double percentage;
-  final Color color;
-
-  const _PieSlice({
-    required this.category,
-    required this.amount,
-    required this.percentage,
-    required this.color,
-  });
-}
-
-class _PieChartPainter extends CustomPainter {
-  final List<_PieSlice> slices;
-
-  const _PieChartPainter({required this.slices});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    const gapAngle = 0.025; // radians gap between slices
-
-    double startAngle = -math.pi / 2; // start at top
-
-    for (final slice in slices) {
-      final sweepAngle = slice.percentage * 2 * math.pi - gapAngle;
-      final paint = Paint()
-        ..color = slice.color
-        ..style = PaintingStyle.fill;
-
-      canvas.drawArc(rect, startAngle, sweepAngle, true, paint);
-      startAngle += slice.percentage * 2 * math.pi;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PieChartPainter oldDelegate) =>
-      oldDelegate.slices != slices;
-}

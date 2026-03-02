@@ -38,6 +38,7 @@ class AppLocalizations {
   String get navStatement => _t('Extrato', 'Statement', 'Extracto');
   String get navPlanning => _t('Planejamento', 'Planning', 'Planificación');
   String get navProfile => _t('Perfil', 'Profile', 'Perfil');
+  String get navReports => _t('Relatórios', 'Reports', 'Informes');
   String get newTransaction => _t('Nova Transação', 'New Transaction', 'Nueva Transacción');
 
   // ── Dashboard ────────────────────────────────────────────────────────────

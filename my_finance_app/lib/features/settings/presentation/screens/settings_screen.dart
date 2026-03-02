@@ -6,6 +6,7 @@ import '../../../../core/providers/app_settings_provider.dart';
 import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../sharing/presentation/providers/sharing_provider.dart';
@@ -222,17 +223,16 @@ class SettingsScreen extends ConsumerWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        CircleAvatar(
+                        UserAvatar(
+                          photoUrl: user?.photoUrl,
+                          initials: initials,
                           radius: 34,
                           backgroundColor:
                               Colors.white.withValues(alpha: 0.22),
-                          child: Text(
-                            initials,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          textStyle: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                         const SizedBox(width: 14),

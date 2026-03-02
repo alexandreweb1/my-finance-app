@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../budget/domain/entities/budget_entity.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
@@ -41,6 +43,7 @@ class DashboardScreen extends ConsumerWidget {
     final dateLoc = ref.watch(dateLocaleProvider);
     final name = user?.displayName?.split(' ').first ?? l10n.hello;
     final greeting = _greeting(l10n);
+    final initials = _initials(user?.displayName);
 
     // Transactions filtered to the selected month (visible wallets only)
     final monthTxs = visibleTxs
@@ -66,6 +69,12 @@ class DashboardScreen extends ConsumerWidget {
             greeting: greeting,
             balance: balance,
             transactions: visibleTxs,
+            userInitials: initials,
+            userPhotoUrl: user?.photoUrl,
+            onSettingsTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
           ),
 
           const SizedBox(height: 20),
@@ -134,6 +143,13 @@ class DashboardScreen extends ConsumerWidget {
     if (hour < 18) return l10n.goodAfternoon;
     return l10n.goodEvening;
   }
+
+  static String _initials(String? displayName) {
+    if (displayName == null || displayName.trim().isEmpty) return '?';
+    final parts = displayName.trim().split(' ');
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return (parts.first[0] + parts.last[0]).toUpperCase();
+  }
 }
 
 // ─── Dark Header ──────────────────────────────────────────────────────────────
@@ -142,12 +158,18 @@ class _DarkHeader extends ConsumerWidget {
   final String greeting;
   final double balance;
   final List<TransactionEntity> transactions;
+  final String userInitials;
+  final String? userPhotoUrl;
+  final VoidCallback onSettingsTap;
 
   const _DarkHeader({
     required this.name,
     required this.greeting,
     required this.balance,
     required this.transactions,
+    required this.userInitials,
+    this.userPhotoUrl,
+    required this.onSettingsTap,
   });
 
   @override
@@ -176,7 +198,7 @@ class _DarkHeader extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                Flexible(
+                Expanded(
                   child: Text(
                     '$greeting, $name!',
                     overflow: TextOverflow.ellipsis,
@@ -187,13 +209,19 @@ class _DarkHeader extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.logout_outlined,
-                      color: Colors.white70, size: 20),
-                  tooltip: 'Sair',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () =>
-                      ref.read(authNotifierProvider.notifier).signOut(),
+                GestureDetector(
+                  onTap: onSettingsTap,
+                  child: UserAvatar(
+                    photoUrl: userPhotoUrl,
+                    initials: userInitials,
+                    radius: 18,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    textStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -286,15 +314,31 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
     });
   }
 
-  List<double> _monthlyBalances(List<DateTime> months) {
+  List<double> _monthlyIncome(List<DateTime> months) {
     return months.map((month) {
-      double bal = 0;
+      double total = 0;
       for (final t in widget.transactions) {
-        if (t.date.year == month.year && t.date.month == month.month) {
-          bal += t.isIncome ? t.amount : -t.amount;
+        if (t.date.year == month.year &&
+            t.date.month == month.month &&
+            t.isIncome) {
+          total += t.amount;
         }
       }
-      return bal;
+      return total;
+    }).toList();
+  }
+
+  List<double> _monthlyExpenses(List<DateTime> months) {
+    return months.map((month) {
+      double total = 0;
+      for (final t in widget.transactions) {
+        if (t.date.year == month.year &&
+            t.date.month == month.month &&
+            !t.isIncome) {
+          total += t.amount;
+        }
+      }
+      return total;
     }).toList();
   }
 
@@ -303,11 +347,18 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
     final dateLoc = ref.watch(dateLocaleProvider);
     final selectedMonth = ref.watch(dashboardSelectedMonthProvider);
     final months = _months();
-    final rawData = _monthlyBalances(months);
-    final allZero = rawData.every((v) => v == 0);
-    final data = allZero
-        ? [0.0, 40.0, 80.0, 60.0, 120.0, 100.0, 200.0, 180.0, 250.0, 220.0, 300.0, 400.0]
-        : rawData;
+    final rawIncome = _monthlyIncome(months);
+    final rawExpenses = _monthlyExpenses(months);
+    final allZero =
+        rawIncome.every((v) => v == 0) && rawExpenses.every((v) => v == 0);
+    final incomeData = allZero
+        ? [40.0, 80.0, 60.0, 120.0, 100.0, 200.0, 180.0, 250.0, 220.0,
+           300.0, 350.0, 400.0]
+        : rawIncome;
+    final expenseData = allZero
+        ? [20.0, 40.0, 90.0, 50.0, 140.0, 80.0, 220.0, 100.0, 180.0,
+           150.0, 200.0, 250.0]
+        : rawExpenses;
 
     // Index of the selected month within our months list (-1 if not found).
     final selectedIdx = months.indexWhere((m) =>
@@ -344,7 +395,8 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
                   width: totalWidth,
                   child: CustomPaint(
                     painter: _SparklinePainter(
-                      data: data,
+                      incomeData: incomeData,
+                      expenseData: expenseData,
                       selectedIndex: selectedIdx,
                     ),
                     size: const Size(totalWidth, 80),
@@ -358,6 +410,7 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
                     final isSelected = i == selectedIdx;
                     final label = DateFormat('MMM', dateLoc).format(month);
                     return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () {
                         ref
                             .read(dashboardSelectedMonthProvider.notifier)
@@ -365,8 +418,9 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
                       },
                       child: SizedBox(
                         width: _kMonthColWidth,
+                        height: 44,
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               label,
@@ -409,50 +463,36 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
 }
 
 class _SparklinePainter extends CustomPainter {
-  final List<double> data;
+  final List<double> incomeData;
+  final List<double> expenseData;
   final int selectedIndex;
 
+  static const _kRed = Color(0xFFE05252);
+
   const _SparklinePainter({
-    required this.data,
+    required this.incomeData,
+    required this.expenseData,
     required this.selectedIndex,
   });
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.length < 2) return;
-
-    final minV = data.reduce(math.min);
-    final maxV = data.reduce(math.max);
+  List<Offset> _toPoints(List<double> data, double minV, double maxV, Size size) {
     final range = (maxV - minV).abs();
     final effectiveRange = range < 1 ? 1.0 : range;
-
-    final points = List.generate(data.length, (i) {
+    return List.generate(data.length, (i) {
       final x = i / (data.length - 1) * size.width;
       final norm = range < 1 ? 0.5 : (data[i] - minV) / effectiveRange;
       final y = size.height - (norm * size.height * 0.75) - size.height * 0.1;
       return Offset(x, y);
     });
+  }
 
-    // Selected month highlight column
-    if (selectedIndex >= 0 && selectedIndex < data.length) {
-      final colW = size.width / data.length;
-      final colX = selectedIndex * colW;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(colX, 0, colW, size.height),
-          const Radius.circular(4),
-        ),
-        Paint()..color = Colors.white.withValues(alpha: 0.08),
-      );
-    }
-
+  void _drawSeries(Canvas canvas, Size size, List<Offset> points, Color color) {
     // Area fill
     final fill = Path()..moveTo(0, size.height);
     fill.lineTo(points.first.dx, points.first.dy);
     for (int i = 1; i < points.length; i++) {
       final cx = (points[i - 1].dx + points[i].dx) / 2;
-      fill.cubicTo(
-          cx, points[i - 1].dy, cx, points[i].dy, points[i].dx, points[i].dy);
+      fill.cubicTo(cx, points[i - 1].dy, cx, points[i].dy, points[i].dx, points[i].dy);
     }
     fill.lineTo(size.width, size.height);
     fill.close();
@@ -464,8 +504,8 @@ class _SparklinePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            _kGreen.withValues(alpha: 0.45),
-            _kGreen.withValues(alpha: 0.02),
+            color.withValues(alpha: 0.25),
+            color.withValues(alpha: 0.0),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
     );
@@ -474,29 +514,66 @@ class _SparklinePainter extends CustomPainter {
     final line = Path()..moveTo(points.first.dx, points.first.dy);
     for (int i = 1; i < points.length; i++) {
       final cx = (points[i - 1].dx + points[i].dx) / 2;
-      line.cubicTo(
-          cx, points[i - 1].dy, cx, points[i].dy, points[i].dx, points[i].dy);
+      line.cubicTo(cx, points[i - 1].dy, cx, points[i].dy, points[i].dx, points[i].dy);
     }
     canvas.drawPath(
-        line,
-        Paint()
-          ..color = _kGreen
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5
-          ..strokeCap = StrokeCap.round);
+      line,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+  }
 
-    // Dot on the selected month (or last point if nothing selected)
-    final dotIdx =
-        selectedIndex >= 0 && selectedIndex < points.length
-            ? selectedIndex
-            : points.length - 1;
-    canvas.drawCircle(points[dotIdx], 5, Paint()..color = _kGreen);
-    canvas.drawCircle(points[dotIdx], 3, Paint()..color = Colors.white);
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (incomeData.length < 2 || expenseData.length < 2) return;
+
+    // Shared scale across both series so lines are comparable
+    final allValues = [...incomeData, ...expenseData];
+    final minV = allValues.reduce(math.min);
+    final maxV = allValues.reduce(math.max);
+
+    final incomePoints = _toPoints(incomeData, minV, maxV, size);
+    final expensePoints = _toPoints(expenseData, minV, maxV, size);
+
+    // Selected month highlight column
+    if (selectedIndex >= 0 && selectedIndex < incomeData.length) {
+      final colW = size.width / incomeData.length;
+      final colX = selectedIndex * colW;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(colX, 0, colW, size.height),
+          const Radius.circular(4),
+        ),
+        Paint()..color = Colors.white.withValues(alpha: 0.08),
+      );
+    }
+
+    // Draw expense (red) first so income (green) renders on top
+    _drawSeries(canvas, size, expensePoints, _kRed);
+    _drawSeries(canvas, size, incomePoints, _kGreen);
+
+    // Dots on selected month (or last point)
+    final dotIdx = selectedIndex >= 0 && selectedIndex < incomePoints.length
+        ? selectedIndex
+        : incomePoints.length - 1;
+
+    // Expense dot
+    canvas.drawCircle(expensePoints[dotIdx], 4, Paint()..color = _kRed);
+    canvas.drawCircle(expensePoints[dotIdx], 2.5, Paint()..color = Colors.white);
+
+    // Income dot
+    canvas.drawCircle(incomePoints[dotIdx], 5, Paint()..color = _kGreen);
+    canvas.drawCircle(incomePoints[dotIdx], 3, Paint()..color = Colors.white);
   }
 
   @override
   bool shouldRepaint(_SparklinePainter old) =>
-      old.data != data || old.selectedIndex != selectedIndex;
+      old.incomeData != incomeData ||
+      old.expenseData != expenseData ||
+      old.selectedIndex != selectedIndex;
 }
 
 // ─── Income / Expense Row ─────────────────────────────────────────────────────

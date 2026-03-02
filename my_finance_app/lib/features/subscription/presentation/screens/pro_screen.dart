@@ -127,20 +127,6 @@ class ProScreen extends ConsumerWidget {
                     onTap: () =>
                         ref.read(iapNotifierProvider.notifier).buyAnnual(),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Vitalício
-                  _PriceCard(
-                    planName: 'Vitalício',
-                    price: 'R\$ 120,00',
-                    period: '',
-                    detail: 'Pagamento único · Acesso para sempre',
-                    isHighlighted: false,
-                    isLoading: iapState.isLoading,
-                    buttonLabel: 'Comprar',
-                    onTap: () =>
-                        ref.read(iapNotifierProvider.notifier).buyLifetime(),
-                  ),
                   const SizedBox(height: 20),
 
                   // Erro do IAP
@@ -246,8 +232,6 @@ class _ActivePlanCard extends StatelessWidget {
         return 'Pro Mensal';
       case 'annual':
         return 'Pro Anual';
-      case 'lifetime':
-        return 'Pro Vitalício';
       default:
         return 'Pro';
     }
@@ -295,15 +279,6 @@ class _ActivePlanCard extends StatelessWidget {
                               .colorScheme
                               .onSurface
                               .withValues(alpha: 0.55),
-                        ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Acesso vitalício',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: _kGreen,
-                          fontWeight: FontWeight.w600,
                         ),
                   ),
                 ],
@@ -440,7 +415,6 @@ class _PriceCard extends StatelessWidget {
   final String? savings;
   final bool isHighlighted;
   final bool isLoading;
-  final String buttonLabel;
   final VoidCallback onTap;
 
   const _PriceCard({
@@ -451,7 +425,6 @@ class _PriceCard extends StatelessWidget {
     this.savings,
     required this.isHighlighted,
     required this.isLoading,
-    this.buttonLabel = 'Assinar',
     required this.onTap,
   });
 
@@ -555,8 +528,8 @@ class _PriceCard extends StatelessWidget {
                             color: Colors.black,
                           ),
                         )
-                      : Text(buttonLabel,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      : const Text('Assinar',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

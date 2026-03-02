@@ -57,8 +57,6 @@ class SubscriptionModel extends SubscriptionEntity {
         return SubscriptionType.monthly;
       case 'annual':
         return SubscriptionType.annual;
-      case 'lifetime':
-        return SubscriptionType.lifetime;
       default:
         return SubscriptionType.none;
     }
@@ -75,8 +73,6 @@ class SubscriptionModel extends SubscriptionEntity {
         return 'monthly';
       case SubscriptionType.annual:
         return 'annual';
-      case SubscriptionType.lifetime:
-        return 'lifetime';
       case SubscriptionType.none:
         return 'none';
     }

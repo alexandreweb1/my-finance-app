@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum SubscriptionType { monthly, annual, lifetime, none }
+enum SubscriptionType { monthly, annual, none }
 
 enum SubscriptionStatus { active, expired }
 
@@ -35,7 +35,6 @@ class SubscriptionEntity extends Equatable {
   /// - Ainda não expirou
   bool get isActive {
     if (status != SubscriptionStatus.active) return false;
-    if (type == SubscriptionType.lifetime) return true;
     if (expiryDate == null) return true;
     return expiryDate!.isAfter(DateTime.now());
   }
