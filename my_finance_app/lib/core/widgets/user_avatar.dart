@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// CircleAvatar that shows [photoUrl] when available, falling back to
 /// [initials] text if the image fails to load or is absent.
-class UserAvatar extends StatefulWidget {
+/// Works reliably on mobile and web via Image.network + ClipOval.
+class UserAvatar extends StatelessWidget {
   final String? photoUrl;
   final String initials;
   final double radius;
@@ -19,36 +20,35 @@ class UserAvatar extends StatefulWidget {
   });
 
   @override
-  State<UserAvatar> createState() => _UserAvatarState();
-}
+  Widget build(BuildContext context) {
+    final url = photoUrl?.trim();
+    final hasPhoto = url != null && url.isNotEmpty;
+    final size = radius * 2;
 
-class _UserAvatarState extends State<UserAvatar> {
-  bool _imageError = false;
-
-  @override
-  void didUpdateWidget(UserAvatar old) {
-    super.didUpdateWidget(old);
-    // Reset error state when URL changes
-    if (old.photoUrl != widget.photoUrl) {
-      _imageError = false;
+    if (hasPhoto) {
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          // Show initials while the photo is loading
+          loadingBuilder: (_, child, progress) =>
+              progress == null ? child : _initialsAvatar(),
+          // Fall back to initials if the URL fails to load
+          errorBuilder: (_, __, ___) => _initialsAvatar(),
+        ),
+      );
     }
+
+    return _initialsAvatar();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final hasPhoto = widget.photoUrl?.isNotEmpty == true && !_imageError;
+  Widget _initialsAvatar() {
     return CircleAvatar(
-      radius: widget.radius,
-      backgroundColor: widget.backgroundColor,
-      backgroundImage: hasPhoto ? NetworkImage(widget.photoUrl!) : null,
-      onBackgroundImageError: hasPhoto
-          ? (_, __) {
-              if (mounted) setState(() => _imageError = true);
-            }
-          : null,
-      child: !hasPhoto
-          ? Text(widget.initials, style: widget.textStyle)
-          : null,
+      radius: radius,
+      backgroundColor: backgroundColor,
+      child: Text(initials, style: textStyle),
     );
   }
 }
