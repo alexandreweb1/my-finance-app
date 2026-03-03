@@ -28,4 +28,6 @@ abstract class AuthRepository {
 
   Future<Either<Failure, void>> updatePassword(
       String currentPassword, String newPassword);
+
+  Future<Either<Failure, void>> linkEmailPassword(String password);
 }

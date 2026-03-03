@@ -132,6 +132,85 @@ final statementMonthTransactionsProvider =
       .toList();
 });
 
+// --- Type filter for statement (null = show all) ---
+
+final statementTypeFilterProvider = StateProvider<TransactionType?>(
+  (ref) => null,
+);
+
+// --- Custom date range for statement – PRO feature ---
+// Stored as (startDate, endDate); null = not active.
+final statementDateRangeProvider = StateProvider<(DateTime, DateTime)?>(
+  (ref) => null,
+);
+
+// --- Display providers: respects date range + type filter ---
+
+final statementDisplayTransactionsProvider =
+    Provider<List<TransactionEntity>>((ref) {
+  final isAnnual = ref.watch(statementIsAnnualProvider);
+  final typeFilter = ref.watch(statementTypeFilterProvider);
+  final dateRange = ref.watch(statementDateRangeProvider);
+
+  List<TransactionEntity> txs;
+  if (dateRange != null) {
+    final (start, end) = dateRange;
+    final endInclusive = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    txs = ref
+        .watch(visibleTransactionsProvider)
+        .where((t) =>
+            !t.date.isBefore(start) && !t.date.isAfter(endInclusive))
+        .toList();
+  } else if (isAnnual) {
+    txs = ref.watch(statementAnnualTransactionsProvider);
+  } else {
+    txs = ref.watch(statementMonthTransactionsProvider);
+  }
+
+  if (typeFilter != null) {
+    txs = txs.where((t) => t.type == typeFilter).toList();
+  }
+  return txs;
+});
+
+final statementDisplayIncomeProvider = Provider<double>((ref) {
+  final dateRange = ref.watch(statementDateRangeProvider);
+  if (dateRange != null) {
+    final (start, end) = dateRange;
+    final endInclusive = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    return ref
+        .watch(visibleTransactionsProvider)
+        .where((t) =>
+            t.isIncome &&
+            !t.date.isBefore(start) &&
+            !t.date.isAfter(endInclusive))
+        .fold(0.0, (sum, t) => sum + t.amount);
+  }
+  final isAnnual = ref.watch(statementIsAnnualProvider);
+  return isAnnual
+      ? ref.watch(statementAnnualIncomeProvider)
+      : ref.watch(statementMonthIncomeProvider);
+});
+
+final statementDisplayExpenseProvider = Provider<double>((ref) {
+  final dateRange = ref.watch(statementDateRangeProvider);
+  if (dateRange != null) {
+    final (start, end) = dateRange;
+    final endInclusive = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    return ref
+        .watch(visibleTransactionsProvider)
+        .where((t) =>
+            t.isExpense &&
+            !t.date.isBefore(start) &&
+            !t.date.isAfter(endInclusive))
+        .fold(0.0, (sum, t) => sum + t.amount);
+  }
+  final isAnnual = ref.watch(statementIsAnnualProvider);
+  return isAnnual
+      ? ref.watch(statementAnnualExpenseProvider)
+      : ref.watch(statementMonthExpenseProvider);
+});
+
 // --- Annual toggle ---
 
 final statementIsAnnualProvider = StateProvider<bool>((ref) => false);

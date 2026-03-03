@@ -63,7 +63,17 @@ final categoriesStreamProvider =
 // --- Filtered Providers ---
 
 final incomeCategoriesProvider = Provider<List<CategoryEntity>>((ref) {
-  return ref.watch(categoriesStreamProvider).value?.where((c) => c.isIncome).toList() ?? [];
+  final all = ref.watch(categoriesStreamProvider).value?.where((c) => c.isIncome).toList() ?? [];
+  all.sort((a, b) {
+    final aName = a.name.toLowerCase().trim();
+    final bName = b.name.toLowerCase().trim();
+    final aIsSalary = aName == 'salário' || aName == 'salario';
+    final bIsSalary = bName == 'salário' || bName == 'salario';
+    if (aIsSalary && !bIsSalary) return -1;
+    if (!aIsSalary && bIsSalary) return 1;
+    return a.name.compareTo(b.name);
+  });
+  return all;
 });
 
 final expenseCategoriesProvider = Provider<List<CategoryEntity>>((ref) {

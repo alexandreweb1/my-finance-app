@@ -104,4 +104,14 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(AuthFailure(e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> linkEmailPassword(String password) async {
+    try {
+      await remoteDataSource.linkEmailPassword(password);
+      return const Right(null);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
+    }
+  }
 }

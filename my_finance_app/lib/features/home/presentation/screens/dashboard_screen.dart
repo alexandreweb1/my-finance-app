@@ -14,6 +14,7 @@ import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../transactions/presentation/widgets/transaction_list_tile.dart';
 import '../providers/dashboard_provider.dart';
+import 'main_screen.dart';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const _kNavy = Color(0xFF1A2B4A);
@@ -587,6 +588,16 @@ class _IncomeExpenseRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final fmt = ref.watch(currencyFormatterProvider);
+    final typeFilter = ref.watch(statementTypeFilterProvider);
+
+    void onTapType(TransactionType type) {
+      // Toggle: tapping the same type clears the filter
+      ref.read(statementTypeFilterProvider.notifier).state =
+          typeFilter == type ? null : type;
+      // Navigate to the statement tab (index 1)
+      ref.read(mainTabIndexProvider.notifier).state = 1;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -598,6 +609,8 @@ class _IncomeExpenseRow extends ConsumerWidget {
               icon: Icons.arrow_downward_rounded,
               iconColor: _kGreen,
               valueColor: _kGreen,
+              isActive: typeFilter == TransactionType.income,
+              onTap: () => onTapType(TransactionType.income),
             ),
           ),
           const SizedBox(width: 16),
@@ -608,6 +621,8 @@ class _IncomeExpenseRow extends ConsumerWidget {
               icon: Icons.arrow_upward_rounded,
               iconColor: const Color(0xFFE05252),
               valueColor: const Color(0xFFE05252),
+              isActive: typeFilter == TransactionType.expense,
+              onTap: () => onTapType(TransactionType.expense),
             ),
           ),
         ],
@@ -622,6 +637,8 @@ class _MiniStatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final Color valueColor;
+  final bool isActive;
+  final VoidCallback? onTap;
 
   const _MiniStatCard({
     required this.label,
@@ -629,62 +646,69 @@ class _MiniStatCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.valueColor,
+    this.isActive = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: isActive ? Border.all(color: iconColor, width: 2) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w500)),
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: valueColor,
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: isActive ? 0.25 : 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: valueColor,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

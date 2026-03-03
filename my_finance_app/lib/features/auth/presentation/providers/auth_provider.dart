@@ -53,6 +53,14 @@ final authStateProvider = StreamProvider<UserEntity?>(
   (ref) => ref.watch(authRepositoryProvider).authStateChanges,
 );
 
+// Reactive provider: true when the current Firebase user has an email+password
+// credential linked (vs Google-only). Re-evaluates whenever auth state changes.
+final hasPasswordProviderProvider = Provider<bool>((ref) {
+  ref.watch(authStateProvider); // rebuild when auth changes
+  final user = ref.watch(firebaseAuthProvider).currentUser;
+  return user?.providerData.any((p) => p.providerId == 'password') ?? false;
+});
+
 // --- Auth Notifier ---
 
 class AuthState {
@@ -150,6 +158,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result =
         await _authRepository.updatePassword(currentPassword, newPassword);
+    return result.fold(
+      (failure) {
+        state = AuthState(errorMessage: failure.message);
+        return false;
+      },
+      (_) {
+        state = const AuthState();
+        return true;
+      },
+    );
+  }
+
+  Future<bool> linkEmailPassword(String password) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    final result = await _authRepository.linkEmailPassword(password);
     return result.fold(
       (failure) {
         state = AuthState(errorMessage: failure.message);

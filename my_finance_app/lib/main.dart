@@ -122,6 +122,17 @@ class AppRouter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authAsync = ref.watch(authStateProvider);
 
+    // Pop all pushed routes when the user signs out so the login screen
+    // becomes visible immediately instead of leaving settings/other screens
+    // sitting on top of the navigation stack.
+    ref.listen<AsyncValue<UserEntity?>>(authStateProvider, (previous, next) {
+      next.whenData((user) {
+        if (user == null) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+    });
+
     return authAsync.when(
       data: (UserEntity? user) =>
           user != null ? const MainScreen() : const LoginScreen(),

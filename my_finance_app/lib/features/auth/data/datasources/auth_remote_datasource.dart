@@ -29,6 +29,10 @@ abstract class AuthRemoteDataSource {
   Future<void> updateProfile({String? displayName});
 
   Future<void> updatePassword(String currentPassword, String newPassword);
+
+  /// Links an email+password credential to the current (Google) account,
+  /// enabling dual sign-in for the same Firebase user.
+  Future<void> linkEmailPassword(String password);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -147,10 +151,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> signOut() async {
     try {
-      await Future.wait([
-        _firebaseAuth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
+      // Sign out of Firebase first — triggers authStateChanges immediately.
+      await _firebaseAuth.signOut();
+      // Google sign-out in background (slower network call, not required for UI update).
+      _googleSignIn.signOut().ignore();
     } catch (e) {
       throw const AuthException('Erro ao sair da conta.');
     }
@@ -210,6 +214,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await user.updatePassword(newPassword);
     } on FirebaseAuthException catch (e) {
       throw AuthException(e.message ?? 'Erro ao alterar senha.');
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      throw AuthException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> linkEmailPassword(String password) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null || user.email == null) {
+        throw const AuthException('Usuário não autenticado.');
+      }
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.linkWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(e.message ?? 'Erro ao definir senha.');
     } on AuthException {
       rethrow;
     } catch (e) {

@@ -185,6 +185,7 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider);
     final incomeCategories = ref.watch(incomeCategoriesProvider);
     final expenseCategories = ref.watch(expenseCategoriesProvider);
+    final hasPasswordProvider = ref.watch(hasPasswordProviderProvider);
 
     final displayName = user?.displayName ?? '';
     final email = user?.email ?? '';
@@ -292,15 +293,24 @@ class SettingsScreen extends ConsumerWidget {
 
                 // Account
                 _SettingsCard(children: [
-                  ListTile(
-                    leading: const _IconBadge(Icons.lock_outline,
-                        color: Color(0xFF5C6BC0)),
-                    title: Text(l10n.changePassword),
-                    trailing:
-                        const Icon(Icons.chevron_right, size: 20),
-                    onTap: () =>
-                        _showChangePasswordDialog(context, ref),
-                  ),
+                  if (hasPasswordProvider)
+                    ListTile(
+                      leading: const _IconBadge(Icons.lock_outline,
+                          color: Color(0xFF5C6BC0)),
+                      title: Text(l10n.changePassword),
+                      trailing: const Icon(Icons.chevron_right, size: 20),
+                      onTap: () => _showChangePasswordDialog(context, ref),
+                    )
+                  else
+                    ListTile(
+                      leading: const _IconBadge(Icons.password_outlined,
+                          color: Color(0xFF7B68EE)),
+                      title: Text(l10n.setPassword),
+                      subtitle: Text(l10n.setPasswordSubtitle,
+                          style: const TextStyle(fontSize: 12)),
+                      trailing: const Icon(Icons.chevron_right, size: 20),
+                      onTap: () => _showSetPasswordDialog(context),
+                    ),
                 ]),
                 const SizedBox(height: 12),
 
@@ -418,6 +428,11 @@ class SettingsScreen extends ConsumerWidget {
   void _showChangePasswordDialog(BuildContext context, WidgetRef ref) {
     showDialog(
         context: context, builder: (_) => const _ChangePasswordDialog());
+  }
+
+  void _showSetPasswordDialog(BuildContext context) {
+    showDialog(
+        context: context, builder: (_) => const _SetPasswordDialog());
   }
 
   void _showCurrencyDialog(
@@ -733,6 +748,99 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Set Password Dialog (for Google-only users who want to add email/password)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SetPasswordDialog extends ConsumerStatefulWidget {
+  const _SetPasswordDialog();
+
+  @override
+  ConsumerState<_SetPasswordDialog> createState() =>
+      _SetPasswordDialogState();
+}
+
+class _SetPasswordDialogState extends ConsumerState<_SetPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _pwController = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _pwController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .linkEmailPassword(_pwController.text);
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    if (success) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.passwordSet)),
+      );
+    } else {
+      final err = ref.read(authNotifierProvider).errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err ?? 'Erro ao definir senha.'),
+        backgroundColor: Colors.red.shade700,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final isLoading = ref.watch(authNotifierProvider).isLoading;
+    return AlertDialog(
+      title: Text(l10n.setPassword),
+      content: SizedBox(
+        width: 360,
+        child: Form(
+          key: _formKey,
+          child: TextFormField(
+            controller: _pwController,
+            obscureText: _obscure,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: l10n.newPassword,
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(
+                    _obscure ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return l10n.enterNewPassword;
+              if (v.length < 6) return l10n.minChars;
+              return null;
+            },
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.cancel)),
+        FilledButton(
+          onPressed: isLoading ? null : _submit,
+          child: isLoading
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(l10n.save),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Category Section
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -750,6 +858,7 @@ class _CategorySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final isPro = ref.watch(isProProvider);
     return ExpansionTile(
       title:
           Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -762,11 +871,16 @@ class _CategorySection extends ConsumerWidget {
                   color: Color(cat.colorValue), size: 20),
             ),
             title: Text(cat.name),
-            trailing: cat.isDefault
-                ? Tooltip(
-                    message: l10n.defaultCategory,
-                    child: const Icon(Icons.lock_outline,
-                        size: 16, color: Colors.grey),
+            trailing: (cat.isDefault && !isPro)
+                ? GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ProScreen()),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.lock_outline,
+                          size: 16, color: Colors.grey),
+                    ),
                   )
                 : Row(
                     mainAxisSize: MainAxisSize.min,
@@ -855,32 +969,35 @@ class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
         widget.type == CategoryType.expense ? l10n.expense : l10n.incomeType;
     return AlertDialog(
       title: Text('${l10n.newCategoryTitle} – $typeLabel'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                  labelText: l10n.categoryName,
-                  border: const OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            Text(l10n.selectIcon,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _IconPickerGrid(
-                selected: _iconCodePoint,
-                onSelected: (v) => setState(() => _iconCodePoint = v)),
-            const SizedBox(height: 16),
-            Text(l10n.selectColor,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _ColorDots(
-                selected: _colorValue,
-                onSelected: (v) => setState(() => _colorValue = v)),
-          ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                    labelText: l10n.categoryName,
+                    border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Text(l10n.selectIcon,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _IconPickerGrid(
+                  selected: _iconCodePoint,
+                  onSelected: (v) => setState(() => _iconCodePoint = v)),
+              const SizedBox(height: 16),
+              Text(l10n.selectColor,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _ColorDots(
+                  selected: _colorValue,
+                  onSelected: (v) => setState(() => _colorValue = v)),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -958,32 +1075,35 @@ class _EditCategoryDialogState extends ConsumerState<_EditCategoryDialog> {
     final isLoading = ref.watch(categoriesNotifierProvider).isLoading;
     return AlertDialog(
       title: Text(l10n.editCategory),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                  labelText: l10n.categoryName,
-                  border: const OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            Text(l10n.selectIcon,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _IconPickerGrid(
-                selected: _iconCodePoint,
-                onSelected: (v) => setState(() => _iconCodePoint = v)),
-            const SizedBox(height: 16),
-            Text(l10n.selectColor,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _ColorDots(
-                selected: _colorValue,
-                onSelected: (v) => setState(() => _colorValue = v)),
-          ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                    labelText: l10n.categoryName,
+                    border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Text(l10n.selectIcon,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _IconPickerGrid(
+                  selected: _iconCodePoint,
+                  onSelected: (v) => setState(() => _iconCodePoint = v)),
+              const SizedBox(height: 16),
+              Text(l10n.selectColor,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _ColorDots(
+                  selected: _colorValue,
+                  onSelected: (v) => setState(() => _colorValue = v)),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -1345,6 +1465,7 @@ class _WalletSection extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final walletsAsync = ref.watch(walletsStreamProvider);
     final hiddenWalletIds = ref.watch(appSettingsProvider).hiddenWalletIds;
+    final isPro = ref.watch(isProProvider);
 
     final walletTiles = walletsAsync.when(
       data: (wallets) => wallets.map((w) {
@@ -1380,11 +1501,16 @@ class _WalletSection extends ConsumerWidget {
                     .read(appSettingsProvider.notifier)
                     .toggleWalletVisibility(w.id),
               ),
-              if (w.isDefault)
-                Tooltip(
-                  message: l10n.defaultWallet,
-                  child: const Icon(Icons.lock_outline,
-                      size: 16, color: Colors.grey),
+              if (w.isDefault && !isPro)
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProScreen()),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.lock_outline,
+                        size: 16, color: Colors.grey),
+                  ),
                 )
               else ...[
                 IconButton(
@@ -1502,33 +1628,36 @@ class _AddWalletDialogState extends ConsumerState<_AddWalletDialog> {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(l10n.newWallet),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              autofocus: true,
-              decoration: InputDecoration(
-                  labelText: l10n.walletName,
-                  border: const OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            Text(l10n.selectIcon,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _IconPickerGrid(
-                selected: _iconCodePoint,
-                onSelected: (v) => setState(() => _iconCodePoint = v)),
-            const SizedBox(height: 16),
-            Text(l10n.selectColor,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _ColorDots(
-                selected: _colorValue,
-                onSelected: (v) => setState(() => _colorValue = v)),
-          ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nameController,
+                autofocus: true,
+                decoration: InputDecoration(
+                    labelText: l10n.walletName,
+                    border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Text(l10n.selectIcon,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _IconPickerGrid(
+                  selected: _iconCodePoint,
+                  onSelected: (v) => setState(() => _iconCodePoint = v)),
+              const SizedBox(height: 16),
+              Text(l10n.selectColor,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _ColorDots(
+                  selected: _colorValue,
+                  onSelected: (v) => setState(() => _colorValue = v)),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -1613,32 +1742,35 @@ class _EditWalletDialogState extends ConsumerState<_EditWalletDialog> {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(l10n.editWallet),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                  labelText: l10n.walletName,
-                  border: const OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            Text(l10n.selectIcon,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _IconPickerGrid(
-                selected: _iconCodePoint,
-                onSelected: (v) => setState(() => _iconCodePoint = v)),
-            const SizedBox(height: 16),
-            Text(l10n.selectColor,
-                style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
-            _ColorDots(
-                selected: _colorValue,
-                onSelected: (v) => setState(() => _colorValue = v)),
-          ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                    labelText: l10n.walletName,
+                    border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Text(l10n.selectIcon,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _IconPickerGrid(
+                  selected: _iconCodePoint,
+                  onSelected: (v) => setState(() => _iconCodePoint = v)),
+              const SizedBox(height: 16),
+              Text(l10n.selectColor,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              _ColorDots(
+                  selected: _colorValue,
+                  onSelected: (v) => setState(() => _colorValue = v)),
+            ],
+          ),
         ),
       ),
       actions: [

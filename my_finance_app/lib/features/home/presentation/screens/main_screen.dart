@@ -13,6 +13,9 @@ import 'dashboard_screen.dart';
 
 const _kGreen = Color(0xFF00D887);
 
+/// Allows other screens to programmatically switch the main tab.
+final mainTabIndexProvider = StateProvider<int>((ref) => 0);
+
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
@@ -36,6 +39,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     ref.watch(walletsSeedProvider);
     ref.watch(iapInitProvider); // inicializa IAP e restaura compras ao logar
     final l10n = AppLocalizations.of(context);
+
+    // Listen for external navigation (e.g. from dashboard cards)
+    ref.listen<int>(mainTabIndexProvider, (_, next) {
+      if (next != _currentIndex) setState(() => _currentIndex = next);
+    });
 
     return Scaffold(
       body: IndexedStack(
@@ -67,7 +75,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               label: l10n.navHome,
               index: 0,
               currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
+              onTap: (i) {
+                setState(() => _currentIndex = i);
+                ref.read(mainTabIndexProvider.notifier).state = i;
+              },
             ),
             _NavItem(
               icon: Icons.receipt_long_outlined,
@@ -75,7 +86,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               label: l10n.navStatement,
               index: 1,
               currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
+              onTap: (i) {
+                setState(() => _currentIndex = i);
+                ref.read(mainTabIndexProvider.notifier).state = i;
+              },
             ),
             const SizedBox(width: 56),
             _NavItem(
@@ -84,7 +98,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               label: l10n.navPlanning,
               index: 2,
               currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
+              onTap: (i) {
+                setState(() => _currentIndex = i);
+                ref.read(mainTabIndexProvider.notifier).state = i;
+              },
             ),
             _NavItem(
               icon: Icons.bar_chart_outlined,
@@ -92,7 +109,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               label: l10n.navReports,
               index: 3,
               currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
+              onTap: (i) {
+                setState(() => _currentIndex = i);
+                ref.read(mainTabIndexProvider.notifier).state = i;
+              },
             ),
           ],
         ),

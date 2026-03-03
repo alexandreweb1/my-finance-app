@@ -88,6 +88,9 @@ class AppLocalizations {
   String get selectMonth => _t('Selecionar mês', 'Select month', 'Seleccionar mes');
   String get annualView => _t('Visão anual', 'Annual view', 'Vista anual');
   String get monthlyView => _t('Visão mensal', 'Monthly view', 'Vista mensual');
+  String get customPeriod => _t('Período personalizado', 'Custom period', 'Período personalizado');
+  String get clearFilter => _t('Limpar filtro', 'Clear filter', 'Limpiar filtro');
+  String get filterAll => _t('Todos', 'All', 'Todos');
   String get expenseByCategory => _t('Gastos por categoria', 'Expenses by category', 'Gastos por categoría');
 
   // ── Wallets ───────────────────────────────────────────────────────────────
@@ -134,6 +137,9 @@ class AppLocalizations {
   String get enterNewPassword => _t('Informe a nova senha', 'Enter new password', 'Ingrese la nueva contraseña');
   String get minChars => _t('Mínimo 6 caracteres', 'Minimum 6 characters', 'Mínimo 6 caracteres');
   String get passwordChanged => _t('Senha alterada com sucesso!', 'Password changed successfully!', '¡Contraseña cambiada con éxito!');
+  String get setPassword => _t('Definir senha', 'Set password', 'Establecer contraseña');
+  String get setPasswordSubtitle => _t('Permite login com email e senha', 'Enables email & password login', 'Permite inicio de sesión con email y contraseña');
+  String get passwordSet => _t('Senha definida! Agora você pode entrar com email e senha.', 'Password set! You can now sign in with email and password.', '¡Contraseña definida! Ahora puede iniciar sesión con email y contraseña.');
   String get defaultCategory => _t('Categoria padrão', 'Default category', 'Categoría predeterminada');
   String get addExpenseCategory => _t('Adicionar despesa', 'Add expense', 'Agregar gasto');
   String get addIncomeCategory => _t('Adicionar receita', 'Add income', 'Agregar ingreso');
