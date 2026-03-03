@@ -6,6 +6,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
+import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../domain/entities/budget_entity.dart';
 import '../providers/budget_provider.dart';
 
@@ -196,12 +197,23 @@ class _EmptyBudgets extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.watch(dateLocaleProvider);
-    final prevBudgets =
-        ref.watch(previousMonthBudgetsProvider).value ?? [];
+    final prevBudgets = ref.watch(previousMonthBudgetsProvider).value ?? [];
     final isLoading = ref.watch(budgetNotifierProvider).isLoading;
+    final allTransactions = ref.watch(visibleTransactionsProvider);
     final prevMonth = DateTime(month.year, month.month - 1, 1);
     final prevMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(prevMonth);
     final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month);
+
+    // Total spent per category in the previous month
+    final prevMonthSpending = <String, double>{};
+    for (final t in allTransactions) {
+      if (t.isExpense &&
+          t.date.year == prevMonth.year &&
+          t.date.month == prevMonth.month) {
+        prevMonthSpending[t.category] =
+            (prevMonthSpending[t.category] ?? 0.0) + t.amount;
+      }
+    }
 
     return Center(
       child: Column(
@@ -234,7 +246,8 @@ class _EmptyBudgets extends ConsumerWidget {
               label: Text('${l10n.replicateFrom} $prevMonthLabel'),
               onPressed: isLoading
                   ? null
-                  : () => _confirmCopy(context, ref, prevBudgets, l10n,
+                  : () => _showCopyOptionsDialog(
+                        context, ref, prevBudgets, prevMonthSpending, l10n,
                         prevMonthLabel, currentMonthLabel),
             ),
           ],
@@ -243,43 +256,76 @@ class _EmptyBudgets extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmCopy(
+  Future<void> _showCopyOptionsDialog(
     BuildContext context,
     WidgetRef ref,
     List<BudgetEntity> prevBudgets,
+    Map<String, double> prevMonthSpending,
     AppLocalizations l10n,
     String prevMonthLabel,
     String currentMonthLabel,
   ) async {
-    final confirmed = await showDialog<bool>(
+    final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.replicateBudgets),
-        content: Text(
-          '${l10n.replicate} ${prevBudgets.length} ${l10n.replicateConfirm} '
-          '$prevMonthLabel ${l10n.replicateConfirmTo} $currentMonthLabel?',
+        title: Text('${l10n.createBudgetsFor} $currentMonthLabel'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _BudgetOptionTile(
+              icon: Icons.copy_outlined,
+              title: l10n.copyPrevLimits,
+              subtitle: '${l10n.copyPrevLimitsDesc} $prevMonthLabel',
+              onTap: () => Navigator.of(ctx).pop('copy'),
+            ),
+            const SizedBox(height: 8),
+            _BudgetOptionTile(
+              icon: Icons.insights_outlined,
+              title: l10n.baseOnSpending,
+              subtitle:
+                  '${l10n.baseOnSpendingDesc} $prevMonthLabel ${l10n.baseOnSpendingDescSuffix}',
+              onTap: () => Navigator.of(ctx).pop('spending'),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(null),
             child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.replicate),
           ),
         ],
       ),
     );
 
-    if (confirmed != true || !context.mounted) return;
+    if (choice == null || !context.mounted) return;
 
-    final success = await ref
-        .read(budgetNotifierProvider.notifier)
-        .copyFromPreviousMonth(
-          previousBudgets: prevBudgets,
-          targetMonth: month,
-        );
+    final bool success;
+    if (choice == 'copy') {
+      success = await ref
+          .read(budgetNotifierProvider.notifier)
+          .copyFromPreviousMonth(
+            previousBudgets: prevBudgets,
+            targetMonth: month,
+          );
+    } else {
+      // Build a budget list using actual spending as the limit amount
+      final spendingBudgets = prevBudgets
+          .map((b) => BudgetEntity(
+                id: b.id,
+                userId: b.userId,
+                categoryId: b.categoryId,
+                categoryName: b.categoryName,
+                limitAmount: prevMonthSpending[b.categoryName] ?? 0.0,
+                month: b.month,
+              ))
+          .toList();
+      success = await ref
+          .read(budgetNotifierProvider.notifier)
+          .copyFromPreviousMonth(
+            previousBudgets: spendingBudgets,
+            targetMonth: month,
+          );
+    }
 
     if (!context.mounted) return;
     if (!success) {
@@ -450,6 +496,66 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
               : Text(l10n.save),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Option tile used inside the copy/spending choice dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BudgetOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _BudgetOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 26, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                        fontSize: 12, color: colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                size: 18, color: colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -121,6 +121,12 @@ class AppLocalizations {
   String get spent => _t('Gasto', 'Spent', 'Gastado');
   String get limitLabel => _t('Limite', 'Limit', 'Límite');
   String get errorReplicating => _t('Erro ao replicar orçamentos.', 'Error copying budgets.', 'Error al copiar presupuestos.');
+  String get createBudgetsFor => _t('Criar orçamentos para', 'Create budgets for', 'Crear presupuestos para');
+  String get copyPrevLimits => _t('Copiar limites do mês passado', 'Copy previous month limits', 'Copiar límites del mes anterior');
+  String get copyPrevLimitsDesc => _t('Usa os mesmos limites definidos em', 'Uses the same limits defined in', 'Usa los mismos límites definidos en');
+  String get baseOnSpending => _t('Basear nos gastos reais', 'Basear nos gastos reais', 'Basar en gastos reales');
+  String get baseOnSpendingDesc => _t('Usa o total gasto em', 'Uses total spending in', 'Usa el total gastado en');
+  String get baseOnSpendingDescSuffix => _t('como limite de cada categoria', 'as the limit per category', 'como límite por categoría');
 
   // ── Settings ─────────────────────────────────────────────────────────────
   String get settings => _t('Configurações', 'Settings', 'Configuración');
