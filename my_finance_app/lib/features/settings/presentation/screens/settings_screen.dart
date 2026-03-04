@@ -948,10 +948,10 @@ class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
+    final effectiveUserId = ref.read(effectiveUserIdProvider);
+    if (effectiveUserId.isEmpty) return;
     final success = await ref.read(categoriesNotifierProvider.notifier).add(
-          userId: user.id,
+          userId: effectiveUserId,
           name: name,
           type: widget.type,
           iconCodePoint: _iconCodePoint,
@@ -1601,11 +1601,11 @@ class _AddWalletDialogState extends ConsumerState<_AddWalletDialog> {
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
+    final effectiveUserId = ref.read(effectiveUserIdProvider);
+    if (effectiveUserId.isEmpty) return;
     setState(() => _isLoading = true);
     final success = await ref.read(walletsNotifierProvider.notifier).add(
-          userId: user.id,
+          userId: effectiveUserId,
           name: name,
           iconCodePoint: _iconCodePoint,
           colorValue: _colorValue,

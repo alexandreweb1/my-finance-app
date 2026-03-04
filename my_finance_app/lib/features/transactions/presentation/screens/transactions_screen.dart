@@ -6,6 +6,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
+import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/transaction_list_tile.dart';
@@ -24,6 +25,8 @@ class TransactionsScreen extends ConsumerWidget {
     final selectedMonth = ref.watch(transactionsSelectedMonthProvider);
     final isAnnual = ref.watch(statementIsAnnualProvider);
     final dateRange = ref.watch(statementDateRangeProvider);
+    final hasFilters = ref.watch(statementHasFiltersProvider);
+    final activeFilterCount = ref.watch(statementActiveFilterCountProvider);
 
     final income = ref.watch(statementDisplayIncomeProvider);
     final expense = ref.watch(statementDisplayExpenseProvider);
@@ -35,45 +38,87 @@ class TransactionsScreen extends ConsumerWidget {
         ? selectedMonth.year.toString()
         : DateFormat('MMMM yyyy', dateLoc).format(selectedMonth);
 
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.navStatement),
         centerTitle: false,
         actions: [
-          // ── Date range picker (PRO) ─────────────────────────────────────
-          IconButton(
-            tooltip: l10n.customPeriod,
-            icon: Icon(
-              Icons.date_range_rounded,
-              color: dateRange != null
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
-            ),
-            onPressed: () => _showDateRangePicker(context, ref),
-          ),
-          // ── Annual / monthly toggle ─────────────────────────────────────
-          IconButton(
-            tooltip: isAnnual ? l10n.monthlyView : l10n.annualView,
-            icon: Icon(isAnnual
-                ? Icons.calendar_view_day_outlined
-                : Icons.calendar_month_outlined),
-            // Disabled when a custom date range is active
-            onPressed: dateRange != null
-                ? null
-                : () {
-                    if (!isAnnual && !ref.read(isProProvider)) {
-                      showProGateBottomSheet(
-                        context,
-                        featureName: 'Visão Anual',
-                        featureDescription:
-                            'Analise todas as suas transações do ano de uma vez.',
-                        featureIcon: Icons.calendar_month_rounded,
-                      );
-                      return;
-                    }
-                    ref.read(statementIsAnnualProvider.notifier).state =
-                        !isAnnual;
-                  },
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              PopupMenuButton<String>(
+                tooltip: l10n.moreOptions,
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'dateRange':
+                      _showDateRangePicker(context, ref);
+                    case 'annual':
+                      if (!isAnnual && !ref.read(isProProvider)) {
+                        showProGateBottomSheet(
+                          context,
+                          featureName: 'Visão Anual',
+                          featureDescription:
+                              'Analise todas as suas transações do ano de uma vez.',
+                          featureIcon: Icons.calendar_month_rounded,
+                        );
+                        return;
+                      }
+                      ref.read(statementIsAnnualProvider.notifier).state =
+                          !isAnnual;
+                    case 'filters':
+                      _showFilterSheet(context);
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'dateRange',
+                    child: _MenuItemRow(
+                      icon: Icons.date_range_rounded,
+                      label: l10n.customPeriod,
+                      active: dateRange != null,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'annual',
+                    enabled: dateRange == null,
+                    child: _MenuItemRow(
+                      icon: isAnnual
+                          ? Icons.calendar_view_day_outlined
+                          : Icons.calendar_month_outlined,
+                      label: isAnnual ? l10n.monthlyView : l10n.annualView,
+                      disabled: dateRange != null,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'filters',
+                    child: _MenuItemRow(
+                      icon: Icons.tune_rounded,
+                      label: l10n.filterTitle,
+                      active: hasFilters,
+                      badge: hasFilters ? '$activeFilterCount' : null,
+                    ),
+                  ),
+                ],
+              ),
+              if (hasFilters || dateRange != null)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -179,6 +224,77 @@ class TransactionsScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _MonthPickerSheet(dateLoc: dateLoc),
+    );
+  }
+
+  void _showFilterSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _FilterSheet(),
+    );
+  }
+}
+
+// ─── Popup Menu Item Row ───────────────────────────────────────────────────────
+class _MenuItemRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final bool disabled;
+  final String? badge;
+
+  const _MenuItemRow({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    this.disabled = false,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = disabled
+        ? cs.onSurface.withValues(alpha: 0.38)
+        : active
+            ? cs.primary
+            : cs.onSurfaceVariant;
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: disabled ? cs.onSurface.withValues(alpha: 0.38) : null,
+            ),
+          ),
+        ),
+        if (active && badge == null)
+          Icon(Icons.check_rounded, size: 16, color: cs.primary),
+        if (badge != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: cs.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              badge!,
+              style: TextStyle(
+                fontSize: 10,
+                color: cs.onPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -660,6 +776,391 @@ class _SummaryItem extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Filter Sheet ─────────────────────────────────────────────────────────────
+class _FilterSheet extends ConsumerStatefulWidget {
+  const _FilterSheet();
+
+  @override
+  ConsumerState<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends ConsumerState<_FilterSheet> {
+  late TransactionType? _type;
+  late Set<String> _categories;
+  late Set<String> _wallets;
+  final _minCtrl = TextEditingController();
+  final _maxCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _type = ref.read(statementTypeFilterProvider);
+    _categories = Set.from(ref.read(statementCategoryFilterProvider));
+    _wallets = Set.from(ref.read(statementWalletFilterProvider));
+    final min = ref.read(statementMinAmountFilterProvider);
+    final max = ref.read(statementMaxAmountFilterProvider);
+    if (min != null) _minCtrl.text = _fmt(min);
+    if (max != null) _maxCtrl.text = _fmt(max);
+  }
+
+  @override
+  void dispose() {
+    _minCtrl.dispose();
+    _maxCtrl.dispose();
+    super.dispose();
+  }
+
+  String _fmt(double v) =>
+      v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
+
+  double? _parse(String text) =>
+      double.tryParse(text.trim().replaceAll(',', '.'));
+
+  bool get _hasLocalFilters =>
+      _type != null ||
+      _categories.isNotEmpty ||
+      _wallets.isNotEmpty ||
+      _minCtrl.text.isNotEmpty ||
+      _maxCtrl.text.isNotEmpty;
+
+  void _apply() {
+    ref.read(statementTypeFilterProvider.notifier).state = _type;
+    ref.read(statementCategoryFilterProvider.notifier).state = _categories;
+    ref.read(statementWalletFilterProvider.notifier).state = _wallets;
+    ref.read(statementMinAmountFilterProvider.notifier).state =
+        _parse(_minCtrl.text);
+    ref.read(statementMaxAmountFilterProvider.notifier).state =
+        _parse(_maxCtrl.text);
+    Navigator.of(context).pop();
+  }
+
+  void _clearAll() {
+    setState(() {
+      _type = null;
+      _categories = <String>{};
+      _wallets = <String>{};
+      _minCtrl.clear();
+      _maxCtrl.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
+
+    // Unique categories from ALL visible transactions
+    final allTxs = ref.watch(visibleTransactionsProvider);
+    final availableCategories =
+        allTxs.map((t) => t.category).toSet().toList()..sort();
+
+    // Wallets list
+    final wallets = ref.watch(walletsStreamProvider).value ?? [];
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (_, scrollCtrl) => Column(
+        children: [
+          // Handle
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          // Header
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  l10n.filterTitle,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                if (_hasLocalFilters)
+                  TextButton(
+                    onPressed: _clearAll,
+                    child: Text(l10n.filterClearAll),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Scrollable content
+          Expanded(
+            child: ListView(
+              controller: scrollCtrl,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              children: [
+                // ── Tipo ──
+                _FilterSection(
+                  title: l10n.filterType,
+                  child: _TypeSelector(
+                    selected: _type,
+                    allLabel: l10n.filterAll,
+                    incomeLabel: l10n.filterIncome,
+                    expenseLabel: l10n.filterExpenses,
+                    onChanged: (t) => setState(() => _type = t),
+                  ),
+                ),
+
+                // ── Categorias ──
+                if (availableCategories.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _FilterSection(
+                    title: l10n.filterCategories,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: availableCategories.map((cat) {
+                        final selected = _categories.contains(cat);
+                        return FilterChip(
+                          label: Text(cat),
+                          selected: selected,
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _categories = {..._categories, cat};
+                            } else {
+                              _categories = _categories
+                                  .where((c) => c != cat)
+                                  .toSet();
+                            }
+                          }),
+                          selectedColor: cs.primaryContainer,
+                          checkmarkColor: cs.primary,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+
+                // ── Carteiras ──
+                if (wallets.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _FilterSection(
+                    title: l10n.wallets,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: wallets.map((w) {
+                        final selected = _wallets.contains(w.id);
+                        return FilterChip(
+                          avatar: Icon(
+                            IconData(w.iconCodePoint,
+                                fontFamily: 'MaterialIcons'),
+                            size: 16,
+                            color: selected
+                                ? cs.primary
+                                : cs.onSurfaceVariant,
+                          ),
+                          label: Text(w.name),
+                          selected: selected,
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _wallets = {..._wallets, w.id};
+                            } else {
+                              _wallets =
+                                  _wallets.where((id) => id != w.id).toSet();
+                            }
+                          }),
+                          selectedColor: cs.primaryContainer,
+                          checkmarkColor: cs.primary,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+
+                // ── Faixa de valor ──
+                const SizedBox(height: 20),
+                _FilterSection(
+                  title: l10n.filterAmountRange,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _minCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: InputDecoration(
+                            labelText: l10n.filterMin,
+                            prefixText: 'R\$ ',
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _maxCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: InputDecoration(
+                            labelText: l10n.filterMax,
+                            prefixText: 'R\$ ',
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _apply,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                  child: Text(l10n.filterApply),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Filter Section Header ────────────────────────────────────────────────────
+class _FilterSection extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _FilterSection({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10),
+        child,
+      ],
+    );
+  }
+}
+
+// ─── Type Selector (Todos / Receitas / Despesas) ──────────────────────────────
+class _TypeSelector extends StatelessWidget {
+  final TransactionType? selected;
+  final String allLabel;
+  final String incomeLabel;
+  final String expenseLabel;
+  final ValueChanged<TransactionType?> onChanged;
+
+  const _TypeSelector({
+    required this.selected,
+    required this.allLabel,
+    required this.incomeLabel,
+    required this.expenseLabel,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _TypeChip(
+          label: allLabel,
+          isSelected: selected == null,
+          onTap: () => onChanged(null),
+        ),
+        const SizedBox(width: 8),
+        _TypeChip(
+          label: incomeLabel,
+          isSelected: selected == TransactionType.income,
+          color: Colors.green.shade600,
+          onTap: () => onChanged(
+              selected == TransactionType.income ? null : TransactionType.income),
+        ),
+        const SizedBox(width: 8),
+        _TypeChip(
+          label: expenseLabel,
+          isSelected: selected == TransactionType.expense,
+          color: Colors.red.shade600,
+          onTap: () => onChanged(
+              selected == TransactionType.expense
+                  ? null
+                  : TransactionType.expense),
+        ),
+      ],
+    );
+  }
+}
+
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _TypeChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final effectiveColor = color ?? cs.primary;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? effectiveColor.withValues(alpha: 0.15)
+              : cs.surfaceContainerHighest,
+          border: Border.all(
+            color: isSelected ? effectiveColor : Colors.transparent,
+            width: 1.5,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? effectiveColor : cs.onSurfaceVariant,
+            fontSize: 13,
+          ),
         ),
       ),
     );

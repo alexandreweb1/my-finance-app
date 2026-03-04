@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -15,14 +17,14 @@ class BudgetRepositoryImpl implements BudgetRepository {
   @override
   Stream<Either<Failure, List<BudgetEntity>>> watchBudgets(
       String userId, DateTime month) {
-    return remoteDataSource
-        .watchBudgets(userId, month)
-        .map<Either<Failure, List<BudgetEntity>>>(
-          (models) => Right(models),
-        )
-        .handleError(
-          (e) => Left(ServerFailure(e.toString())),
-        );
+    return remoteDataSource.watchBudgets(userId, month).transform(
+      StreamTransformer.fromHandlers(
+        handleData: (models, sink) =>
+            sink.add(Right(List<BudgetEntity>.from(models))),
+        handleError: (error, _, sink) =>
+            sink.add(Left(ServerFailure(error.toString()))),
+      ),
+    );
   }
 
   @override

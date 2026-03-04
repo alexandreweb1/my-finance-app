@@ -144,13 +144,51 @@ final statementDateRangeProvider = StateProvider<(DateTime, DateTime)?>(
   (ref) => null,
 );
 
-// --- Display providers: respects date range + type filter ---
+// --- Advanced filters ---
+
+/// Set of category names to show. Empty = all categories.
+final statementCategoryFilterProvider = StateProvider<Set<String>>(
+  (ref) => <String>{},
+);
+
+/// Set of wallet IDs to show. Empty = all wallets.
+final statementWalletFilterProvider = StateProvider<Set<String>>(
+  (ref) => <String>{},
+);
+
+/// Minimum transaction amount. Null = no minimum.
+final statementMinAmountFilterProvider = StateProvider<double?>((ref) => null);
+
+/// Maximum transaction amount. Null = no maximum.
+final statementMaxAmountFilterProvider = StateProvider<double?>((ref) => null);
+
+/// Count of currently active filters.
+final statementActiveFilterCountProvider = Provider<int>((ref) {
+  int n = 0;
+  if (ref.watch(statementTypeFilterProvider) != null) n++;
+  if (ref.watch(statementCategoryFilterProvider).isNotEmpty) n++;
+  if (ref.watch(statementWalletFilterProvider).isNotEmpty) n++;
+  if (ref.watch(statementMinAmountFilterProvider) != null) n++;
+  if (ref.watch(statementMaxAmountFilterProvider) != null) n++;
+  return n;
+});
+
+/// Whether any filter is currently active.
+final statementHasFiltersProvider = Provider<bool>(
+  (ref) => ref.watch(statementActiveFilterCountProvider) > 0,
+);
+
+// --- Display providers: respects date range + type + advanced filters ---
 
 final statementDisplayTransactionsProvider =
     Provider<List<TransactionEntity>>((ref) {
   final isAnnual = ref.watch(statementIsAnnualProvider);
   final typeFilter = ref.watch(statementTypeFilterProvider);
   final dateRange = ref.watch(statementDateRangeProvider);
+  final categoryFilter = ref.watch(statementCategoryFilterProvider);
+  final walletFilter = ref.watch(statementWalletFilterProvider);
+  final minAmount = ref.watch(statementMinAmountFilterProvider);
+  final maxAmount = ref.watch(statementMaxAmountFilterProvider);
 
   List<TransactionEntity> txs;
   if (dateRange != null) {
@@ -169,6 +207,18 @@ final statementDisplayTransactionsProvider =
 
   if (typeFilter != null) {
     txs = txs.where((t) => t.type == typeFilter).toList();
+  }
+  if (categoryFilter.isNotEmpty) {
+    txs = txs.where((t) => categoryFilter.contains(t.category)).toList();
+  }
+  if (walletFilter.isNotEmpty) {
+    txs = txs.where((t) => walletFilter.contains(t.walletId)).toList();
+  }
+  if (minAmount != null) {
+    txs = txs.where((t) => t.amount >= minAmount).toList();
+  }
+  if (maxAmount != null) {
+    txs = txs.where((t) => t.amount <= maxAmount).toList();
   }
   return txs;
 });

@@ -25,7 +25,11 @@ final userProfileStreamProvider =
 final effectiveUserIdProvider = Provider<String>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return '';
-  final profile = ref.watch(userProfileStreamProvider).value;
+  final profileAsync = ref.watch(userProfileStreamProvider);
+  // While the profile is still loading, return empty so queries don't fire
+  // with the wrong userId (own ID instead of master's ID).
+  if (profileAsync.isLoading) return '';
+  final profile = profileAsync.value;
   return (profile?['masterUserId'] as String?) ?? user.id;
 });
 

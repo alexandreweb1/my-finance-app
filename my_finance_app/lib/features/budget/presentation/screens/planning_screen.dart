@@ -6,6 +6,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
+import '../../../../core/utils/money_input_formatter.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../domain/entities/budget_entity.dart';
 import '../providers/budget_provider.dart';
@@ -20,6 +21,11 @@ class PlanningScreen extends ConsumerWidget {
     final summaries = ref.watch(budgetSummaryProvider);
     final budgetsAsync = ref.watch(budgetsStreamProvider);
 
+    final sortedSummaries = [...summaries]
+      ..sort((a, b) =>
+          a.budget.categoryName.compareTo(b.budget.categoryName));
+
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.planning),
@@ -30,13 +36,22 @@ class PlanningScreen extends ConsumerWidget {
           _MonthSelector(month: selectedMonth),
           Expanded(
             child: budgetsAsync.when(
-              data: (_) => summaries.isEmpty
+              data: (_) => sortedSummaries.isEmpty
                   ? _EmptyBudgets(month: selectedMonth)
                   : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 80),
-                      itemCount: summaries.length,
-                      itemBuilder: (ctx, i) =>
-                          _BudgetCard(summary: summaries[i]),
+                      padding: const EdgeInsets.only(bottom: 24),
+                      // +2: summary card (index 0) + add-button (last index)
+                      itemCount: sortedSummaries.length + 2,
+                      itemBuilder: (ctx, i) {
+                        if (i == 0) {
+                          return _BudgetSummaryCard(
+                              summaries: sortedSummaries);
+                        }
+                        if (i == sortedSummaries.length + 1) {
+                          return _AddBudgetButton(month: selectedMonth);
+                        }
+                        return _BudgetCard(summary: sortedSummaries[i - 1]);
+                      },
                     ),
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
@@ -44,14 +59,6 @@ class PlanningScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => _AddBudgetDialog(month: selectedMonth),
-        ),
-        icon: const Icon(Icons.add),
-        label: Text(l10n.budget),
       ),
     );
   }
@@ -94,6 +101,180 @@ class _MonthSelector extends ConsumerWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Budget Summary Card (totals header)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BudgetSummaryCard extends ConsumerWidget {
+  final List<BudgetSummary> summaries;
+
+  const _BudgetSummaryCard({required this.summaries});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fmt = ref.watch(currencyFormatterProvider);
+    final l10n = AppLocalizations.of(context);
+
+    final totalPlanned =
+        summaries.fold(0.0, (sum, s) => sum + s.budget.limitAmount);
+    final totalSpent = summaries.fold(0.0, (sum, s) => sum + s.spentAmount);
+    final remaining = totalPlanned - totalSpent;
+    final isOver = totalSpent > totalPlanned;
+
+    final progress =
+        totalPlanned > 0 ? (totalSpent / totalPlanned).clamp(0.0, 1.0) : 0.0;
+    final progressColor =
+        isOver ? Colors.red.shade600 : Colors.green.shade600;
+
+    final cs = Theme.of(context).colorScheme;
+    final pct = (progress * 100).toStringAsFixed(0);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              cs.primaryContainer.withValues(alpha: 0.35),
+              cs.surface,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          children: [
+            // ── Título centralizado ──
+            Text(
+              l10n.budgetSummaryTitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: cs.onSurface,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(height: 14),
+            // ── Barra de progresso + % ──
+            Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: cs.surfaceContainerHighest,
+                    color: progressColor,
+                    minHeight: 10,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '$pct%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: progressColor,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // ── Três colunas com divisores ──
+            IntrinsicHeight(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _SummaryColumn(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: l10n.budgetPlanned,
+                      value: fmt(totalPlanned),
+                    ),
+                  ),
+                  VerticalDivider(
+                      color: cs.outlineVariant, width: 1, thickness: 1),
+                  Expanded(
+                    child: _SummaryColumn(
+                      icon: Icons.shopping_cart_outlined,
+                      label: l10n.spent,
+                      value: fmt(totalSpent),
+                      valueColor: progressColor,
+                    ),
+                  ),
+                  VerticalDivider(
+                      color: cs.outlineVariant, width: 1, thickness: 1),
+                  Expanded(
+                    child: _SummaryColumn(
+                      icon: isOver
+                          ? Icons.warning_amber_rounded
+                          : Icons.savings_outlined,
+                      label: isOver
+                          ? l10n.budgetExceeded
+                          : l10n.budgetRemaining,
+                      value: fmt(remaining.abs()),
+                      valueColor: isOver ? Colors.red.shade600 : Colors.green.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryColumn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _SummaryColumn({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18, color: valueColor ?? cs.onSurfaceVariant),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Budget Card (individual row)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _BudgetCard extends ConsumerWidget {
   final BudgetSummary summary;
 
@@ -107,9 +288,7 @@ class _BudgetCard extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final progressColor = summary.isOverBudget
         ? Colors.red.shade600
-        : summary.progress > 0.8
-            ? Colors.orange.shade600
-            : Colors.green.shade600;
+        : Colors.green.shade600;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -228,13 +407,8 @@ class _EmptyBudgets extends ConsumerWidget {
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade500),
           ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.tapToStart,
-            style: const TextStyle(fontSize: 13),
-          ),
-          if (prevBudgets.isNotEmpty) ...[
-            const SizedBox(height: 24),
+          const SizedBox(height: 24),
+          if (prevBudgets.isNotEmpty)
             OutlinedButton.icon(
               icon: isLoading
                   ? const SizedBox(
@@ -249,6 +423,15 @@ class _EmptyBudgets extends ConsumerWidget {
                   : () => _showCopyOptionsDialog(
                         context, ref, prevBudgets, prevMonthSpending, l10n,
                         prevMonthLabel, currentMonthLabel),
+            ),
+          if (prevBudgets.isEmpty) ...[
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.budget),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => _AddBudgetDialog(month: month),
+              ),
             ),
           ],
         ],
@@ -286,6 +469,13 @@ class _EmptyBudgets extends ConsumerWidget {
                   '${l10n.baseOnSpendingDesc} $prevMonthLabel ${l10n.baseOnSpendingDescSuffix}',
               onTap: () => Navigator.of(ctx).pop('spending'),
             ),
+            const SizedBox(height: 8),
+            _BudgetOptionTile(
+              icon: Icons.add_circle_outline,
+              title: l10n.createManually,
+              subtitle: l10n.createManuallyDesc,
+              onTap: () => Navigator.of(ctx).pop('manual'),
+            ),
           ],
         ),
         actions: [
@@ -298,6 +488,14 @@ class _EmptyBudgets extends ConsumerWidget {
     );
 
     if (choice == null || !context.mounted) return;
+
+    if (choice == 'manual') {
+      await showDialog(
+        context: context,
+        builder: (_) => _AddBudgetDialog(month: month),
+      );
+      return;
+    }
 
     final bool success;
     if (choice == 'copy') {
@@ -363,7 +561,7 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
   void initState() {
     super.initState();
     if (_isEditing) {
-      _amountController.text = widget.budget!.limitAmount.toString();
+      _amountController.text = doubleToMoneyText(widget.budget!.limitAmount);
     }
   }
 
@@ -382,10 +580,8 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
       );
       return;
     }
-    final amount = double.tryParse(
-      _amountController.text.replaceAll(',', '.'),
-    );
-    if (amount == null || amount <= 0) {
+    final amount = moneyTextToDouble(_amountController.text);
+    if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.invalidAmount)),
       );
@@ -467,14 +663,17 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _amountController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.number,
+                inputFormatters: [MoneyInputFormatter()],
                 decoration: InputDecoration(
                   labelText: l10n.limit,
                   border: const OutlineInputBorder(),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? l10n.enterAmount : null,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return l10n.enterAmount;
+                  if (moneyTextToDouble(v) <= 0) return l10n.invalidAmount;
+                  return null;
+                },
               ),
             ],
           ),
@@ -554,6 +753,35 @@ class _BudgetOptionTile extends StatelessWidget {
             Icon(Icons.chevron_right,
                 size: 18, color: colorScheme.onSurfaceVariant),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add-budget button rendered at the bottom of the budget list
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AddBudgetButton extends StatelessWidget {
+  final DateTime month;
+
+  const _AddBudgetButton({required this.month});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: OutlinedButton.icon(
+        onPressed: () => showDialog(
+          context: context,
+          builder: (_) => _AddBudgetDialog(month: month),
+        ),
+        icon: const Icon(Icons.add),
+        label: Text(l10n.budget),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 48),
         ),
       ),
     );

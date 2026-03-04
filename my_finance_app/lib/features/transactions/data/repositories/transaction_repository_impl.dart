@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -15,13 +17,14 @@ class TransactionRepositoryImpl implements TransactionRepository {
   @override
   Stream<Either<Failure, List<TransactionEntity>>> watchTransactions(
       String userId) {
-    return remoteDataSource.watchTransactions(userId).map(
-          (transactions) => Right<Failure, List<TransactionEntity>>(transactions),
-        ).handleError(
-          (e) => Left<Failure, List<TransactionEntity>>(
-            ServerFailure(e.toString()),
-          ),
-        );
+    return remoteDataSource.watchTransactions(userId).transform(
+      StreamTransformer.fromHandlers(
+        handleData: (transactions, sink) =>
+            sink.add(Right(List<TransactionEntity>.from(transactions))),
+        handleError: (error, _, sink) =>
+            sink.add(Left(ServerFailure(error.toString()))),
+      ),
+    );
   }
 
   @override

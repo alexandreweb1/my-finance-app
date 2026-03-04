@@ -22,11 +22,14 @@ class TransactionRemoteDataSourceImpl implements TransactionRemoteDataSource {
   Stream<List<TransactionModel>> watchTransactions(String userId) {
     return _collection
         .where('userId', isEqualTo: userId)
-        .orderBy('date', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TransactionModel.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => TransactionModel.fromFirestore(doc))
+              .toList()
+            ..sort((a, b) => b.date.compareTo(a.date));
+          return list;
+        });
   }
 
   static const _kTimeout = Duration(seconds: 12);

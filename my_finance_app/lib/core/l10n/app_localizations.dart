@@ -91,6 +91,17 @@ class AppLocalizations {
   String get customPeriod => _t('Período personalizado', 'Custom period', 'Período personalizado');
   String get clearFilter => _t('Limpar filtro', 'Clear filter', 'Limpiar filtro');
   String get filterAll => _t('Todos', 'All', 'Todos');
+  String get moreOptions => _t('Mais opções', 'More options', 'Más opciones');
+  String get filterTitle => _t('Filtros', 'Filters', 'Filtros');
+  String get filterClearAll => _t('Limpar tudo', 'Clear all', 'Limpiar todo');
+  String get filterType => _t('Tipo', 'Type', 'Tipo');
+  String get filterCategories => _t('Categorias', 'Categories', 'Categorías');
+  String get filterAmountRange => _t('Faixa de valor', 'Amount range', 'Rango de valores');
+  String get filterMin => _t('Mínimo', 'Minimum', 'Mínimo');
+  String get filterMax => _t('Máximo', 'Maximum', 'Máximo');
+  String get filterApply => _t('Aplicar filtros', 'Apply filters', 'Aplicar filtros');
+  String get filterIncome => _t('Receitas', 'Income', 'Ingresos');
+  String get filterExpenses => _t('Despesas', 'Expenses', 'Gastos');
   String get expenseByCategory => _t('Gastos por categoria', 'Expenses by category', 'Gastos por categoría');
 
   // ── Wallets ───────────────────────────────────────────────────────────────
@@ -127,6 +138,12 @@ class AppLocalizations {
   String get baseOnSpending => _t('Basear nos gastos reais', 'Basear nos gastos reais', 'Basar en gastos reales');
   String get baseOnSpendingDesc => _t('Usa o total gasto em', 'Uses total spending in', 'Usa el total gastado en');
   String get baseOnSpendingDescSuffix => _t('como limite de cada categoria', 'as the limit per category', 'como límite por categoría');
+  String get budgetSummaryTitle => _t('Resumo do mês', 'Monthly Summary', 'Resumen mensual');
+  String get budgetPlanned => _t('Previsto', 'Planned', 'Previsto');
+  String get budgetRemaining => _t('Restante', 'Remaining', 'Restante');
+  String get budgetExceeded => _t('Excedido', 'Exceeded', 'Excedido');
+  String get createManually => _t('Criar manualmente', 'Create manually', 'Crear manualmente');
+  String get createManuallyDesc => _t('Define o limite de cada categoria individualmente', 'Set each category limit individually', 'Define el límite de cada categoría individualmente');
 
   // ── Settings ─────────────────────────────────────────────────────────────
   String get settings => _t('Configurações', 'Settings', 'Configuración');

@@ -10,6 +10,8 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../budget/domain/entities/budget_entity.dart';
+import '../../../sharing/domain/entities/invitation_entity.dart';
+import '../../../sharing/presentation/providers/sharing_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../transactions/presentation/widgets/transaction_list_tile.dart';
@@ -90,7 +92,7 @@ class DashboardScreen extends ConsumerWidget {
               subtitle: monthLabel,
             ),
             const SizedBox(height: 8),
-            ...budgetSummaries.take(3).map((s) => _BudgetCard(summary: s)),
+            _DashboardBudgetSummary(summaries: budgetSummaries),
             const SizedBox(height: 24),
           ],
 
@@ -180,6 +182,7 @@ class _DarkHeader extends ConsumerWidget {
     final topPad = MediaQuery.of(context).padding.top;
     final screenW = MediaQuery.of(context).size.width;
     final compact = screenW < 340;
+    final pendingInvites = ref.watch(pendingInvitationsProvider).value ?? [];
 
     return Container(
       decoration: const BoxDecoration(
@@ -209,7 +212,10 @@ class _DarkHeader extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                if (pendingInvites.isNotEmpty) ...[
+                  _NotificationBell(count: pendingInvites.length),
+                  const SizedBox(width: 8),
+                ],
                 GestureDetector(
                   onTap: onSettingsTap,
                   child: UserAvatar(
@@ -745,25 +751,31 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ─── Budget Card ──────────────────────────────────────────────────────────────
-class _BudgetCard extends ConsumerWidget {
-  final BudgetSummary summary;
+// ─── Dashboard Budget Summary ─────────────────────────────────────────────────
+class _DashboardBudgetSummary extends ConsumerWidget {
+  final List<BudgetSummary> summaries;
 
-  const _BudgetCard({required this.summary});
+  const _DashboardBudgetSummary({required this.summaries});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fmt = ref.watch(currencyFormatterProvider);
-    final progressColor = summary.isOverBudget
-        ? const Color(0xFFE05252)
-        : summary.progress > 0.8
-            ? Colors.orange.shade600
-            : _kGreen;
+    final l10n = AppLocalizations.of(context);
+
+    final totalPlanned =
+        summaries.fold(0.0, (sum, s) => sum + s.budget.limitAmount);
+    final totalSpent = summaries.fold(0.0, (sum, s) => sum + s.spentAmount);
+    final remaining = totalPlanned - totalSpent;
+    final isOver = totalSpent > totalPlanned;
+    final progress =
+        totalPlanned > 0 ? (totalSpent / totalPlanned).clamp(0.0, 1.0) : 0.0;
+    final progressColor =
+        isOver ? const Color(0xFFE05252) : _kGreen;
 
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
@@ -778,36 +790,321 @@ class _BudgetCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: colorScheme.surfaceContainerHighest,
+            color: progressColor,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Flexible(
-                child: Text(
-                  summary.budget.categoryName,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface),
+              Expanded(
+                child: _BudgetStatColumn(
+                  label: l10n.budgetPlanned,
+                  value: fmt(totalPlanned),
                 ),
               ),
+              Expanded(
+                child: _BudgetStatColumn(
+                  label: l10n.spent,
+                  value: fmt(totalSpent),
+                  valueColor: progressColor,
+                ),
+              ),
+              Expanded(
+                child: _BudgetStatColumn(
+                  label: isOver ? l10n.budgetExceeded : l10n.budgetRemaining,
+                  value: fmt(remaining.abs()),
+                  valueColor: isOver ? const Color(0xFFE05252) : null,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetStatColumn extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _BudgetStatColumn({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: valueColor ?? Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Notification Bell ────────────────────────────────────────────────────────
+class _NotificationBell extends StatelessWidget {
+  final int count;
+
+  const _NotificationBell({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const _InvitationsSheet(),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(
+            Icons.notifications_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
+          Positioned(
+            top: -4,
+            right: -4,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                color: Color(0xFFE05252),
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                count > 9 ? '9+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Invitations Bottom Sheet ─────────────────────────────────────────────────
+class _InvitationsSheet extends ConsumerWidget {
+  const _InvitationsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invitations = ref.watch(pendingInvitationsProvider).value ?? [];
+    final colorScheme = Theme.of(context).colorScheme;
+
+    ref.listen(pendingInvitationsProvider, (_, next) {
+      if ((next.value ?? []).isEmpty && context.mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.notifications_active_rounded,
+                  color: Colors.amber.shade700),
               const SizedBox(width: 8),
               Text(
-                '${fmt(summary.spentAmount)} / '
-                '${fmt(summary.budget.limitAmount)}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                'Convites pendentes',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Alguém quer compartilhar as finanças com você.',
+            style:
+                TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+          ...invitations.map((inv) => _InvitationCard(invitation: inv)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Single Invitation Card ───────────────────────────────────────────────────
+class _InvitationCard extends ConsumerStatefulWidget {
+  final InvitationEntity invitation;
+
+  const _InvitationCard({required this.invitation});
+
+  @override
+  ConsumerState<_InvitationCard> createState() => _InvitationCardState();
+}
+
+class _InvitationCardState extends ConsumerState<_InvitationCard> {
+  bool _loading = false;
+
+  Future<void> _respond(bool accept) async {
+    setState(() => _loading = true);
+    final notifier = ref.read(sharingNotifierProvider.notifier);
+    final error = accept
+        ? await notifier.acceptInvitation(widget.invitation)
+        : await notifier.declineInvitation(widget.invitation.id);
+    if (mounted) {
+      setState(() => _loading = false);
+      if (error != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final inv = widget.invitation;
+    final displayName =
+        inv.masterName.isNotEmpty ? inv.masterName : inv.masterEmail;
+    final initial = displayName[0].toUpperCase();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.amber.shade300.withValues(alpha: 0.6),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor:
+                    const Color(0xFF7E57C2).withValues(alpha: 0.15),
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Color(0xFF7E57C2),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (inv.masterName.isNotEmpty)
+                      Text(
+                        inv.masterEmail,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          LinearProgressIndicator(
-            value: summary.progress,
-            backgroundColor:
-                Theme.of(context).colorScheme.surfaceContainerHighest,
-            color: progressColor,
-            minHeight: 6,
-            borderRadius: BorderRadius.circular(3),
+          Text(
+            '$displayName quer compartilhar as finanças com você.',
+            style:
+                TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
           ),
+          const SizedBox(height: 14),
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade600,
+                      side: BorderSide(color: Colors.red.shade300),
+                    ),
+                    onPressed: () => _respond(false),
+                    child: const Text('Recusar'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => _respond(true),
+                    child: const Text('Aceitar'),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

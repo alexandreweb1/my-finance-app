@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/providers/effective_user_provider.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../../core/utils/money_input_formatter.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 
@@ -116,8 +117,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
   Future<void> _showNewCategoryDialog() async {
     final nameCtrl = TextEditingController();
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
+    final effectiveUserId = ref.read(effectiveUserIdProvider);
+    if (effectiveUserId.isEmpty) return;
 
     final created = await showDialog<String>(
       context: context,
@@ -155,7 +156,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         : CategoryType.expense;
 
     final success = await ref.read(categoriesNotifierProvider.notifier).add(
-          userId: user.id,
+          userId: effectiveUserId,
           name: created,
           type: categoryType,
           iconCodePoint: Icons.label_outline_rounded.codePoint,
@@ -177,8 +178,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   Future<void> _showNewWalletDialog() async {
     final l10n = AppLocalizations.of(context);
     final nameCtrl = TextEditingController();
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
+    final effectiveUserId = ref.read(effectiveUserIdProvider);
+    if (effectiveUserId.isEmpty) return;
 
     final created = await showDialog<String>(
       context: context,
@@ -212,7 +213,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     if (!mounted) return;
 
     final success = await ref.read(walletsNotifierProvider.notifier).add(
-          userId: user.id,
+          userId: effectiveUserId,
           name: created,
           iconCodePoint: Icons.account_balance_wallet_outlined.codePoint,
           colorValue: 0xFF607D8B,
@@ -233,7 +234,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     if (_isEditing) {
       final t = widget.transaction!;
       _titleController.text = t.title;
-      _amountController.text = t.amount.toString();
+      _amountController.text = doubleToMoneyText(t.amount);
       _descriptionController.text = t.description ?? '';
       _type = t.type;
       _category = t.category;
@@ -263,10 +264,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final amount = double.tryParse(
-      _amountController.text.replaceAll(',', '.'),
-    );
-    if (amount == null || amount <= 0) {
+    final amount = moneyTextToDouble(_amountController.text);
+    if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Valor inválido')),
       );
@@ -447,16 +446,16 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _amountController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [MoneyInputFormatter()],
                   decoration: InputDecoration(
                     labelText: l10n.amountField,
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return l10n.enterAmount;
-                    final n = double.tryParse(v.replaceAll(',', '.'));
-                    if (n == null || n <= 0) return l10n.invalidAmount;
+                    final n = moneyTextToDouble(v);
+                    if (n <= 0) return l10n.invalidAmount;
                     if (n > 1000000000) return l10n.maxAmount;
                     return null;
                   },
