@@ -926,27 +926,13 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   const SizedBox(height: 20),
                   _FilterSection(
                     title: l10n.filterCategories,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: availableCategories.map((cat) {
-                        final selected = _categories.contains(cat);
-                        return FilterChip(
-                          label: Text(cat),
-                          selected: selected,
-                          onSelected: (v) => setState(() {
-                            if (v) {
-                              _categories = {..._categories, cat};
-                            } else {
-                              _categories = _categories
-                                  .where((c) => c != cat)
-                                  .toSet();
-                            }
-                          }),
-                          selectedColor: cs.primaryContainer,
-                          checkmarkColor: cs.primary,
-                        );
-                      }).toList(),
+                    child: _MultiSelectDropdown(
+                      placeholder: l10n.filterCategories,
+                      options: availableCategories
+                          .map((c) => _SelectOption(id: c, label: c))
+                          .toList(),
+                      selected: _categories,
+                      onChanged: (v) => setState(() => _categories = v),
                     ),
                   ),
                 ],
@@ -956,34 +942,14 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   const SizedBox(height: 20),
                   _FilterSection(
                     title: l10n.wallets,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: wallets.map((w) {
-                        final selected = _wallets.contains(w.id);
-                        return FilterChip(
-                          avatar: Icon(
-                            IconData(w.iconCodePoint,
-                                fontFamily: 'MaterialIcons'),
-                            size: 16,
-                            color: selected
-                                ? cs.primary
-                                : cs.onSurfaceVariant,
-                          ),
-                          label: Text(w.name),
-                          selected: selected,
-                          onSelected: (v) => setState(() {
-                            if (v) {
-                              _wallets = {..._wallets, w.id};
-                            } else {
-                              _wallets =
-                                  _wallets.where((id) => id != w.id).toSet();
-                            }
-                          }),
-                          selectedColor: cs.primaryContainer,
-                          checkmarkColor: cs.primary,
-                        );
-                      }).toList(),
+                    child: _MultiSelectDropdown(
+                      placeholder: l10n.wallets,
+                      options: wallets
+                          .map((w) => _SelectOption(id: w.id, label: w.name))
+                          .toList(),
+                      selected: _wallets,
+                      onChanged: (v) => setState(() => _wallets = v),
+                      leadingIcon: Icons.account_balance_wallet_outlined,
                     ),
                   ),
                 ],
@@ -1161,6 +1127,219 @@ class _TypeChip extends StatelessWidget {
             color: isSelected ? effectiveColor : cs.onSurfaceVariant,
             fontSize: 13,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Multi-Select Dropdown ────────────────────────────────────────────────────
+class _SelectOption {
+  final String id;
+  final String label;
+
+  const _SelectOption({required this.id, required this.label});
+}
+
+class _MultiSelectDropdown extends StatelessWidget {
+  final String placeholder;
+  final List<_SelectOption> options;
+  final Set<String> selected;
+  final ValueChanged<Set<String>> onChanged;
+  final IconData? leadingIcon;
+
+  const _MultiSelectDropdown({
+    required this.placeholder,
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+    this.leadingIcon,
+  });
+
+  String _buildLabel() {
+    if (selected.isEmpty) return placeholder;
+    final labels =
+        options.where((o) => selected.contains(o.id)).map((o) => o.label);
+    return labels.join(', ');
+  }
+
+  void _openSheet(BuildContext context) {
+    // local copy so we can cancel
+    Set<String> temp = Set.from(selected);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final cs = Theme.of(ctx).colorScheme;
+            return DraggableScrollableSheet(
+              initialChildSize: 0.5,
+              minChildSize: 0.35,
+              maxChildSize: 0.85,
+              expand: false,
+              builder: (_, scrollCtrl) => Column(
+                children: [
+                  // Handle
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 4),
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: cs.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    child: Row(
+                      children: [
+                        Text(
+                          placeholder,
+                          style: const TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        if (temp.isNotEmpty)
+                          TextButton(
+                            onPressed: () =>
+                                setSheetState(() => temp = {}),
+                            child: const Text('Limpar'),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // List
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollCtrl,
+                      itemCount: options.length,
+                      itemBuilder: (_, i) {
+                        final opt = options[i];
+                        final isChecked = temp.contains(opt.id);
+                        return CheckboxListTile(
+                          value: isChecked,
+                          title: Row(
+                            children: [
+                              if (leadingIcon != null) ...[
+                                Icon(leadingIcon,
+                                    size: 18,
+                                    color: isChecked
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(opt.label),
+                            ],
+                          ),
+                          activeColor: cs.primary,
+                          controlAffinity: ListTileControlAffinity.trailing,
+                          onChanged: (v) {
+                            setSheetState(() {
+                              if (v == true) {
+                                temp = {...temp, opt.id};
+                              } else {
+                                temp = temp
+                                    .where((id) => id != opt.id)
+                                    .toSet();
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  // Apply button
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    child: FilledButton(
+                      onPressed: () {
+                        onChanged(temp);
+                        Navigator.of(ctx).pop();
+                      },
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                      child: const Text('Confirmar'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasSelection = selected.isNotEmpty;
+
+    return GestureDetector(
+      onTap: () => _openSheet(context),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: hasSelection ? cs.primary : cs.outline,
+            width: hasSelection ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(10),
+          color: hasSelection
+              ? cs.primaryContainer.withValues(alpha: 0.3)
+              : cs.surfaceContainerHighest,
+        ),
+        child: Row(
+          children: [
+            if (hasSelection)
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${selected.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onPrimary,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: Text(
+                _buildLabel(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: hasSelection ? cs.onSurface : cs.onSurfaceVariant,
+                  fontWeight:
+                      hasSelection ? FontWeight.w500 : FontWeight.normal,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.expand_more_rounded,
+              size: 20,
+              color: hasSelection ? cs.primary : cs.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );
