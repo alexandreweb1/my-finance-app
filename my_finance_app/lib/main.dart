@@ -152,6 +152,14 @@ final _lightTheme = ThemeData(
   inputDecorationTheme: const InputDecorationTheme(
     border: OutlineInputBorder(),
   ),
+  cardTheme: const CardThemeData(
+    elevation: 4,
+    shadowColor: Colors.black38,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+      side: BorderSide(color: Color(0xFFC4CDD8), width: 1),
+    ),
+  ),
 );
 
 final _darkTheme = ThemeData(

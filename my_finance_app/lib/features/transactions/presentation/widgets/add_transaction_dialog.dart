@@ -20,7 +20,18 @@ class AddTransactionDialog extends ConsumerStatefulWidget {
   /// If provided, the dialog opens in edit mode pre-filled with this transaction.
   final TransactionEntity? transaction;
 
-  const AddTransactionDialog({super.key, this.transaction});
+  /// Pre-fills the amount field (used by the notification suggestion feature).
+  final double? initialAmount;
+
+  /// Pre-selects the transaction type (used by the notification suggestion feature).
+  final TransactionType? initialType;
+
+  const AddTransactionDialog({
+    super.key,
+    this.transaction,
+    this.initialAmount,
+    this.initialType,
+  });
 
   @override
   ConsumerState<AddTransactionDialog> createState() =>
@@ -240,6 +251,15 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       _category = t.category;
       _date = t.date;
       _walletId = t.walletId;
+    }
+    // Pre-fill from notification suggestion
+    if (!_isEditing) {
+      if (widget.initialAmount != null) {
+        _amountController.text = doubleToMoneyText(widget.initialAmount!);
+      }
+      if (widget.initialType != null) {
+        _type = widget.initialType!;
+      }
     }
     _titleController.addListener(() => _onTitleChanged(_titleController.text));
   }

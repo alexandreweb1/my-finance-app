@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/app_settings_provider.dart';
+import '../../../../core/services/notification_listener_service.dart';
+import '../../../../core/services/notification_providers.dart';
 import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -395,6 +397,10 @@ class SettingsScreen extends ConsumerWidget {
 
                 // Sharing
                 const _SharingSection(),
+                const SizedBox(height: 12),
+
+                // Notification Detection
+                const _NotificationDetectionSection(),
                 const SizedBox(height: 12),
 
                 // Logout
@@ -1984,5 +1990,104 @@ class _ProBannerCard extends ConsumerWidget {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification Detection Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NotificationDetectionSection extends ConsumerStatefulWidget {
+  const _NotificationDetectionSection();
+
+  @override
+  ConsumerState<_NotificationDetectionSection> createState() =>
+      _NotificationDetectionSectionState();
+}
+
+class _NotificationDetectionSectionState
+    extends ConsumerState<_NotificationDetectionSection>
+    with WidgetsBindingObserver {
+  bool _permissionGranted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkPermission();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Re-check permission when user returns from system Settings
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    final granted = await NotificationListenerBridge.isPermissionGranted();
+    if (mounted) setState(() => _permissionGranted = granted);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = ref.watch(notificationDetectionEnabledProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return _SettingsCard(children: [
+      SwitchListTile(
+        secondary: const _IconBadge(
+          Icons.notifications_active_outlined,
+          color: Color(0xFF29B6F6),
+        ),
+        title: const Text('Detectar transações'),
+        subtitle: const Text(
+          'Lê notificações de bancos e sugere lançamentos automáticamente',
+          style: TextStyle(fontSize: 12),
+        ),
+        value: enabled,
+        onChanged: (v) =>
+            ref.read(notificationDetectionEnabledProvider.notifier).setValue(v),
+      ),
+      if (enabled) ...[
+        const Divider(height: 1, indent: 56),
+        ListTile(
+          leading: _IconBadge(
+            _permissionGranted
+                ? Icons.verified_outlined
+                : Icons.warning_amber_outlined,
+            color: _permissionGranted
+                ? Colors.green.shade600
+                : Colors.orange.shade700,
+          ),
+          title: Text(
+            _permissionGranted
+                ? 'Acesso a notificações ativo'
+                : 'Acesso a notificações necessário',
+          ),
+          subtitle: Text(
+            _permissionGranted
+                ? 'O app está monitorando notificações'
+                : 'Toque para abrir as configurações do sistema',
+            style: const TextStyle(fontSize: 12),
+          ),
+          trailing: _permissionGranted
+              ? Icon(Icons.check_circle_outline,
+                  color: Colors.green.shade600, size: 20)
+              : Icon(Icons.open_in_new_outlined,
+                  color: cs.primary, size: 20),
+          onTap: _permissionGranted
+              ? null
+              : () async {
+                  await NotificationListenerBridge.openPermissionSettings();
+                },
+        ),
+      ],
+    ]);
   }
 }

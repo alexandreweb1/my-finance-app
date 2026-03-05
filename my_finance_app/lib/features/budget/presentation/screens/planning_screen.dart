@@ -303,7 +303,7 @@ class _BudgetCard extends ConsumerWidget {
                   child: Text(
                     budget.categoryName,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15),
+                        fontWeight: FontWeight.w600, fontSize: 17),
                   ),
                 ),
                 Text(

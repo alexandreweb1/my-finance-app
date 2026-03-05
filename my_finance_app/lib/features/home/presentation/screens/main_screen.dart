@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/services/local_notification_service.dart';
+import '../../../../core/services/notification_listener_service.dart';
+import '../../../../core/services/notification_permission_dialog.dart';
+import '../../../../core/services/notification_providers.dart';
+import '../../../../core/services/notification_suggestion.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
@@ -34,6 +39,41 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _initNotificationFeature();
+  }
+
+  Future<void> _initNotificationFeature() async {
+    // Initialize local notifications and wire the tap handler
+    await LocalNotificationService.instance.init(
+      onSuggestionTap: (suggestion) {
+        ref.read(pendingSuggestionProvider.notifier).state = suggestion;
+      },
+    );
+
+    // Only proceed if the feature is enabled in settings
+    final enabled = ref.read(notificationDetectionEnabledProvider);
+    if (!enabled) return;
+
+    // Ask for Notification Access permission after a short delay
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      await showNotificationPermissionDialogIfNeeded(context);
+    }
+
+    _startListening();
+  }
+
+  void _startListening() {
+    NotificationListenerBridge.suggestionStream.listen((suggestion) {
+      // Check again in case user disabled while app was open
+      if (!ref.read(notificationDetectionEnabledProvider)) return;
+      LocalNotificationService.instance.showSuggestion(suggestion);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     ref.watch(categoriesSeedProvider);
     ref.watch(walletsSeedProvider);
@@ -43,6 +83,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     // Listen for external navigation (e.g. from dashboard cards)
     ref.listen<int>(mainTabIndexProvider, (_, next) {
       if (next != _currentIndex) setState(() => _currentIndex = next);
+    });
+
+    // Open AddTransactionDialog when a notification suggestion is tapped
+    ref.listen<NotificationSuggestion?>(pendingSuggestionProvider,
+        (_, suggestion) {
+      if (suggestion == null) return;
+      ref.read(pendingSuggestionProvider.notifier).state = null;
+      showDialog<void>(
+        context: context,
+        builder: (_) => AddTransactionDialog(
+          initialAmount: suggestion.amount,
+          initialType: suggestion.type,
+        ),
+      );
     });
 
     return Scaffold(
