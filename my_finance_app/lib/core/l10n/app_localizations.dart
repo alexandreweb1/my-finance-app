@@ -133,11 +133,13 @@ class AppLocalizations {
   String get limitLabel => _t('Limite', 'Limit', 'Límite');
   String get errorReplicating => _t('Erro ao replicar orçamentos.', 'Error copying budgets.', 'Error al copiar presupuestos.');
   String get createBudgetsFor => _t('Criar orçamentos para', 'Create budgets for', 'Crear presupuestos para');
-  String get copyPrevLimits => _t('Copiar limites do mês passado', 'Copy previous month limits', 'Copiar límites del mes anterior');
-  String get copyPrevLimitsDesc => _t('Usa os mesmos limites definidos em', 'Uses the same limits defined in', 'Usa los mismos límites definidos en');
-  String get baseOnSpending => _t('Basear nos gastos reais', 'Basear nos gastos reais', 'Basar en gastos reales');
-  String get baseOnSpendingDesc => _t('Usa o total gasto em', 'Uses total spending in', 'Usa el total gastado en');
+  String get copyPrevLimits => _t('Copiar limites de um mês anterior', 'Copy limits from a previous month', 'Copiar límites de un mes anterior');
+  String get copyPrevLimitsDesc => _t('Copia os limites definidos em um mês anterior', 'Copies the limits defined in a previous month', 'Copia los límites definidos en un mes anterior');
+  String get baseOnSpending => _t('Basear nos gastos reais', 'Base on real spending', 'Basar en gastos reales');
+  String get baseOnSpendingDesc => _t('Usa o total gasto em um mês como limite de cada categoria', 'Uses total spending in a month as the limit per category', 'Usa el total gastado en un mes como límite por categoría');
   String get baseOnSpendingDescSuffix => _t('como limite de cada categoria', 'as the limit per category', 'como límite por categoría');
+  String get createBudgets => _t('Criar orçamentos', 'Create budgets', 'Crear presupuestos');
+  String get selectSourceMonth => _t('Selecionar mês de referência', 'Select reference month', 'Seleccionar mes de referencia');
   String get budgetSummaryTitle => _t('Resumo do mês', 'Monthly Summary', 'Resumen mensual');
   String get budgetPlanned => _t('Previsto', 'Planned', 'Previsto');
   String get budgetRemaining => _t('Restante', 'Remaining', 'Restante');

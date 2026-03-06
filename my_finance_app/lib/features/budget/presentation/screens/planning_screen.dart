@@ -376,23 +376,8 @@ class _EmptyBudgets extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.watch(dateLocaleProvider);
-    final prevBudgets = ref.watch(previousMonthBudgetsProvider).value ?? [];
     final isLoading = ref.watch(budgetNotifierProvider).isLoading;
-    final allTransactions = ref.watch(visibleTransactionsProvider);
-    final prevMonth = DateTime(month.year, month.month - 1, 1);
-    final prevMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(prevMonth);
     final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month);
-
-    // Total spent per category in the previous month
-    final prevMonthSpending = <String, double>{};
-    for (final t in allTransactions) {
-      if (t.isExpense &&
-          t.date.year == prevMonth.year &&
-          t.date.month == prevMonth.month) {
-        prevMonthSpending[t.category] =
-            (prevMonthSpending[t.category] ?? 0.0) + t.amount;
-      }
-    }
 
     return Center(
       child: Column(
@@ -408,32 +393,19 @@ class _EmptyBudgets extends ConsumerWidget {
             style: TextStyle(color: Colors.grey.shade500),
           ),
           const SizedBox(height: 24),
-          if (prevBudgets.isNotEmpty)
-            OutlinedButton.icon(
-              icon: isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.copy_outlined, size: 18),
-              label: Text('${l10n.replicateFrom} $prevMonthLabel'),
-              onPressed: isLoading
-                  ? null
-                  : () => _showCopyOptionsDialog(
-                        context, ref, prevBudgets, prevMonthSpending, l10n,
-                        prevMonthLabel, currentMonthLabel),
-            ),
-          if (prevBudgets.isEmpty) ...[
-            OutlinedButton.icon(
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(l10n.budget),
-              onPressed: () => showDialog(
-                context: context,
-                builder: (_) => _AddBudgetDialog(month: month),
-              ),
-            ),
-          ],
+          OutlinedButton.icon(
+            icon: isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_chart_outlined, size: 18),
+            label: Text(l10n.createBudgets),
+            onPressed: isLoading
+                ? null
+                : () => _showCopyOptionsDialog(context, ref),
+          ),
         ],
       ),
     );
@@ -442,12 +414,11 @@ class _EmptyBudgets extends ConsumerWidget {
   Future<void> _showCopyOptionsDialog(
     BuildContext context,
     WidgetRef ref,
-    List<BudgetEntity> prevBudgets,
-    Map<String, double> prevMonthSpending,
-    AppLocalizations l10n,
-    String prevMonthLabel,
-    String currentMonthLabel,
   ) async {
+    final l10n = AppLocalizations.of(context);
+    final dateLoc = ref.read(dateLocaleProvider);
+    final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month);
+
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -458,15 +429,14 @@ class _EmptyBudgets extends ConsumerWidget {
             _BudgetOptionTile(
               icon: Icons.copy_outlined,
               title: l10n.copyPrevLimits,
-              subtitle: '${l10n.copyPrevLimitsDesc} $prevMonthLabel',
+              subtitle: l10n.copyPrevLimitsDesc,
               onTap: () => Navigator.of(ctx).pop('copy'),
             ),
             const SizedBox(height: 8),
             _BudgetOptionTile(
               icon: Icons.insights_outlined,
               title: l10n.baseOnSpending,
-              subtitle:
-                  '${l10n.baseOnSpendingDesc} $prevMonthLabel ${l10n.baseOnSpendingDescSuffix}',
+              subtitle: l10n.baseOnSpendingDesc,
               onTap: () => Navigator.of(ctx).pop('spending'),
             ),
             const SizedBox(height: 8),
@@ -497,40 +467,119 @@ class _EmptyBudgets extends ConsumerWidget {
       return;
     }
 
-    final bool success;
+    // Ask the user which month to use as reference
+    final sourceMonth = await _pickSourceMonth(context, ref);
+    if (sourceMonth == null || !context.mounted) return;
+
     if (choice == 'copy') {
-      success = await ref
+      // Fetch budgets for the chosen source month
+      final budgets =
+          await ref.read(budgetsForMonthProvider(sourceMonth).future);
+      if (!context.mounted) return;
+      if (budgets.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorReplicating)),
+        );
+        return;
+      }
+      final success = await ref
           .read(budgetNotifierProvider.notifier)
           .copyFromPreviousMonth(
-            previousBudgets: prevBudgets,
+            previousBudgets: budgets,
             targetMonth: month,
           );
+      if (!context.mounted) return;
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorReplicating)),
+        );
+      }
     } else {
-      // Build a budget list using actual spending as the limit amount
-      final spendingBudgets = prevBudgets
-          .map((b) => BudgetEntity(
-                id: b.id,
-                userId: b.userId,
-                categoryId: b.categoryId,
-                categoryName: b.categoryName,
-                limitAmount: prevMonthSpending[b.categoryName] ?? 0.0,
-                month: b.month,
-              ))
+      // Build budgets from expense categories with spending in the chosen month
+      final allTransactions = ref.read(visibleTransactionsProvider);
+      final expenseCategories = ref.read(expenseCategoriesProvider);
+      final spending = <String, double>{};
+      for (final t in allTransactions) {
+        if (t.isExpense &&
+            t.date.year == sourceMonth.year &&
+            t.date.month == sourceMonth.month) {
+          spending[t.category] = (spending[t.category] ?? 0.0) + t.amount;
+        }
+      }
+      final categoryByName = {for (final c in expenseCategories) c.name: c};
+      final spendingBudgets = spending.entries
+          .map((entry) {
+            final category = categoryByName[entry.key];
+            if (category == null) return null;
+            return BudgetEntity(
+              id: '',
+              userId: '',
+              categoryId: category.id,
+              categoryName: category.name,
+              limitAmount: entry.value,
+              month: month,
+            );
+          })
+          .whereType<BudgetEntity>()
           .toList();
-      success = await ref
+      if (spendingBudgets.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.errorReplicating)),
+          );
+        }
+        return;
+      }
+      final success = await ref
           .read(budgetNotifierProvider.notifier)
           .copyFromPreviousMonth(
             previousBudgets: spendingBudgets,
             targetMonth: month,
           );
+      if (!context.mounted) return;
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorReplicating)),
+        );
+      }
     }
+  }
 
-    if (!context.mounted) return;
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.errorReplicating)),
-      );
-    }
+  Future<DateTime?> _pickSourceMonth(
+      BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final dateLoc = ref.read(dateLocaleProvider);
+    // Generate the last 24 months before the current target month
+    final months = List.generate(
+      24,
+      (i) => DateTime(month.year, month.month - 1 - i, 1),
+    );
+    return showDialog<DateTime>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.selectSourceMonth),
+        children: [
+          SizedBox(
+            height: 300,
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: months.length,
+              itemBuilder: (_, i) => SimpleDialogOption(
+                onPressed: () => Navigator.of(ctx).pop(months[i]),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    DateFormat('MMMM yyyy', dateLoc).format(months[i]),
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

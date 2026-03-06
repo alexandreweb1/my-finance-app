@@ -60,6 +60,17 @@ final budgetsStreamProvider = StreamProvider<List<BudgetEntity>>((ref) {
   );
 });
 
+/// Budgets for any specific month (used for month-picker based copy/spending).
+final budgetsForMonthProvider =
+    StreamProvider.family<List<BudgetEntity>, DateTime>((ref, month) {
+  final effectiveUserId = ref.watch(effectiveUserIdProvider);
+  if (effectiveUserId.isEmpty) return const Stream.empty();
+  return ref
+      .watch(getBudgetsUseCaseProvider)
+      .call(GetBudgetsParams(userId: effectiveUserId, month: month))
+      .map((result) => result.getOrElse(() => []));
+});
+
 /// Budgets from the month immediately before [selectedMonthProvider].
 final previousMonthBudgetsProvider = StreamProvider<List<BudgetEntity>>((ref) {
   final authState = ref.watch(authStateProvider);
