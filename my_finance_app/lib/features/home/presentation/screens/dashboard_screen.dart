@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/utils/category_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -14,7 +15,7 @@ import '../../../sharing/domain/entities/invitation_entity.dart';
 import '../../../sharing/presentation/providers/sharing_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
-import '../../../transactions/presentation/widgets/transaction_list_tile.dart';
+import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../providers/dashboard_provider.dart';
 import 'main_screen.dart';
 
@@ -37,7 +38,6 @@ class DashboardScreen extends ConsumerWidget {
     final balance = ref.watch(balanceProvider);
     final income = ref.watch(dashboardMonthIncomeProvider);
     final expense = ref.watch(dashboardMonthExpenseProvider);
-    final transactionsAsync = ref.watch(transactionsStreamProvider);
     final visibleTxs = ref.watch(visibleTransactionsProvider);
     final budgetSummaries = ref.watch(dashboardBudgetSummaryProvider);
     final selectedMonth = ref.watch(dashboardSelectedMonthProvider);
@@ -47,13 +47,6 @@ class DashboardScreen extends ConsumerWidget {
     final name = user?.displayName?.split(' ').first ?? l10n.hello;
     final greeting = _greeting(l10n);
     final initials = _initials(user?.displayName);
-
-    // Transactions filtered to the selected month (visible wallets only)
-    final monthTxs = visibleTxs
-        .where((t) =>
-            t.date.year == selectedMonth.year &&
-            t.date.month == selectedMonth.month)
-        .toList();
 
     final monthLabel =
         DateFormat('MMM yyyy', dateLoc).format(selectedMonth);
@@ -96,43 +89,12 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 24),
           ],
 
-          _SectionHeader(
-            title: l10n.recentTransactions,
-            subtitle: monthLabel,
+          const _SectionHeader(
+            title: 'Saldo por carteira',
+            subtitle: '',
           ),
           const SizedBox(height: 8),
-          transactionsAsync.when(
-            data: (_) => monthTxs.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Text(
-                        l10n.noTransactions,
-                        style: TextStyle(color: Colors.grey.shade500),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: monthTxs
-                        .take(5)
-                        .map((t) => TransactionListTile(transaction: t))
-                        .toList(),
-                  ),
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (e, _) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  l10n.errorGeneric,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
+          const _WalletBalancesSection(),
 
           const SizedBox(height: 100),
         ],
@@ -860,6 +822,161 @@ class _BudgetStatColumn extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Wallet Balances Section ──────────────────────────────────────────────────
+
+class _WalletBalancesSection extends ConsumerWidget {
+  const _WalletBalancesSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wallets = ref.watch(walletsStreamProvider).value ?? [];
+    final balances = ref.watch(walletBalancesProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Include "Geral" bucket (walletId == '') if it has transactions
+    final hasGeral = balances.containsKey('');
+
+    if (wallets.isEmpty && !hasGeral) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            'Nenhuma carteira encontrada',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    final items = <Widget>[];
+
+    for (int i = 0; i < wallets.length; i++) {
+      final w = wallets[i];
+      final balance = balances[w.id] ?? 0;
+      if (i > 0) {
+        items.add(Divider(
+          height: 1,
+          indent: 56,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ));
+      }
+      items.add(_WalletBalanceTile(
+        icon: categoryIcon(w.iconCodePoint),
+        color: Color(w.colorValue),
+        name: w.name,
+        balance: balance,
+        fmt: fmt,
+      ));
+    }
+
+    if (hasGeral) {
+      if (items.isNotEmpty) {
+        items.add(Divider(
+          height: 1,
+          indent: 56,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ));
+      }
+      items.add(_WalletBalanceTile(
+        icon: Icons.account_balance_wallet_outlined,
+        color: Colors.grey,
+        name: 'Geral',
+        balance: balances[''] ?? 0,
+        fmt: fmt,
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(children: items),
+      ),
+    );
+  }
+}
+
+class _WalletBalanceTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String name;
+  final double balance;
+  final String Function(double) fmt;
+
+  const _WalletBalanceTile({
+    required this.icon,
+    required this.color,
+    required this.name,
+    required this.balance,
+    required this.fmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPositive = balance >= 0;
+    final balanceColor =
+        isPositive ? const Color(0xFF10B981) : const Color(0xFFE05252);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                fmt(balance.abs()),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: balanceColor,
+                ),
+              ),
+              Text(
+                isPositive ? 'Positivo' : 'Negativo',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: balanceColor.withValues(alpha: 0.75),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/wallets/presentation/providers/wallets_provider.dart';
@@ -70,6 +72,12 @@ final isProProvider = Provider<bool>((ref) {
         data: (entity) => entity.isActive,
       ) ??
       false;
+});
+
+/// True enquanto o status de assinatura ainda está sendo buscado no Firestore.
+/// Usado pelos gates para não bloquear usuários Pro antes do carregamento terminar.
+final isSubscriptionLoadingProvider = Provider<bool>((ref) {
+  return ref.watch(subscriptionStreamProvider).isLoading;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,9 +165,12 @@ class IAPNotifier extends StateNotifier<IAPState> {
     // Busca detalhes dos produtos
     final response =
         await InAppPurchase.instance.queryProductDetails(_kProductIds);
-    print('[IAP] encontrados: ${response.productDetails.map((p) => p.id).toList()}');
-    print('[IAP] não encontrados: ${response.notFoundIDs}');
-    print('[IAP] erro: ${response.error}');
+    assert(() {
+      debugPrint('[IAP] encontrados: ${response.productDetails.map((p) => p.id).toList()}');
+      debugPrint('[IAP] não encontrados: ${response.notFoundIDs}');
+      debugPrint('[IAP] erro: ${response.error}');
+      return true;
+    }());
     state = state.copyWith(
       isLoading: false,
       isAvailable: true,
@@ -253,8 +264,29 @@ class IAPNotifier extends StateNotifier<IAPState> {
       return;
     }
     state = state.copyWith(isLoading: true, clearError: true);
-    final param = PurchaseParam(productDetails: product);
     try {
+      final PurchaseParam param;
+      if (!kIsWeb && Platform.isAndroid) {
+        // Google Play Billing v5+: assinaturas requerem GooglePlayPurchaseParam
+        // com o offerToken do plano base da assinatura.
+        final googleProduct = product as GooglePlayProductDetails;
+        final offerToken = googleProduct.offerToken;
+        if (offerToken == null) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage:
+                'Plano de assinatura não configurado na Play Store. '
+                'Certifique-se de que o produto tem um plano base ativo.',
+          );
+          return;
+        }
+        param = GooglePlayPurchaseParam(
+          productDetails: googleProduct,
+          offerToken: offerToken,
+        );
+      } else {
+        param = PurchaseParam(productDetails: product);
+      }
       await InAppPurchase.instance.buyNonConsumable(purchaseParam: param);
     } catch (e) {
       state = state.copyWith(

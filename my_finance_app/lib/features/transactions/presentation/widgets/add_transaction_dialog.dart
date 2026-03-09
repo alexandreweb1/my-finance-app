@@ -282,6 +282,41 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir lançamento'),
+        content: const Text('Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final success = await ref
+        .read(transactionsNotifierProvider.notifier)
+        .delete(widget.transaction!.id);
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao excluir lançamento.')),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final amount = moneyTextToDouble(_amountController.text);
@@ -613,6 +648,22 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ),
                   maxLines: 2,
                 ),
+                if (_isEditing) ...[
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 4),
+                  OutlinedButton.icon(
+                    onPressed: isLoading ? null : _delete,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      side: BorderSide(
+                          color: Theme.of(context).colorScheme.error),
+                      minimumSize: const Size(double.infinity, 44),
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('Excluir lançamento'),
+                  ),
+                ],
               ],
             ),
           ),

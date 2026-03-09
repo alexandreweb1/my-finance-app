@@ -670,6 +670,36 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
     super.dispose();
   }
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir orçamento'),
+        content: const Text('Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final success =
+        await ref.read(budgetNotifierProvider.notifier).delete(widget.budget!.id);
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
@@ -774,6 +804,22 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
                   return null;
                 },
               ),
+              if (_isEditing) ...[
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 4),
+                OutlinedButton.icon(
+                  onPressed: isLoading ? null : _delete,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.error),
+                    minimumSize: const Size(double.infinity, 44),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Excluir orçamento'),
+                ),
+              ],
             ],
           ),
         ),

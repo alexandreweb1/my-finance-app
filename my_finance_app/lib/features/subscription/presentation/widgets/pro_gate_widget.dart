@@ -25,6 +25,24 @@ class ProGateWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isLoading = ref.watch(isSubscriptionLoadingProvider);
+
+    // Enquanto o Firestore ainda está respondendo, bloqueia interação
+    // mas não exibe o gate de compra (evita falso bloqueio para usuários Pro).
+    if (isLoading) {
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          Opacity(opacity: 0.4, child: IgnorePointer(child: child)),
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ],
+      );
+    }
+
     final isPro = ref.watch(isProProvider);
 
     if (isPro) return child;
@@ -115,12 +133,18 @@ class ProGateWidget extends ConsumerWidget {
 
 /// Mostra um bottom sheet de gate leve — usado quando o gate é numa ação pontual
 /// (ex: selecionar item de dropdown).
+/// Não exibe nada se o status de assinatura ainda está carregando.
 void showProGateBottomSheet(
   BuildContext context, {
   required String featureName,
   required String featureDescription,
   required IconData featureIcon,
 }) {
+  // Evita exibir o gate de compra para usuários Pro cujo status
+  // ainda não chegou do Firestore.
+  final container = ProviderScope.containerOf(context);
+  if (container.read(isSubscriptionLoadingProvider)) return;
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,

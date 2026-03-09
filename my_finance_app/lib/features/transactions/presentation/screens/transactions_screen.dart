@@ -14,11 +14,39 @@ import '../widgets/transaction_list_tile.dart';
 // Number of months to show in the quick picker
 const _kPickerMonths = 24;
 
-class TransactionsScreen extends ConsumerWidget {
+class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
+}
+
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
+  bool _isSearching = false;
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => _isSearching = true);
+    Future.microtask(() => _searchFocus.requestFocus());
+  }
+
+  void _closeSearch() {
+    setState(() => _isSearching = false);
+    _searchController.clear();
+    ref.read(statementSearchQueryProvider.notifier).state = '';
+    _searchFocus.unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final fmt = ref.watch(currencyFormatterProvider);
     final dateLoc = ref.watch(dateLocaleProvider);
@@ -27,6 +55,7 @@ class TransactionsScreen extends ConsumerWidget {
     final dateRange = ref.watch(statementDateRangeProvider);
     final hasFilters = ref.watch(statementHasFiltersProvider);
     final activeFilterCount = ref.watch(statementActiveFilterCountProvider);
+    final searchQuery = ref.watch(statementSearchQueryProvider);
 
     final income = ref.watch(statementDisplayIncomeProvider);
     final expense = ref.watch(statementDisplayExpenseProvider);
@@ -45,6 +74,14 @@ class TransactionsScreen extends ConsumerWidget {
         title: Text(l10n.navStatement),
         centerTitle: false,
         actions: [
+          IconButton(
+            tooltip: 'Pesquisar lançamento',
+            icon: Icon(
+              _isSearching ? Icons.search_off : Icons.search,
+              color: _isSearching ? cs.primary : null,
+            ),
+            onPressed: _isSearching ? _closeSearch : _openSearch,
+          ),
           Stack(
             alignment: Alignment.center,
             children: [
@@ -124,6 +161,42 @@ class TransactionsScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          // ── Search bar ─────────────────────────────────────────────────
+          if (_isSearching)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocus,
+                decoration: InputDecoration(
+                  hintText: 'Pesquisar por título...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            ref
+                                .read(statementSearchQueryProvider.notifier)
+                                .state = '';
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: cs.surfaceContainerHighest,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  isDense: true,
+                ),
+                onChanged: (value) {
+                  ref.read(statementSearchQueryProvider.notifier).state = value;
+                },
+              ),
+            ),
+
           // ── Period selector OR active date-range chip ───────────────────
           if (dateRange != null)
             _DateRangeBar(dateRange: dateRange, dateLoc: dateLoc)

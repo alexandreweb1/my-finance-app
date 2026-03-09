@@ -178,6 +178,9 @@ final statementHasFiltersProvider = Provider<bool>(
   (ref) => ref.watch(statementActiveFilterCountProvider) > 0,
 );
 
+/// Search query for filtering transactions by title.
+final statementSearchQueryProvider = StateProvider<String>((ref) => '');
+
 // --- Display providers: respects date range + type + advanced filters ---
 
 final statementDisplayTransactionsProvider =
@@ -189,6 +192,7 @@ final statementDisplayTransactionsProvider =
   final walletFilter = ref.watch(statementWalletFilterProvider);
   final minAmount = ref.watch(statementMinAmountFilterProvider);
   final maxAmount = ref.watch(statementMaxAmountFilterProvider);
+  final searchQuery = ref.watch(statementSearchQueryProvider);
 
   List<TransactionEntity> txs;
   if (dateRange != null) {
@@ -219,6 +223,10 @@ final statementDisplayTransactionsProvider =
   }
   if (maxAmount != null) {
     txs = txs.where((t) => t.amount <= maxAmount).toList();
+  }
+  if (searchQuery.isNotEmpty) {
+    final q = searchQuery.toLowerCase();
+    txs = txs.where((t) => t.title.toLowerCase().contains(q)).toList();
   }
   return txs;
 });
@@ -288,6 +296,17 @@ final statementAnnualExpenseProvider = Provider<double>((ref) {
   return transactions
       .where((t) => t.isExpense && t.date.year == month.year)
       .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+/// All-time balance per wallet ID (key '' = transactions without wallet / "Geral").
+final walletBalancesProvider = Provider<Map<String, double>>((ref) {
+  final transactions = ref.watch(visibleTransactionsProvider);
+  final Map<String, double> balances = {};
+  for (final t in transactions) {
+    balances[t.walletId] = (balances[t.walletId] ?? 0) +
+        (t.isIncome ? t.amount : -t.amount);
+  }
+  return balances;
 });
 
 // --- Notifier for mutations ---
