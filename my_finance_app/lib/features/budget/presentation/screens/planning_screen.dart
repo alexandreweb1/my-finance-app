@@ -400,7 +400,7 @@ class _EmptyBudgets extends ConsumerWidget {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.add_chart_outlined, size: 18),
+                : const Icon(Icons.post_add_outlined, size: 18),
             label: Text(l10n.createBudgets),
             onPressed: isLoading
                 ? null
@@ -549,35 +549,85 @@ class _EmptyBudgets extends ConsumerWidget {
       BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.read(dateLocaleProvider);
-    // Generate the last 24 months before the current target month
-    final months = List.generate(
-      24,
-      (i) => DateTime(month.year, month.month - 1 - i, 1),
+
+    // Default: previous month relative to target
+    final prevMonth = DateTime(month.year, month.month - 1, 1);
+    int selectedMonth = prevMonth.month;
+    int selectedYear = prevMonth.year;
+
+    // Year range: 5 years back from current target month year
+    final years =
+        List.generate(6, (i) => month.year - i);
+    final monthNames = List.generate(
+      12,
+      (i) => DateFormat('MMMM', dateLoc).format(DateTime(2000, i + 1)),
     );
+
     return showDialog<DateTime>(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: Text(l10n.selectSourceMonth),
-        children: [
-          SizedBox(
-            height: 300,
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: months.length,
-              itemBuilder: (_, i) => SimpleDialogOption(
-                onPressed: () => Navigator.of(ctx).pop(months[i]),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    DateFormat('MMMM yyyy', dateLoc).format(months[i]),
-                    style: const TextStyle(fontSize: 15),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(l10n.selectSourceMonth),
+          content: Row(
+            children: [
+              // Month dropdown
+              Expanded(
+                flex: 3,
+                child: DropdownButtonFormField<int>(
+                  initialValue: selectedMonth,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
+                  items: List.generate(
+                    12,
+                    (i) => DropdownMenuItem(
+                      value: i + 1,
+                      child: Text(monthNames[i]),
+                    ),
+                  ),
+                  onChanged: (v) {
+                    if (v != null) setState(() => selectedMonth = v);
+                  },
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              // Year dropdown
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<int>(
+                  initialValue: selectedYear,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: years
+                      .map((y) => DropdownMenuItem(
+                            value: y,
+                            child: Text(y.toString()),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => selectedYear = v);
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx)
+                  .pop(DateTime(selectedYear, selectedMonth, 1)),
+              child: Text(l10n.confirm),
+            ),
+          ],
+        ),
       ),
     );
   }
