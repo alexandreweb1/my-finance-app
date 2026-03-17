@@ -1185,7 +1185,7 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar')),
+              child: Text(AppLocalizations.of(context).cancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: Colors.red.shade600),
@@ -1284,7 +1284,7 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                             onPressed: () => ref
                                 .read(sharingNotifierProvider.notifier)
                                 .declineInvitation(inv.id),
-                            child: const Text('Recusar'),
+                            child: Text(AppLocalizations.of(context).decline),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
@@ -1292,7 +1292,7 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                             onPressed: () => ref
                                 .read(sharingNotifierProvider.notifier)
                                 .acceptInvitation(inv),
-                            child: const Text('Aceitar'),
+                            child: Text(AppLocalizations.of(context).accept),
                           ),
                         ],
                       ),
@@ -2045,10 +2045,10 @@ class _NotificationDetectionSectionState
           Icons.notifications_active_outlined,
           color: Color(0xFF29B6F6),
         ),
-        title: const Text('Detectar transações'),
-        subtitle: const Text(
-          'Lê notificações de bancos e sugere lançamentos automáticamente',
-          style: TextStyle(fontSize: 12),
+        title: Text(AppLocalizations.of(context).detectTransactions),
+        subtitle: Text(
+          AppLocalizations.of(context).detectTransactionsDesc,
+          style: const TextStyle(fontSize: 12),
         ),
         value: enabled,
         onChanged: (v) =>

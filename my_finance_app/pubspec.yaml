@@ -2,7 +2,7 @@ name: my_finance_app
 description: Personal finance management app with Clean Architecture.
 publish_to: 'none'
 
-version: 1.0.3+49
+version: 1.0.3+55
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -40,6 +40,10 @@ dependencies:
 
   # Local Notifications (notification-to-transaction feature)
   flutter_local_notifications: ^18.0.0
+
+  # App update check
+  package_info_plus: ^8.0.0
+  url_launcher: ^6.3.0
 
   cupertino_icons: ^1.0.8
 

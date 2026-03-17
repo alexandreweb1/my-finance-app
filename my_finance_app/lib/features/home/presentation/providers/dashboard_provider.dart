@@ -1,16 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/effective_user_provider.dart';
+import '../../../../core/providers/selected_month_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../budget/domain/entities/budget_entity.dart';
 import '../../../budget/domain/usecases/get_budgets_usecase.dart';
 import '../../../budget/presentation/providers/budget_provider.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 
-// ─── Selected month for the dashboard (independent of planning screen) ────────
-final dashboardSelectedMonthProvider = StateProvider<DateTime>(
-  (ref) => DateTime(DateTime.now().year, DateTime.now().month, 1),
-);
+// ─── Selected month (shared across all tabs) ──────────────────────────────────
+
+// ignore: non_constant_identifier_names
+final dashboardSelectedMonthProvider = selectedMonthProvider;
 
 // ─── Budget stream for the dashboard's selected month ─────────────────────────
 final dashboardBudgetsStreamProvider =

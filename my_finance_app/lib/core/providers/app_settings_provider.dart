@@ -159,15 +159,36 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     await prefs.setStringList(_keyHiddenWallets, hidden.toList());
   }
 
-  static Future<AppSettings> load() async {
+  /// [deviceLanguageCode] is the system language code (e.g. 'pt', 'en', 'es'),
+  /// passed from main() after WidgetsFlutterBinding.ensureInitialized().
+  /// Used only when the user has never explicitly chosen a language.
+  static Future<AppSettings> load({String? deviceLanguageCode}) async {
     final prefs = await SharedPreferences.getInstance();
     final currencyCode = prefs.getString(_keyCurrency) ?? 'BRL';
-    final languageCode = prefs.getString(_keyLanguage) ?? 'pt';
+    final savedLanguageCode = prefs.getString(_keyLanguage);
     final themeModeStr = prefs.getString(_keyThemeMode) ?? 'system';
     final hiddenList = prefs.getStringList(_keyHiddenWallets) ?? [];
+
+    final AppLanguage language;
+    if (savedLanguageCode != null) {
+      language = AppLanguage.fromCode(savedLanguageCode);
+    } else if (deviceLanguageCode != null) {
+      // No saved preference: default based on device locale.
+      // Portuguese for pt devices, Spanish for es, English for everything else.
+      if (deviceLanguageCode == 'pt') {
+        language = AppLanguage.portuguese;
+      } else if (deviceLanguageCode == 'es') {
+        language = AppLanguage.spanish;
+      } else {
+        language = AppLanguage.english;
+      }
+    } else {
+      language = AppLanguage.portuguese;
+    }
+
     return AppSettings(
       currency: AppCurrency.fromCode(currencyCode),
-      language: AppLanguage.fromCode(languageCode),
+      language: language,
       themeMode: AppThemeMode.fromString(themeModeStr),
       hiddenWalletIds: Set<String>.from(hiddenList),
     );

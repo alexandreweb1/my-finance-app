@@ -49,7 +49,7 @@ class DashboardScreen extends ConsumerWidget {
     final initials = _initials(user?.displayName);
 
     final monthLabel =
-        DateFormat('MMM yyyy', dateLoc).format(selectedMonth);
+        DateFormat('MMM yyyy', dateLoc).format(selectedMonth).capitalizeMonth();
 
     // Use theme-aware surface color so dark mode works correctly.
     // _kLightBg is kept for the light-mode tinted background via
@@ -377,7 +377,7 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
                   children: List.generate(months.length, (i) {
                     final month = months[i];
                     final isSelected = i == selectedIdx;
-                    final label = DateFormat('MMM', dateLoc).format(month);
+                    final label = DateFormat('MMM', dateLoc).format(month).capitalizeMonth();
                     return GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
@@ -1210,14 +1210,14 @@ class _InvitationCardState extends ConsumerState<_InvitationCard> {
                       side: BorderSide(color: Colors.red.shade300),
                     ),
                     onPressed: () => _respond(false),
-                    child: const Text('Recusar'),
+                    child: Text(AppLocalizations.of(context).decline),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
                     onPressed: () => _respond(true),
-                    child: const Text('Aceitar'),
+                    child: Text(AppLocalizations.of(context).accept),
                   ),
                 ),
               ],

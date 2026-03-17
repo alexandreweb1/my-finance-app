@@ -38,4 +38,6 @@ class BudgetSummary {
   double get percentage => progress * 100;
 
   bool get isOverBudget => spentAmount > budget.limitAmount;
+
+  double get remaining => budget.limitAmount - spentAmount;
 }

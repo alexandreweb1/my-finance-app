@@ -3,6 +3,15 @@ import 'package:intl/intl.dart';
 
 import '../providers/app_settings_provider.dart';
 
+extension StringMonthCapitalize on String {
+  /// Capitalizes the first letter of every alphabetic word in the string.
+  /// Example: "março 2025" → "Março 2025", "1 mar 25" → "1 Mar 25".
+  String capitalizeMonth() => replaceAllMapped(
+        RegExp(r'[a-zA-ZÀ-ú]+'),
+        (m) => m[0]![0].toUpperCase() + m[0]!.substring(1),
+      );
+}
+
 class CurrencyFormatter {
   /// Format using a specific [AppCurrency].
   static String format(double amount, AppCurrency currency) =>
@@ -17,10 +26,10 @@ class CurrencyFormatter {
       DateFormat('dd/MM/yyyy', locale).format(date);
 
   static String formatMonthYear(DateTime date, [String locale = 'pt_BR']) =>
-      DateFormat('MMMM yyyy', locale).format(date);
+      DateFormat('MMMM yyyy', locale).format(date).capitalizeMonth();
 
   static String formatMonthShort(DateTime date, [String locale = 'pt_BR']) =>
-      DateFormat('MMM', locale).format(date);
+      DateFormat('MMM', locale).format(date).capitalizeMonth();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

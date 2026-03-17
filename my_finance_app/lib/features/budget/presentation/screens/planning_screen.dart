@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/providers/selected_month_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
@@ -72,7 +73,7 @@ class _MonthSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dateLoc = ref.watch(dateLocaleProvider);
-    final label = DateFormat('MMMM yyyy', dateLoc).format(month);
+    final label = DateFormat('MMMM yyyy', dateLoc).format(month).capitalizeMonth();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
@@ -355,6 +356,16 @@ class _BudgetCard extends ConsumerWidget {
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 Text(
+                  '${l10n.budgetRemaining}: ${fmt(summary.remaining.abs())}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: summary.isOverBudget
+                        ? Colors.red.shade600
+                        : Colors.green.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
                   '${l10n.limitLabel}: ${fmt(budget.limitAmount)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
@@ -377,7 +388,7 @@ class _EmptyBudgets extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.watch(dateLocaleProvider);
     final isLoading = ref.watch(budgetNotifierProvider).isLoading;
-    final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month);
+    final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month).capitalizeMonth();
 
     return Center(
       child: Column(
@@ -417,7 +428,7 @@ class _EmptyBudgets extends ConsumerWidget {
   ) async {
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.read(dateLocaleProvider);
-    final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month);
+    final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month).capitalizeMonth();
 
     final choice = await showDialog<String>(
       context: context,
@@ -560,7 +571,7 @@ class _EmptyBudgets extends ConsumerWidget {
         List.generate(6, (i) => month.year - i);
     final monthNames = List.generate(
       12,
-      (i) => DateFormat('MMMM', dateLoc).format(DateTime(2000, i + 1)),
+      (i) => DateFormat('MMMM', dateLoc).format(DateTime(2000, i + 1)).capitalizeMonth(),
     );
 
     return showDialog<DateTime>(
@@ -673,23 +684,26 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Excluir orçamento'),
-        content: const Text('Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      builder: (ctx) {
+        final l10n = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l10n.deleteBudget),
+          content: Text(l10n.deleteBudgetConfirm),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.cancel),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Excluir'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.delete),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
     final success =
@@ -761,7 +775,7 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
 
     final title = _isEditing
         ? l10n.editBudget
-        : '${l10n.newBudget}${DateFormat('MMM yyyy', dateLoc).format(widget.month)}';
+        : '${l10n.newBudget}${DateFormat('MMM yyyy', dateLoc).format(widget.month).capitalizeMonth()}';
 
     return AlertDialog(
       title: Text(title),
@@ -817,7 +831,7 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
                     minimumSize: const Size(double.infinity, 44),
                   ),
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                  label: const Text('Excluir orçamento'),
+                  label: Text(AppLocalizations.of(context).deleteBudget),
                 ),
               ],
             ],

@@ -17,7 +17,7 @@ import 'features/home/presentation/screens/main_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
 
   // Initialise date formatting for all supported locales.
   await Future.wait([
@@ -26,8 +26,13 @@ Future<void> main() async {
     initializeDateFormatting('es_ES', null),
   ]);
 
+  // Detect device language for first-launch locale defaulting.
+  final deviceLanguageCode =
+      binding.platformDispatcher.locale.languageCode;
+
   // Load persisted settings (currency + language) before first frame.
-  final settings = await AppSettingsNotifier.load();
+  final settings =
+      await AppSettingsNotifier.load(deviceLanguageCode: deviceLanguageCode);
 
   runApp(ProviderScope(
     overrides: [

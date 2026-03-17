@@ -65,7 +65,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     // Label: full year in annual mode, month+year in monthly mode
     final periodLabel = isAnnual
         ? selectedMonth.year.toString()
-        : DateFormat('MMMM yyyy', dateLoc).format(selectedMonth);
+        : DateFormat('MMMM yyyy', dateLoc).format(selectedMonth).capitalizeMonth();
 
     final cs = Theme.of(context).colorScheme;
 
@@ -383,7 +383,7 @@ class _DateRangeBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final (start, end) = dateRange;
     final fmt = DateFormat('d MMM yy', dateLoc);
-    final label = '${fmt.format(start)} – ${fmt.format(end)}';
+    final label = '${fmt.format(start).capitalizeMonth()} – ${fmt.format(end).capitalizeMonth()}';
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
@@ -412,7 +412,7 @@ class _DateRangeBar extends ConsumerWidget {
             onPressed: () =>
                 ref.read(statementDateRangeProvider.notifier).state = null,
             icon: const Icon(Icons.close, size: 16),
-            label: const Text('Limpar', style: TextStyle(fontSize: 12)),
+            label: Text(AppLocalizations.of(context).clear, style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),
@@ -623,7 +623,7 @@ class _MonthPickerSheet extends ConsumerWidget {
                         final isFuture = month.isAfter(DateTime(
                             now.year, now.month, now.day));
                         final label =
-                            DateFormat('MMM', dateLoc).format(month);
+                            DateFormat('MMM', dateLoc).format(month).capitalizeMonth();
 
                         return _MonthChip(
                           label: label,
@@ -1286,7 +1286,7 @@ class _MultiSelectDropdown extends StatelessWidget {
                           TextButton(
                             onPressed: () =>
                                 setSheetState(() => temp = {}),
-                            child: const Text('Limpar'),
+                            child: Text(AppLocalizations.of(context).clear),
                           ),
                       ],
                     ),
@@ -1343,7 +1343,7 @@ class _MultiSelectDropdown extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         minimumSize: const Size(double.infinity, 48),
                       ),
-                      child: const Text('Confirmar'),
+                      child: Text(AppLocalizations.of(ctx).confirm),
                     ),
                   ),
                 ],

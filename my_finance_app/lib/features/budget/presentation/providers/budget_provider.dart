@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/effective_user_provider.dart';
+import '../../../../core/providers/selected_month_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/transactions/presentation/providers/transactions_provider.dart';
 import '../../data/datasources/budget_remote_datasource.dart';
@@ -33,12 +34,6 @@ final setBudgetUseCaseProvider = Provider(
 
 final deleteBudgetUseCaseProvider = Provider(
   (ref) => DeleteBudgetUseCase(ref.watch(budgetRepositoryProvider)),
-);
-
-// --- Selected Month ---
-
-final selectedMonthProvider = StateProvider<DateTime>(
-  (ref) => DateTime(DateTime.now().year, DateTime.now().month, 1),
 );
 
 // --- Stream Providers ---

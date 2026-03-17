@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -37,11 +38,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     final authState = ref.read(authNotifierProvider);
     if (authState.errorMessage == null) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Conta criada com sucesso! Bem-vindo(a)!'),
+        SnackBar(
+          content: Text(l10n.accountCreated),
           backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         ),
       );
       // Limpa a pilha de navegação para o AppRouter redirecionar corretamente
@@ -52,9 +54,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Criar Conta')),
+      appBar: AppBar(title: Text(l10n.createAccount)),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -82,32 +85,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome',
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.nameField,
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v == null || v.isEmpty ? 'Informe seu nome' : null,
+                        v == null || v.isEmpty ? l10n.enterName : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'E-mail',
-                      prefixIcon: Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.emailField,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v == null || !v.contains('@') ? 'E-mail inválido' : null,
+                        v == null || !v.contains('@') ? l10n.invalidEmail : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Senha',
+                      labelText: l10n.passwordField,
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
@@ -119,7 +122,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     validator: (v) => v == null || v.length < 6
-                        ? 'Mínimo 6 caracteres'
+                        ? l10n.minChars
                         : null,
                   ),
                   const SizedBox(height: 24),
@@ -131,7 +134,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Criar Conta'),
+                        : Text(l10n.createAccount),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -141,7 +144,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
-                          'OU',
+                          l10n.or,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -176,8 +179,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         children: [
                           _googleLogo(),
                           const SizedBox(width: 10),
-                          const Text(
-                            'Continuar com Google',
+                          Text(
+                            l10n.continueWithGoogle,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w500,

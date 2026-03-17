@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/providers/app_settings_provider.dart';
 import '../../../../core/providers/effective_user_provider.dart';
+import '../../../../core/providers/selected_month_provider.dart';
 import '../../data/datasources/transaction_remote_datasource.dart';
 import '../../data/repositories/transaction_repository_impl.dart';
 import '../../domain/entities/transaction_entity.dart';
@@ -60,11 +61,10 @@ final transactionsStreamProvider =
   );
 });
 
-// --- Selected month for the statement screen ---
+// --- Selected month (shared across all tabs) ---
 
-final transactionsSelectedMonthProvider = StateProvider<DateTime>(
-  (ref) => DateTime(DateTime.now().year, DateTime.now().month, 1),
-);
+// ignore: non_constant_identifier_names
+final transactionsSelectedMonthProvider = selectedMonthProvider;
 
 // --- Visible transactions (excludes transactions from hidden wallets) ---
 

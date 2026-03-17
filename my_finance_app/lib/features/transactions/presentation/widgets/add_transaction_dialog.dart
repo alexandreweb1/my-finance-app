@@ -42,7 +42,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
-  final _descriptionController = TextEditingController();
 
   TransactionType _type = TransactionType.expense;
   String? _category;
@@ -131,16 +130,17 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final effectiveUserId = ref.read(effectiveUserIdProvider);
     if (effectiveUserId.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context);
     final created = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nova Categoria'),
+        title: Text(l10n.newCategoryTitle),
         content: TextField(
           controller: nameCtrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome da categoria',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l10n.categoryName,
+            border: const OutlineInputBorder(),
           ),
           textCapitalization: TextCapitalization.words,
           onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
@@ -148,11 +148,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(nameCtrl.text.trim()),
-            child: const Text('Criar'),
+            child: Text(l10n.create),
           ),
         ],
       ),
@@ -246,7 +246,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       final t = widget.transaction!;
       _titleController.text = t.title;
       _amountController.text = doubleToMoneyText(t.amount);
-      _descriptionController.text = t.description ?? '';
+      // description preserved from original transaction
       _type = t.type;
       _category = t.category;
       _date = t.date;
@@ -268,7 +268,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
-    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -283,22 +282,23 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir lançamento'),
-        content: const Text('Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.'),
+        title: Text(l10n.deleteTransaction),
+        content: Text(l10n.deleteTransactionConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Excluir'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -312,7 +312,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao excluir lançamento.')),
+        SnackBar(content: Text(AppLocalizations.of(context).errorDeletingTransaction)),
       );
     }
   }
@@ -339,9 +339,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         type: _type,
         category: _category!,
         date: _date,
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
+        description: widget.transaction!.description,
         walletId: _walletId,
       );
       success = await notifier.update(updated);
@@ -352,9 +350,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         type: _type,
         category: _category!,
         date: _date,
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
         walletId: _walletId,
       );
     }
@@ -405,35 +400,97 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SegmentedButton<TransactionType>(
-                  segments: [
-                    ButtonSegment(
-                      value: TransactionType.expense,
-                      label: Text(l10n.expense),
-                      icon: const Icon(Icons.arrow_downward),
+                // ── Type toggle (Despesa / Receita) ──────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: _TypeButton(
+                        label: l10n.expense,
+                        icon: Icons.arrow_downward_rounded,
+                        isSelected: _type == TransactionType.expense,
+                        activeColor: const Color(0xFFEF4444),
+                        onTap: () => setState(() {
+                          _type = TransactionType.expense;
+                          _category = null;
+                          _suggestedCategory = null;
+                        }),
+                      ),
                     ),
-                    ButtonSegment(
-                      value: TransactionType.income,
-                      label: Text(l10n.incomeType),
-                      icon: const Icon(Icons.arrow_upward),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _TypeButton(
+                        label: l10n.incomeType,
+                        icon: Icons.arrow_upward_rounded,
+                        isSelected: _type == TransactionType.income,
+                        activeColor: const Color(0xFF10B981),
+                        onTap: () => setState(() {
+                          _type = TransactionType.income;
+                          _category = null;
+                          _suggestedCategory = null;
+                        }),
+                      ),
                     ),
                   ],
-                  selected: {_type},
-                  onSelectionChanged: (v) => setState(() {
-                    _type = v.first;
-                    _category = null;
-                    _suggestedCategory = null;
-                  }),
+                ),
+
+                // ── Amount field (prominent) ─────────────────────────────
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [MoneyInputFormatter()],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: _type == TransactionType.expense
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF10B981),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'R\$ 0,00',
+                    hintStyle: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: (_type == TransactionType.expense
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF10B981))
+                          .withValues(alpha: 0.35),
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                        color: _type == TransactionType.expense
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFF10B981),
+                        width: 2,
+                      ),
+                    ),
+                    errorBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red),
+                    ),
+                    focusedErrorBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red, width: 2),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return l10n.enterAmount;
+                    final n = moneyTextToDouble(v);
+                    if (n <= 0) return l10n.invalidAmount;
+                    if (n > 1000000000) return l10n.maxAmount;
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
+
+                // ── Title field (optional) ───────────────────────────────
                 TextFormField(
                   controller: _titleController,
                   decoration: InputDecoration(
                     labelText: l10n.titleField,
                     border: const OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? l10n.enterTitle : null,
                 ),
 
                 // Auto-suggest banner
@@ -498,23 +555,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       : const SizedBox.shrink(),
                 ),
 
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [MoneyInputFormatter()],
-                  decoration: InputDecoration(
-                    labelText: l10n.amountField,
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return l10n.enterAmount;
-                    final n = moneyTextToDouble(v);
-                    if (n <= 0) return l10n.invalidAmount;
-                    if (n > 1000000000) return l10n.maxAmount;
-                    return null;
-                  },
-                ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   key: ValueKey(_category),
@@ -639,15 +679,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     }
                   },
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: InputDecoration(
-                    labelText: l10n.descriptionField,
-                    border: const OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
                 if (_isEditing) ...[
                   const SizedBox(height: 20),
                   const Divider(),
@@ -661,7 +692,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       minimumSize: const Size(double.infinity, 44),
                     ),
                     icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: const Text('Excluir lançamento'),
+                    label: Text(l10n.deleteTransaction),
                   ),
                 ],
               ],
@@ -685,6 +716,70 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               : Text(l10n.save),
         ),
       ],
+    );
+  }
+}
+
+// ─── Type Toggle Button ────────────────────────────────────────────────────────
+
+class _TypeButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _TypeButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.18)
+              : activeColor.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? activeColor.withValues(alpha: 0.7)
+                : activeColor.withValues(alpha: 0.2),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected
+                  ? activeColor
+                  : activeColor.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected
+                    ? activeColor
+                    : activeColor.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

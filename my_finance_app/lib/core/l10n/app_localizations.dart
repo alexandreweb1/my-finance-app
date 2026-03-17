@@ -182,6 +182,61 @@ class AppLocalizations {
   // ── Auth ─────────────────────────────────────────────────────────────────
   String get login => _t('Entrar', 'Login', 'Iniciar sesión');
   String get register => _t('Criar conta', 'Create account', 'Crear cuenta');
+  String get createAccount => _t('Criar Conta', 'Create Account', 'Crear Cuenta');
+  String get accountCreated => _t('Conta criada com sucesso! Bem-vindo(a)!', 'Account created successfully! Welcome!', '¡Cuenta creada con éxito! ¡Bienvenido/a!');
+  String get enterName => _t('Informe seu nome', 'Enter your name', 'Ingrese su nombre');
+  String get emailField => _t('E-mail', 'E-mail', 'E-mail');
+  String get invalidEmail => _t('E-mail inválido', 'Invalid e-mail', 'E-mail inválido');
+  String get passwordField => _t('Senha', 'Password', 'Contraseña');
+  String get continueWithGoogle => _t('Continuar com Google', 'Continue with Google', 'Continuar con Google');
+  String get or => _t('OU', 'OR', 'O');
+
+  // ── Budget actions ────────────────────────────────────────────────────────
+  String get deleteBudget => _t('Excluir orçamento', 'Delete budget', 'Eliminar presupuesto');
+  String get deleteBudgetConfirm => _t(
+      'Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.',
+      'Are you sure you want to delete this budget? This action cannot be undone.',
+      '¿Está seguro de que desea eliminar este presupuesto? Esta acción no se puede deshacer.');
+
+  // ── Transaction actions ───────────────────────────────────────────────────
+  String get deleteTransaction => _t('Excluir lançamento', 'Delete transaction', 'Eliminar transacción');
+  String get deleteTransactionConfirm => _t(
+      'Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.',
+      'Are you sure you want to delete this transaction? This action cannot be undone.',
+      '¿Está seguro de que desea eliminar esta transacción? Esta acción no se puede deshacer.');
+  String get errorDeletingTransaction => _t('Erro ao excluir lançamento.', 'Error deleting transaction.', 'Error al eliminar transacción.');
+
+  // ── Invitations ───────────────────────────────────────────────────────────
+  String get decline => _t('Recusar', 'Decline', 'Rechazar');
+  String get accept => _t('Aceitar', 'Accept', 'Aceptar');
+
+  // ── Notification detection ────────────────────────────────────────────────
+  String get detectTransactions => _t('Detectar transações', 'Detect transactions', 'Detectar transacciones');
+  String get detectTransactionsDesc => _t(
+      'Lê notificações de bancos e sugere lançamentos automáticamente',
+      'Reads bank notifications and suggests transactions automatically',
+      'Lee notificaciones bancarias y sugiere transacciones automáticamente');
+  String get detectTransactionsDialogTitle => _t(
+      'Detectar transações automáticamente',
+      'Automatically detect transactions',
+      'Detectar transacciones automáticamente');
+  String get detectTransactionsDialogContent => _t(
+      'Permita que o app leia suas notificações para identificar valores de cobranças e pagamentos e sugerir o lançamento automaticamente.\n\nNenhuma notificação é armazenada ou enviada para servidores.',
+      'Allow the app to read your notifications to identify payment amounts and automatically suggest transactions.\n\nNo notifications are stored or sent to servers.',
+      'Permita que la app lea sus notificaciones para identificar montos de cobros y pagos y sugerir el registro automáticamente.\n\nNinguna notificación se almacena ni se envía a servidores.');
+  String get notNow => _t('Agora não', 'Not now', 'Ahora no');
+  String get enable => _t('Ativar', 'Enable', 'Activar');
+
+  // ── Common ────────────────────────────────────────────────────────────────
+  String get clear => _t('Limpar', 'Clear', 'Limpiar');
+
+  // ── App Update ───────────────────────────────────────────────────────────
+  String get updateAvailable => _t(
+      'Nova versão disponível! Atualize agora.',
+      'New version available! Update now.',
+      '¡Nueva versión disponible! Actualiza ahora.');
+  String get updateNow => _t('Atualizar', 'Update', 'Actualizar');
+  String get dismiss => _t('Fechar', 'Dismiss', 'Cerrar');
 
   // ── Common ───────────────────────────────────────────────────────────────
   String get errorGeneric => _t('Erro desconhecido.', 'Unknown error.', 'Error desconocido.');

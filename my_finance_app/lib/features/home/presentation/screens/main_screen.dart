@@ -14,6 +14,7 @@ import '../../../subscription/presentation/providers/subscription_provider.dart'
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
 import '../../../transactions/presentation/widgets/add_transaction_dialog.dart';
+import '../widgets/update_banner.dart';
 import 'dashboard_screen.dart';
 
 const _kGreen = Color(0xFF00D887);
@@ -100,9 +101,16 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     });
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Column(
+        children: [
+          const UpdateBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _screens,
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showDialog(

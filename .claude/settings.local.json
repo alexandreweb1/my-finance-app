@@ -10,7 +10,8 @@
       "Bash(cmd.exe /c \"dir C:\\\\development\\\\flutter\\\\bin\\\\flutter.bat 2>&1\")",
       "Bash(cmd.exe /c:*)",
       "Bash(/c/flutter/bin/flutter --version:*)",
-      "Bash(./android/gradlew --stop)"
+      "Bash(./android/gradlew --stop)",
+      "Bash(xargs grep -l \"GooglePlayProductDetails\")"
     ]
   }
 }
