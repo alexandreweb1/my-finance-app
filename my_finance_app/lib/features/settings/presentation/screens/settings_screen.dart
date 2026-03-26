@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -177,11 +178,43 @@ class _IconBadge extends StatelessWidget {
 // SettingsScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _scrollController = ScrollController();
+
+  // Section anchor keys (web only)
+  final _keyAccount = GlobalKey();
+  final _keyPreferences = GlobalKey();
+  final _keyData = GlobalKey();
+  final _keySharing = GlobalKey();
+  final _keyNotifications = GlobalKey();
+  final _keyLogout = GlobalKey();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollTo(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.05,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final user = ref.watch(authStateProvider).value;
     final settings = ref.watch(appSettingsProvider);
@@ -193,234 +226,263 @@ class SettingsScreen extends ConsumerWidget {
     final email = user?.email ?? '';
     final initials = _initials(user?.displayName ?? user?.email ?? '?');
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // ── Gradient profile header ──────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 176,
-            pinned: true,
-            backgroundColor: _kDarkBlue,
-            foregroundColor: Colors.white,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                l10n.settings,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [_kDarkBlue, _kBlue],
+    final sliverAppBar = SliverAppBar(
+      expandedHeight: 176,
+      pinned: true,
+      backgroundColor: _kDarkBlue,
+      foregroundColor: Colors.white,
+      flexibleSpace: FlexibleSpaceBar(
+        title: Text(
+          l10n.settings,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_kDarkBlue, _kBlue],
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 48),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  UserAvatar(
+                    photoUrl: user?.photoUrl,
+                    initials: initials,
+                    radius: 34,
+                    backgroundColor: Colors.white.withValues(alpha: 0.22),
+                    textStyle: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 8, 48),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        UserAvatar(
-                          photoUrl: user?.photoUrl,
-                          initials: initials,
-                          radius: 34,
-                          backgroundColor:
-                              Colors.white.withValues(alpha: 0.22),
-                          textStyle: const TextStyle(
-                            fontSize: 24,
+                        Text(
+                          displayName.isNotEmpty ? displayName : l10n.noName,
+                          style: const TextStyle(
+                            fontSize: 17,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                displayName.isNotEmpty
-                                    ? displayName
-                                    : l10n.noName,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                email,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color:
-                                      Colors.white.withValues(alpha: 0.75),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined,
-                              color: Colors.white),
-                          tooltip: l10n.editProfile,
-                          onPressed: () => showDialog(
-                            context: context,
-                            builder: (_) =>
-                                _EditProfileDialog(currentName: displayName),
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.75),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                    tooltip: l10n.editProfile,
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (_) =>
+                          _EditProfileDialog(currentName: displayName),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+        ),
+      ),
+    );
 
-          // ── Settings body ────────────────────────────────────────────────
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
-            sliver: SliverList.list(
+    final settingsContent = [
+      // ── Banner Pro ─────────────────────────────────────────────────────
+      const _ProBannerCard(),
+      const SizedBox(height: 12),
+
+      // Account
+      KeyedSubtree(
+        key: _keyAccount,
+        child: _SettingsCard(children: [
+          if (hasPasswordProvider)
+            ListTile(
+              leading: const _IconBadge(Icons.lock_outline,
+                  color: Color(0xFF5C6BC0)),
+              title: Text(l10n.changePassword),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => _showChangePasswordDialog(context),
+            )
+          else
+            ListTile(
+              leading: const _IconBadge(Icons.password_outlined,
+                  color: Color(0xFF7B68EE)),
+              title: Text(l10n.setPassword),
+              subtitle: Text(l10n.setPasswordSubtitle,
+                  style: const TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => _showSetPasswordDialog(context),
+            ),
+        ]),
+      ),
+      const SizedBox(height: 12),
+
+      // Preferences
+      KeyedSubtree(
+        key: _keyPreferences,
+        child: _SettingsCard(children: [
+          ListTile(
+            leading: const _IconBadge(Icons.currency_exchange_outlined,
+                color: Color(0xFF26A69A)),
+            title: Text(l10n.currency),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Banner Pro ───────────────────────────────────────────────
-                const _ProBannerCard(),
-                const SizedBox(height: 12),
-
-                // Account
-                _SettingsCard(children: [
-                  if (hasPasswordProvider)
-                    ListTile(
-                      leading: const _IconBadge(Icons.lock_outline,
-                          color: Color(0xFF5C6BC0)),
-                      title: Text(l10n.changePassword),
-                      trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () => _showChangePasswordDialog(context, ref),
-                    )
-                  else
-                    ListTile(
-                      leading: const _IconBadge(Icons.password_outlined,
-                          color: Color(0xFF7B68EE)),
-                      title: Text(l10n.setPassword),
-                      subtitle: Text(l10n.setPasswordSubtitle,
-                          style: const TextStyle(fontSize: 12)),
-                      trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () => _showSetPasswordDialog(context),
-                    ),
-                ]),
-                const SizedBox(height: 12),
-
-                // Preferences
-                _SettingsCard(children: [
-                  ListTile(
-                    leading: const _IconBadge(Icons.currency_exchange_outlined,
-                        color: Color(0xFF26A69A)),
-                    title: Text(l10n.currency),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(settings.currency.label,
-                            style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 13)),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right, size: 20),
-                      ],
-                    ),
-                    onTap: () =>
-                        _showCurrencyDialog(context, ref, l10n),
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  ListTile(
-                    leading: const _IconBadge(Icons.language_outlined,
-                        color: Color(0xFF42A5F5)),
-                    title: Text(l10n.language),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(settings.language.nativeLabel,
-                            style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 13)),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right, size: 20),
-                      ],
-                    ),
-                    onTap: () =>
-                        _showLanguageDialog(context, ref, l10n),
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  ListTile(
-                    leading: const _IconBadge(Icons.brightness_6_outlined,
-                        color: Color(0xFFFFA726)),
-                    title: Text(l10n.appearance),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_themeModeLabel(settings.themeMode, l10n),
-                            style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 13)),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right, size: 20),
-                      ],
-                    ),
-                    onTap: () =>
-                        _showAppearanceDialog(context, ref, l10n),
-                  ),
-                ]),
-                const SizedBox(height: 12),
-
-                // Data
-                _SettingsCard(children: [
-                  const _WalletSection(),
-                  const Divider(height: 1, indent: 16),
-                  _CategorySection(
-                    title: l10n.expenseCategories,
-                    type: CategoryType.expense,
-                    categories: expenseCategories,
-                  ),
-                  const Divider(height: 1, indent: 16),
-                  _CategorySection(
-                    title: l10n.incomeCategories,
-                    type: CategoryType.income,
-                    categories: incomeCategories,
-                  ),
-                ]),
-                const SizedBox(height: 12),
-
-                // Sharing
-                const _SharingSection(),
-                const SizedBox(height: 12),
-
-                // Notification Detection
-                const _NotificationDetectionSection(),
-                const SizedBox(height: 12),
-
-                // Logout
-                _SettingsCard(children: [
-                  ListTile(
-                    leading: _IconBadge(Icons.logout,
-                        color: Colors.red.shade400),
-                    title: Text(l10n.logout,
-                        style:
-                            TextStyle(color: Colors.red.shade600)),
-                    onTap: () => ref
-                        .read(authNotifierProvider.notifier)
-                        .signOut(),
-                  ),
-                ]),
+                Text(settings.currency.label,
+                    style: TextStyle(
+                        color: Colors.grey.shade500, fontSize: 13)),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right, size: 20),
               ],
             ),
+            onTap: () => _showCurrencyDialog(context, l10n),
           ),
-        ],
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const _IconBadge(Icons.language_outlined,
+                color: Color(0xFF42A5F5)),
+            title: Text(l10n.language),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(settings.language.nativeLabel,
+                    style: TextStyle(
+                        color: Colors.grey.shade500, fontSize: 13)),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right, size: 20),
+              ],
+            ),
+            onTap: () => _showLanguageDialog(context, l10n),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const _IconBadge(Icons.brightness_6_outlined,
+                color: Color(0xFFFFA726)),
+            title: Text(l10n.appearance),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_themeModeLabel(settings.themeMode, l10n),
+                    style: TextStyle(
+                        color: Colors.grey.shade500, fontSize: 13)),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right, size: 20),
+              ],
+            ),
+            onTap: () => _showAppearanceDialog(context, l10n),
+          ),
+        ]),
       ),
+      const SizedBox(height: 12),
+
+      // Data
+      KeyedSubtree(
+        key: _keyData,
+        child: _SettingsCard(children: [
+          const _WalletSection(),
+          const Divider(height: 1, indent: 16),
+          _CategorySection(
+            title: l10n.expenseCategories,
+            type: CategoryType.expense,
+            categories: expenseCategories,
+          ),
+          const Divider(height: 1, indent: 16),
+          _CategorySection(
+            title: l10n.incomeCategories,
+            type: CategoryType.income,
+            categories: incomeCategories,
+          ),
+        ]),
+      ),
+      const SizedBox(height: 12),
+
+      // Sharing
+      KeyedSubtree(
+        key: _keySharing,
+        child: const _SharingSection(),
+      ),
+      const SizedBox(height: 12),
+
+      // Notification Detection
+      KeyedSubtree(
+        key: _keyNotifications,
+        child: const _NotificationDetectionSection(),
+      ),
+      const SizedBox(height: 12),
+
+      // Logout
+      KeyedSubtree(
+        key: _keyLogout,
+        child: _SettingsCard(children: [
+          ListTile(
+            leading:
+                _IconBadge(Icons.logout, color: Colors.red.shade400),
+            title: Text(l10n.logout,
+                style: TextStyle(color: Colors.red.shade600)),
+            onTap: () =>
+                ref.read(authNotifierProvider.notifier).signOut(),
+          ),
+        ]),
+      ),
+    ];
+
+    final scrollView = CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        sliverAppBar,
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, kIsWeb ? 220 : 16, 48),
+          sliver: SliverList.list(children: settingsContent),
+        ),
+      ],
+    );
+
+    return Scaffold(
+      body: kIsWeb
+          ? Stack(
+              children: [
+                scrollView,
+                Positioned(
+                  right: 12,
+                  top: kToolbarHeight +
+                      MediaQuery.of(context).padding.top +
+                      12,
+                  width: 192,
+                  child: _WebSidebarNav(
+                    l10n: l10n,
+                    onAccount: () => _scrollTo(_keyAccount),
+                    onPreferences: () => _scrollTo(_keyPreferences),
+                    onData: () => _scrollTo(_keyData),
+                    onSharing: () => _scrollTo(_keySharing),
+                    onNotifications: () => _scrollTo(_keyNotifications),
+                    onLogout: () => _scrollTo(_keyLogout),
+                  ),
+                ),
+              ],
+            )
+          : scrollView,
     );
   }
 
@@ -431,7 +493,7 @@ class SettingsScreen extends ConsumerWidget {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
 
-  void _showChangePasswordDialog(BuildContext context, WidgetRef ref) {
+  void _showChangePasswordDialog(BuildContext context) {
     showDialog(
         context: context, builder: (_) => const _ChangePasswordDialog());
   }
@@ -441,20 +503,17 @@ class SettingsScreen extends ConsumerWidget {
         context: context, builder: (_) => const _SetPasswordDialog());
   }
 
-  void _showCurrencyDialog(
-      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+  void _showCurrencyDialog(BuildContext context, AppLocalizations l10n) {
     showDialog(
         context: context, builder: (ctx) => _CurrencyDialog(l10n: l10n));
   }
 
-  void _showLanguageDialog(
-      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+  void _showLanguageDialog(BuildContext context, AppLocalizations l10n) {
     showDialog(
         context: context, builder: (ctx) => _LanguageDialog(l10n: l10n));
   }
 
-  void _showAppearanceDialog(
-      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+  void _showAppearanceDialog(BuildContext context, AppLocalizations l10n) {
     showDialog(
         context: context, builder: (ctx) => _AppearanceDialog(l10n: l10n));
   }
@@ -2089,5 +2148,136 @@ class _NotificationDetectionSectionState
         ),
       ],
     ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Web sidebar navigation (visible only on web)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WebSidebarNav extends StatelessWidget {
+  final AppLocalizations l10n;
+  final VoidCallback onAccount;
+  final VoidCallback onPreferences;
+  final VoidCallback onData;
+  final VoidCallback onSharing;
+  final VoidCallback onNotifications;
+  final VoidCallback onLogout;
+
+  const _WebSidebarNav({
+    required this.l10n,
+    required this.onAccount,
+    required this.onPreferences,
+    required this.onData,
+    required this.onSharing,
+    required this.onNotifications,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: Text(
+                'Navegação',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+            _SidebarItem(
+              icon: Icons.person_outline,
+              label: 'Conta',
+              onTap: onAccount,
+            ),
+            _SidebarItem(
+              icon: Icons.tune_rounded,
+              label: 'Preferências',
+              onTap: onPreferences,
+            ),
+            _SidebarItem(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Dados',
+              onTap: onData,
+            ),
+            _SidebarItem(
+              icon: Icons.people_outline,
+              label: 'Compartilhamento',
+              onTap: onSharing,
+            ),
+            _SidebarItem(
+              icon: Icons.notifications_none_rounded,
+              label: 'Notificações',
+              onTap: onNotifications,
+            ),
+            const Divider(height: 16, indent: 12, endIndent: 12),
+            _SidebarItem(
+              icon: Icons.logout_rounded,
+              label: 'Sair',
+              onTap: onLogout,
+              color: Colors.red.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final effectiveColor = color ?? cs.onSurface.withValues(alpha: 0.75);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: effectiveColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: effectiveColor,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
