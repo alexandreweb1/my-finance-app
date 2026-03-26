@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -100,6 +101,72 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       );
     });
 
+    if (kIsWeb) {
+      return Scaffold(
+        body: Column(
+          children: [
+            const UpdateBanner(),
+            Expanded(
+              child: Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _currentIndex,
+                    onDestinationSelected: (i) {
+                      setState(() => _currentIndex = i);
+                      ref.read(mainTabIndexProvider.notifier).state = i;
+                    },
+                    labelType: NavigationRailLabelType.all,
+                    leading: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: FloatingActionButton(
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (_) => const AddTransactionDialog(),
+                        ),
+                        backgroundColor: _kGreen,
+                        tooltip: l10n.newTransaction,
+                        child: const Icon(Icons.add, color: Colors.white),
+                      ),
+                    ),
+                    destinations: [
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.home_outlined),
+                        selectedIcon: const Icon(Icons.home_rounded),
+                        label: Text(l10n.navHome),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        selectedIcon: const Icon(Icons.receipt_long_rounded),
+                        label: Text(l10n.navStatement),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.pie_chart_outline),
+                        selectedIcon: const Icon(Icons.pie_chart_rounded),
+                        label: Text(l10n.navPlanning),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.bar_chart_outlined),
+                        selectedIcon: const Icon(Icons.bar_chart_rounded),
+                        label: Text(l10n.navReports),
+                      ),
+                    ],
+                  ),
+                  const VerticalDivider(width: 1, thickness: 1),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: _screens,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Mobile layout ────────────────────────────────────────────────────────
     return Scaffold(
       body: Column(
         children: [

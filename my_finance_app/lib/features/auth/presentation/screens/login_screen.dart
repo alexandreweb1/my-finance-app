@@ -322,13 +322,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             Text(
                               'Não tem conta?',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.85),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.75),
                                 fontSize: 14,
                               ),
                             ),
                             TextButton(
                               style: TextButton.styleFrom(
-                                foregroundColor: Colors.white,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.primary,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8),
                               ),
