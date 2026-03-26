@@ -29,7 +29,7 @@ jobs:
 
       - name: Build Web
         working-directory: my_finance_app
-        run: flutter build web --release --web-renderer canvaskit
+        run: flutter build web --release
 
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
