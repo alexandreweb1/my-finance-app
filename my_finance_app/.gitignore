@@ -10,10 +10,9 @@ build/
 ios/
 android/
 
-# Firebase
+# Firebase — native config files (not needed for web build)
 google-services.json
 GoogleService-Info.plist
-lib/core/utils/firebase_options.dart
 
 # IDE
 .idea/
