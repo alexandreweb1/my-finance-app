@@ -1,0 +1,40 @@
+name: Deploy Web → Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'my_finance_app/**'
+
+jobs:
+  deploy:
+    name: Build Flutter Web & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: my_finance_app
+        run: flutter pub get
+
+      - name: Build Web
+        working-directory: my_finance_app
+        run: flutter build web --release --web-renderer canvaskit
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: my_finance_app
