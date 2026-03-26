@@ -24,3 +24,6 @@ lib/core/utils/firebase_options.dart
 # OS
 .DS_Store
 Thumbs.db
+
+.vercel
+.env*.local
