@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -7,6 +8,7 @@ import 'notification_listener_service.dart';
 /// settings when the user hasnds't granted the permission yet.
 Future<void> showNotificationPermissionDialogIfNeeded(
     BuildContext context) async {
+  if (kIsWeb) return;
   final granted = await NotificationListenerBridge.isPermissionGranted();
   if (granted) return;
   if (!context.mounted) return;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -94,97 +95,101 @@ class ProScreen extends ConsumerWidget {
 
                 // ── Planos de preço ──────────────────────────────────────
                 if (!isPro) ...[
-                  Text(
-                    'Escolha seu plano',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Mensal
-                  _PriceCard(
-                    planName: 'Mensal',
-                    price: 'R\$ 5,00',
-                    period: '/mês',
-                    detail: 'Renovação automática mensal',
-                    isHighlighted: false,
-                    isLoading: iapState.isLoading,
-                    onTap: () =>
-                        ref.read(iapNotifierProvider.notifier).buyMonthly(),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Anual (destaque)
-                  _PriceCard(
-                    planName: 'Anual',
-                    price: 'R\$ 50,00',
-                    period: '/ano',
-                    detail: '≈ R\$ 4,17/mês · Economize R\$ 10',
-                    savings: 'MAIS POPULAR',
-                    isHighlighted: true,
-                    isLoading: iapState.isLoading,
-                    onTap: () =>
-                        ref.read(iapNotifierProvider.notifier).buyAnnual(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Erro do IAP
-                  if (iapState.errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline,
-                              color: Colors.red.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              iapState.errorMessage!,
-                              style: TextStyle(
-                                  color: Colors.red.shade700, fontSize: 13),
-                            ),
+                  if (kIsWeb) ...[
+                    const _WebSubscriptionCard(),
+                  ] else ...[
+                    Text(
+                      'Escolha seu plano',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
-                      ),
                     ),
-
-                  if (iapState.errorMessage != null)
                     const SizedBox(height: 12),
 
-                  // Restaurar compras
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: iapState.isLoading
-                          ? null
-                          : () => ref
-                              .read(iapNotifierProvider.notifier)
-                              .restorePurchases(),
-                      icon: const Icon(Icons.restore, size: 16),
-                      label: const Text('Restaurar compras anteriores'),
+                    // Mensal
+                    _PriceCard(
+                      planName: 'Mensal',
+                      price: 'R\$ 5,00',
+                      period: '/mês',
+                      detail: 'Renovação automática mensal',
+                      isHighlighted: false,
+                      isLoading: iapState.isLoading,
+                      onTap: () =>
+                          ref.read(iapNotifierProvider.notifier).buyMonthly(),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 10),
 
-                  // Nota legal
-                  Text(
-                    'O pagamento é processado pela Google Play Store / App Store. '
-                    'As assinaturas renovam automaticamente. '
-                    'Cancele a qualquer momento nas configurações da loja.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.45),
+                    // Anual (destaque)
+                    _PriceCard(
+                      planName: 'Anual',
+                      price: 'R\$ 50,00',
+                      period: '/ano',
+                      detail: '≈ R\$ 4,17/mês · Economize R\$ 10',
+                      savings: 'MAIS POPULAR',
+                      isHighlighted: true,
+                      isLoading: iapState.isLoading,
+                      onTap: () =>
+                          ref.read(iapNotifierProvider.notifier).buyAnnual(),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
+                    const SizedBox(height: 20),
+
+                    // Erro do IAP
+                    if (iapState.errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline,
+                                color: Colors.red.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                iapState.errorMessage!,
+                                style: TextStyle(
+                                    color: Colors.red.shade700, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    if (iapState.errorMessage != null)
+                      const SizedBox(height: 12),
+
+                    // Restaurar compras
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: iapState.isLoading
+                            ? null
+                            : () => ref
+                                .read(iapNotifierProvider.notifier)
+                                .restorePurchases(),
+                        icon: const Icon(Icons.restore, size: 16),
+                        label: const Text('Restaurar compras anteriores'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Nota legal
+                    Text(
+                      'O pagamento é processado pela Google Play Store / App Store. '
+                      'As assinaturas renovam automaticamente. '
+                      'Cancele a qualquer momento nas configurações da loja.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.45),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
 
                 // ── Já é pro ─────────────────────────────────────────────
@@ -560,6 +565,128 @@ class _PriceCard extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Card informativo para web (sem IAP)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WebSubscriptionCard extends StatelessWidget {
+  const _WebSubscriptionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: _kGreen.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kGreen.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: _kGreen.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.smartphone_rounded,
+                size: 28, color: _kGreen),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Assine pelo app mobile',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'As assinaturas são processadas pela Google Play Store ou App Store. '
+            'Baixe o app no seu celular para assinar o Pro.',
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withValues(alpha: 0.6),
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const _StoreBadge(
+                icon: Icons.android_rounded,
+                label: 'Google Play',
+                color: _kGreen,
+              ),
+              const SizedBox(width: 12),
+              _StoreBadge(
+                icon: Icons.apple_rounded,
+                label: 'App Store',
+                color: cs.onSurface.withValues(alpha: 0.75),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Já assinou? Abra o app no celular — seu acesso Pro '
+            'ficará disponível automaticamente nesta versão web.',
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurface.withValues(alpha: 0.45),
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StoreBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
