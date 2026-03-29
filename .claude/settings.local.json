@@ -11,7 +11,9 @@
       "Bash(cmd.exe /c:*)",
       "Bash(/c/flutter/bin/flutter --version:*)",
       "Bash(./android/gradlew --stop)",
-      "Bash(xargs grep -l \"GooglePlayProductDetails\")"
+      "Bash(xargs grep -l \"GooglePlayProductDetails\")",
+      "Bash(head -5 grep -n \"android:label\\\\|android:name\" \"c:/Users/alexa/Documents/Projetos/personal-manage/my_finance_app/android/app/src/main/AndroidManifest.xml\")",
+      "Bash(head -5 grep -n \"CFBundleName\\\\|CFBundleDisplayName\" \"c:/Users/alexa/Documents/Projetos/personal-manage/my_finance_app/ios/Runner/Info.plist\")"
     ]
   }
 }
