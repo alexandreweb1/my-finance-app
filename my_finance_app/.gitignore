@@ -6,6 +6,7 @@
 .pub-cache/
 .pub/
 build/
+!build/web/
 *.iml
 ios/
 android/
