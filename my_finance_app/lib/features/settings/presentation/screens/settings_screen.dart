@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/app_settings_provider.dart';
@@ -430,6 +431,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         key: _keyNotifications,
         child: const _NotificationDetectionSection(),
       ),
+      const SizedBox(height: 12),
+
+      // Legal
+      _SettingsCard(children: [
+        ListTile(
+          leading: const _IconBadge(Icons.privacy_tip_outlined,
+              color: Color(0xFF5C6BC0)),
+          title: const Text('Política de Privacidade'),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () async {
+            final uri = Uri.parse(
+                'https://fintab-privacy.vercel.app/privacy');
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri,
+                  mode: LaunchMode.externalApplication);
+            }
+          },
+        ),
+        const Divider(height: 1, indent: 56),
+        ListTile(
+          leading: const _IconBadge(Icons.description_outlined,
+              color: Color(0xFF5C6BC0)),
+          title: const Text('Termos de Uso'),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () async {
+            final uri = Uri.parse(
+                'https://fintab-privacy.vercel.app/terms');
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri,
+                  mode: LaunchMode.externalApplication);
+            }
+          },
+        ),
+      ]),
       const SizedBox(height: 12),
 
       // Logout

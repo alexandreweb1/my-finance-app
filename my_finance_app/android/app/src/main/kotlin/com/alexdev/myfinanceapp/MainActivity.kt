@@ -1,13 +1,23 @@
 package com.alexdev.myfinanceapp
 
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+
+    override fun onStart() {
+        super.onStart()
+        // Enable edge-to-edge on Android 15+ (API 35)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+        }
+    }
 
     companion object {
         /// Static sink: NotificationMonitorService posts events here directly.

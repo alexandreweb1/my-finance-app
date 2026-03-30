@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fintab — Controle Financeiro Pessoal</title>
+  <meta name="description" content="Fintab é o app de finanças pessoais para quem quer ter controle real do próprio dinheiro. Registre gastos, crie orçamentos e analise suas finanças." />
+  <meta property="og:title" content="Fintab — Controle Financeiro Pessoal" />
+  <meta property="og:description" content="Controle gastos, orçamentos e finanças pessoais em um só lugar." />
+  <meta property="og:type" content="website" />
+
+  <style>
+    :root {
+      --green: #00D887;
+      --green-dark: #00A86B;
+      --blue: #1E88E5;
+      --blue-dark: #0D47A1;
+      --bg: #0a0f1e;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --text: #f0f4ff;
+      --text-muted: rgba(240,244,255,0.55);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 40px;
+      background: rgba(10,15,30,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav-logo {
+      font-size: 1.4rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--green);
+      color: #000 !important;
+      font-weight: 700 !important;
+      padding: 8px 20px;
+      border-radius: 10px;
+      font-size: 0.88rem !important;
+      -webkit-text-fill-color: #000 !important;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 800px;
+      background: radial-gradient(circle, rgba(0,216,135,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,216,135,0.1);
+      border: 1px solid rgba(0,216,135,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.82rem;
+      color: var(--green);
+      font-weight: 600;
+      margin-bottom: 28px;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 4.2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      max-width: 780px;
+      margin-bottom: 24px;
+    }
+    .hero h1 span {
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 520px;
+      margin-bottom: 44px;
+      line-height: 1.7;
+    }
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 24px rgba(0,216,135,0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,216,135,0.4);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 14px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      transition: background 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+    /* ── STATS ── */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      flex-wrap: wrap;
+      padding: 24px 40px 64px;
+    }
+    .stat { text-align: center; }
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── FEATURES ── */
+    .section {
+      padding: 80px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .section-label {
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--green);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .section h2 {
+      text-align: center;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 800;
+      margin-bottom: 56px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover {
+      border-color: rgba(0,216,135,0.3);
+      transform: translateY(-4px);
+    }
+    .feature-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: rgba(0,216,135,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+    }
+    .feature-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .pro-badge {
+      display: inline-block;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      color: #000;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── PRICING ── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      padding: 36px 28px;
+      text-align: center;
+      position: relative;
+    }
+    .pricing-card.highlighted {
+      border-color: var(--green);
+      background: linear-gradient(160deg, rgba(0,216,135,0.07), var(--surface));
+    }
+    .pricing-popular {
+      position: absolute;
+      top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--green);
+      color: #000;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 4px 14px;
+      border-radius: 100px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .pricing-plan { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .pricing-price { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .pricing-price span { font-size: 1rem; font-weight: 500; color: var(--text-muted); }
+    .pricing-detail { font-size: 0.82rem; color: var(--text-muted); margin: 8px 0 28px; }
+    .pricing-cta {
+      display: block;
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: opacity 0.2s;
+    }
+    .pricing-cta:hover { opacity: 0.85; }
+    .pricing-card:not(.highlighted) .pricing-cta {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+    }
+    .pricing-free { color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 24px; }
+
+    /* ── STORES ── */
+    .stores {
+      background: var(--surface2);
+      padding: 80px 24px;
+      text-align: center;
+    }
+    .stores h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; margin-bottom: 12px; }
+    .stores p { color: var(--text-muted); margin-bottom: 40px; }
+    .store-badges {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .store-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 12px 24px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      color: var(--text);
+      transition: background 0.2s;
+    }
+    .store-badge:hover { background: rgba(255,255,255,0.12); }
+    .store-badge svg { width: 22px; height: 22px; fill: var(--text); }
+
+    /* ── CTA FINAL ── */
+    .cta-section {
+      padding: 100px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      bottom: -200px; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(30,136,229,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-section h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; margin-bottom: 16px; }
+    .cta-section p { color: var(--text-muted); margin-bottom: 40px; font-size: 1.05rem; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 32px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 0.83rem;
+      color: var(--text-muted);
+    }
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; gap: 24px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      nav { padding: 14px 20px; }
+      .nav-links { display: none; }
+      .stats { gap: 28px; padding: 16px 20px 48px; }
+      footer { justify-content: center; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Fintab</div>
+  <ul class="nav-links">
+    <li><a href="#features">Funcionalidades</a></li>
+    <li><a href="#pricing">Planos</a></li>
+    <li><a href="#download">Download</a></li>
+    <li><a href="https://my-finance-app-red-omega.vercel.app" class="nav-cta">Abrir app ↗</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    ✦ Controle financeiro simples e poderoso
+  </div>
+  <h1>Seu dinheiro,<br /><span>sob controle</span></h1>
+  <p>
+    Registre gastos, crie orçamentos e analise suas finanças pessoais
+    em um app elegante e fácil de usar.
+  </p>
+  <div class="hero-buttons">
+    <a href="https://my-finance-app-red-omega.vercel.app" class="btn-primary">
+      Usar gratuitamente →
+    </a>
+    <a href="#features" class="btn-secondary">
+      Ver funcionalidades
+    </a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat">
+    <div class="stat-num">100%</div>
+    <div class="stat-label">Dados na sua conta</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">0</div>
+    <div class="stat-label">Dados enviados a terceiros</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">Android + Web</div>
+    <div class="stat-label">Disponível em</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <p class="section-label">Funcionalidades</p>
+  <h2>Tudo que você precisa para<br />cuidar do seu dinheiro</h2>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">💰</div>
+      <h3>Controle de Gastos</h3>
+      <p>Registre receitas e despesas com categorias personalizadas. Saiba exatamente para onde vai cada real.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Visão Anual <span class="pro-badge">PRO</span></h3>
+      <p>Analise seus gastos mês a mês ao longo do ano inteiro e identifique padrões financeiros.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👛</div>
+      <h3>Múltiplas Carteiras <span class="pro-badge">PRO</span></h3>
+      <p>Organize seu dinheiro por carteira: conta corrente, poupança, cartão e muito mais.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Orçamentos por Categoria</h3>
+      <p>Defina limites mensais por categoria e acompanhe em tempo real se está dentro do planejado.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👥</div>
+      <h3>Compartilhamento <span class="pro-badge">PRO</span></h3>
+      <p>Gerencie finanças em conjunto com parceiro, família ou sócio — em tempo real.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔔</div>
+      <h3>Detecção Automática</h3>
+      <p>O app lê notificações de bancos e sugere lançamentos automaticamente. Nada é enviado a servidores.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <p class="section-label">Planos</p>
+  <h2>Comece grátis,<br />evolua quando quiser</h2>
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <div class="pricing-plan">Gratuito</div>
+      <div class="pricing-price">R$ 0<span>/sempre</span></div>
+      <div class="pricing-detail">1 carteira · categorias padrão</div>
+      <a href="https://my-finance-app-red-omega.vercel.app" class="pricing-cta">Começar grátis</a>
+    </div>
+    <div class="pricing-card">
+      <div class="pricing-plan">Pro Mensal</div>
+      <div class="pricing-price">R$ 5<span>/mês</span></div>
+      <div class="pricing-detail">Renovação automática mensal</div>
+      <a href="https://play.google.com/store/apps/details?id=com.alexdev.myfinanceapp" class="pricing-cta">Assinar no app</a>
+    </div>
+    <div class="pricing-card highlighted">
+      <div class="pricing-popular">MAIS POPULAR</div>
+      <div class="pricing-plan">Pro Anual</div>
+      <div class="pricing-price">R$ 50<span>/ano</span></div>
+      <div class="pricing-detail">≈ R$ 4,17/mês · Economize R$ 10</div>
+      <a href="https://play.google.com/store/apps/details?id=com.alexdev.myfinanceapp" class="pricing-cta">Assinar no app</a>
+    </div>
+  </div>
+  <p class="pricing-free">Assinaturas processadas pela Google Play Store · Cancele quando quiser</p>
+</section>
+
+<!-- STORES -->
+<section class="stores" id="download">
+  <h2>Disponível onde você estiver</h2>
+  <p>No celular ou no navegador, suas finanças sempre com você.</p>
+  <div class="store-badges">
+    <a href="https://play.google.com/store/apps/details?id=com.alexdev.myfinanceapp" class="store-badge">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3.18 23.76c.3.17.65.19.97.07l12.45-7.19-2.76-2.77-10.66 9.89zM.29 1.28C.11 1.6 0 1.98 0 2.42v19.17c0 .44.11.82.29 1.13l.06.06 10.74-10.74v-.25L.35 1.22l-.06.06zM20.47 10.33l-2.84-1.64-3.07 3.07 3.07 3.07 2.87-1.66c.82-.47.82-1.37-.03-1.84zM3.18.24l12.45 7.19-2.76 2.76L2.21.3c.32-.12.67-.1.97-.06z"/></svg>
+      Google Play
+    </a>
+    <a href="https://my-finance-app-red-omega.vercel.app" class="store-badge">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+      Versão Web
+    </a>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-section">
+  <h2>Pronto para ter controle<br />das suas finanças?</h2>
+  <p>Grátis para sempre no plano básico. Sem cartão de crédito.</p>
+  <a href="https://my-finance-app-red-omega.vercel.app" class="btn-primary" style="font-size:1.1rem; padding: 16px 40px;">
+    Começar agora — é grátis →
+  </a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="nav-logo">Fintab</div>
+  <div class="footer-links">
+    <a href="https://fintab-privacy.vercel.app/privacy">Política de Privacidade</a>
+    <a href="https://fintab-privacy.vercel.app/terms">Termos de Uso</a>
+    <a href="mailto:alexandre.filho.dev@gmail.com">Contato</a>
+  </div>
+  <div>&copy; 2026 Alexandre Figueiredo Dev</div>
+</footer>
+
+</body>
+</html>
