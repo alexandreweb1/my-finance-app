@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — Fintab</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f9fafb;
+      color: #1a1a2e;
+      line-height: 1.7;
+    }
+    header {
+      background: linear-gradient(135deg, #1565C0, #1E88E5);
+      color: white;
+      padding: 40px 24px 32px;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 700; }
+    header p { margin-top: 6px; opacity: 0.85; font-size: 0.95rem; }
+    main {
+      max-width: 780px;
+      margin: 40px auto;
+      padding: 0 24px 64px;
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1565C0;
+      margin: 32px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e3eafc;
+    }
+    p { margin-bottom: 12px; font-size: 0.95rem; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    ul li { margin-bottom: 6px; font-size: 0.95rem; }
+    .badge {
+      display: inline-block;
+      background: #e3eafc;
+      color: #1565C0;
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.82rem;
+      color: #888;
+      border-top: 1px solid #e5e7eb;
+    }
+    a { color: #1565C0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Política de Privacidade</h1>
+  <p>Fintab — Controle Financeiro Pessoal</p>
+</header>
+
+<main>
+  <p>Última atualização: 30 de março de 2026</p>
+
+  <p>
+    Esta Política de Privacidade descreve como o aplicativo <strong>Fintab</strong>,
+    desenvolvido por <strong>Alexandre Figueiredo Dev</strong>
+    (disponível na Google Play Store sob o ID <code>com.alexdev.myfinanceapp</code>),
+    coleta, usa e protege as informações dos seus usuários.
+  </p>
+
+  <h2>1. Informações que coletamos</h2>
+  <p>O Fintab coleta apenas as informações necessárias para o funcionamento do app:</p>
+  <ul>
+    <li><strong>Dados de autenticação:</strong> nome, endereço de e-mail e foto de perfil fornecidos via login com Google ou cadastro por e-mail/senha.</li>
+    <li><strong>Dados financeiros:</strong> transações, categorias, carteiras e orçamentos que o próprio usuário registra voluntariamente no app.</li>
+    <li><strong>Dados de assinatura:</strong> informações sobre o plano Pro (tipo, status e data de validade), processadas pela Google Play Store.</li>
+    <li><strong>Notificações de outros apps (opcional):</strong> quando o usuário ativa a funcionalidade "Detectar transações", o app lê notificações de apps bancários instalados no dispositivo para sugerir lançamentos automaticamente. Nenhum conteúdo de notificação é transmitido a servidores externos.</li>
+  </ul>
+
+  <h2>2. Como usamos as informações</h2>
+  <ul>
+    <li>Autenticar e identificar o usuário na conta.</li>
+    <li>Sincronizar dados financeiros entre dispositivos via Firebase (Google Cloud).</li>
+    <li>Verificar e gerenciar assinaturas Pro.</li>
+    <li>Sugerir lançamentos automáticos a partir de notificações lidas localmente no dispositivo.</li>
+  </ul>
+
+  <h2>3. Armazenamento e segurança</h2>
+  <p>
+    Os dados são armazenados no <strong>Firebase Firestore</strong> (Google Cloud),
+    com acesso restrito à conta do próprio usuário por meio de regras de segurança.
+    Utilizamos criptografia em trânsito (HTTPS/TLS) em todas as comunicações.
+  </p>
+  <p>
+    Dados de notificações lidos para a funcionalidade de detecção automática são
+    processados <strong>exclusivamente no dispositivo</strong> e nunca enviados
+    a servidores externos.
+  </p>
+
+  <h2>4. Compartilhamento de dados</h2>
+  <p>
+    Não vendemos, alugamos nem compartilhamos dados pessoais com terceiros para
+    fins comerciais. Os dados podem ser acessados pelos seguintes provedores de
+    infraestrutura, exclusivamente para fins operacionais:
+  </p>
+  <ul>
+    <li><strong>Google Firebase</strong> — autenticação e banco de dados.</li>
+    <li><strong>Google Play Store</strong> — processamento de pagamentos e assinaturas.</li>
+  </ul>
+
+  <h2>5. Dados de menores</h2>
+  <p>
+    O Fintab não é direcionado a crianças menores de 13 anos e não coleta
+    intencionalmente dados de menores. Caso identifique que dados de uma criança
+    foram coletados, entre em contato para que possamos removê-los imediatamente.
+  </p>
+
+  <h2>6. Seus direitos (LGPD / GDPR)</h2>
+  <p>Você tem direito a:</p>
+  <ul>
+    <li>Acessar os dados pessoais que temos sobre você.</li>
+    <li>Corrigir dados incorretos ou desatualizados.</li>
+    <li>Solicitar a exclusão de todos os seus dados.</li>
+    <li>Revogar o consentimento a qualquer momento.</li>
+  </ul>
+  <p>
+    Para exercer qualquer desses direitos, entre em contato pelo e-mail:
+    <a href="mailto:alexandre.filho.dev@gmail.com">alexandre.filho.dev@gmail.com</a>
+  </p>
+
+  <h2>7. Exclusão de dados</h2>
+  <p>
+    Para solicitar a exclusão completa da sua conta e todos os dados associados,
+    envie um e-mail para
+    <a href="mailto:alexandre.filho.dev@gmail.com">alexandre.filho.dev@gmail.com</a>
+    com o assunto <strong>"Exclusão de dados — Fintab"</strong>.
+    O prazo para conclusão é de até 30 dias.
+  </p>
+
+  <h2>8. Alterações nesta política</h2>
+  <p>
+    Reservamo-nos o direito de atualizar esta política periodicamente. Mudanças
+    significativas serão comunicadas dentro do próprio app. O uso continuado do
+    Fintab após as alterações implica na aceitação da política revisada.
+  </p>
+
+  <h2>9. Contato</h2>
+  <p>
+    <strong>Alexandre Figueiredo Dev</strong><br />
+    E-mail: <a href="mailto:alexandre.filho.dev@gmail.com">alexandre.filho.dev@gmail.com</a><br />
+    App: Fintab (<code>com.alexdev.myfinanceapp</code>)
+  </p>
+</main>
+
+<footer>
+  &copy; 2026 Alexandre Figueiredo Dev — Fintab. Todos os direitos reservados.
+</footer>
+
+</body>
+</html>
