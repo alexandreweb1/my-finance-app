@@ -8,6 +8,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../../core/utils/money_input_formatter.dart';
+import '../../../goals/presentation/screens/goals_screen.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../domain/entities/budget_entity.dart';
 import '../providers/budget_provider.dart';
@@ -26,40 +27,55 @@ class PlanningScreen extends ConsumerWidget {
       ..sort((a, b) =>
           a.budget.categoryName.compareTo(b.budget.categoryName));
 
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.planning),
-        centerTitle: false,
-      ),
-      body: Column(
-        children: [
-          _MonthSelector(month: selectedMonth),
-          Expanded(
-            child: budgetsAsync.when(
-              data: (_) => sortedSummaries.isEmpty
-                  ? _EmptyBudgets(month: selectedMonth)
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      // +2: summary card (index 0) + add-button (last index)
-                      itemCount: sortedSummaries.length + 2,
-                      itemBuilder: (ctx, i) {
-                        if (i == 0) {
-                          return _BudgetSummaryCard(
-                              summaries: sortedSummaries);
-                        }
-                        if (i == sortedSummaries.length + 1) {
-                          return _AddBudgetButton(month: selectedMonth);
-                        }
-                        return _BudgetCard(summary: sortedSummaries[i - 1]);
-                      },
-                    ),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Erro: $e')),
-            ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.planning),
+          centerTitle: false,
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Orçamentos'),
+              Tab(text: 'Metas'),
+            ],
           ),
-        ],
+        ),
+        body: TabBarView(
+          children: [
+            // ── Orçamentos tab ─────────────────────────────────────
+            Column(
+              children: [
+                _MonthSelector(month: selectedMonth),
+                Expanded(
+                  child: budgetsAsync.when(
+                    data: (_) => sortedSummaries.isEmpty
+                        ? _EmptyBudgets(month: selectedMonth)
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemCount: sortedSummaries.length + 2,
+                            itemBuilder: (ctx, i) {
+                              if (i == 0) {
+                                return _BudgetSummaryCard(
+                                    summaries: sortedSummaries);
+                              }
+                              if (i == sortedSummaries.length + 1) {
+                                return _AddBudgetButton(month: selectedMonth);
+                              }
+                              return _BudgetCard(
+                                  summary: sortedSummaries[i - 1]);
+                            },
+                          ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Erro: $e')),
+                  ),
+                ),
+              ],
+            ),
+            // ── Metas tab ──────────────────────────────────────────
+            const GoalsScreen(),
+          ],
+        ),
       ),
     );
   }

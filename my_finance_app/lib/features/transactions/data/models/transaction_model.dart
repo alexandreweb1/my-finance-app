@@ -13,6 +13,7 @@ class TransactionModel extends TransactionEntity {
     required super.date,
     super.description,
     super.walletId,
+    super.goalId,
   });
 
   factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
@@ -29,6 +30,7 @@ class TransactionModel extends TransactionEntity {
       date: (data['date'] as Timestamp).toDate(),
       description: data['description'] as String?,
       walletId: data['walletId'] as String? ?? '',
+      goalId: data['goalId'] as String?,
     );
   }
 
@@ -42,6 +44,7 @@ class TransactionModel extends TransactionEntity {
       'date': Timestamp.fromDate(date),
       'description': description,
       'walletId': walletId,
+      'goalId': goalId,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -57,6 +60,7 @@ class TransactionModel extends TransactionEntity {
       date: entity.date,
       description: entity.description,
       walletId: entity.walletId,
+      goalId: entity.goalId,
     );
   }
 }

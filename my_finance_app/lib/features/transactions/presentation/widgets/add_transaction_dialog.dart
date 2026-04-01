@@ -9,6 +9,8 @@ import '../../../subscription/presentation/providers/subscription_provider.dart'
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../../core/utils/money_input_formatter.dart';
+import '../../../../core/utils/icon_data_utils.dart';
+import '../../../goals/presentation/providers/goals_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 
@@ -48,6 +50,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   DateTime _date = DateTime.now();
   String? _suggestedCategory;
   String _walletId = '';
+  String? _goalId;
 
   bool get _isEditing => widget.transaction != null;
 
@@ -251,6 +254,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       _category = t.category;
       _date = t.date;
       _walletId = t.walletId;
+      _goalId = t.goalId;
     }
     // Pre-fill from notification suggestion
     if (!_isEditing) {
@@ -341,6 +345,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         date: _date,
         description: widget.transaction!.description,
         walletId: _walletId,
+        goalId: _type == TransactionType.income ? _goalId : null,
       );
       success = await notifier.update(updated);
     } else {
@@ -351,6 +356,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         category: _category!,
         date: _date,
         walletId: _walletId,
+        goalId: _type == TransactionType.income ? _goalId : null,
       );
     }
 
@@ -377,6 +383,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final isLoading = ref.watch(transactionsNotifierProvider).isLoading;
     final categories = _categoryNames();
     final wallets = ref.watch(walletsStreamProvider).value ?? [];
+    final goals = ref.watch(goalsStreamProvider).value ?? [];
 
     // Default category
     _category ??= categories.isNotEmpty ? categories.first : null;
@@ -681,6 +688,42 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     }
                   },
                 ),
+                // ── Goal selector (income only) ──────────────────────
+                if (_type == TransactionType.income && goals.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    key: ValueKey('goal_$_goalId'),
+                    initialValue: goals.any((g) => g.id == _goalId) ? _goalId : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Vincular à meta (opcional)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.savings_rounded, size: 20),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Nenhuma meta'),
+                      ),
+                      ...goals.map(
+                        (g) => DropdownMenuItem<String?>(
+                          value: g.id,
+                          child: Row(
+                            children: [
+                              Icon(
+                                goalIconFromCodePoint(g.iconCodePoint),
+                                size: 16,
+                                color: Color(g.colorValue),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(g.title),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _goalId = v),
+                  ),
+                ],
                 if (_isEditing) ...[
                   const SizedBox(height: 20),
                   const Divider(),

@@ -332,6 +332,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
     required DateTime date,
     String? description,
     String walletId = '',
+    String? goalId,
   }) async {
     state = const AsyncValue.loading();
     final transaction = TransactionEntity(
@@ -344,6 +345,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
       date: date,
       description: description,
       walletId: walletId,
+      goalId: goalId,
     );
     final result = await _addTransaction(
         AddTransactionParams(transaction: transaction));
