@@ -10,6 +10,7 @@ import '../../../../core/services/notification_providers.dart';
 import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
@@ -483,41 +484,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
-    final scrollView = CustomScrollView(
-      controller: _scrollController,
-      slivers: [
-        sliverAppBar,
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, kIsWeb ? 220 : 16, 48),
-          sliver: SliverList.list(children: settingsContent),
-        ),
-      ],
-    );
-
-    return Scaffold(
-      body: kIsWeb
-          ? Stack(
-              children: [
-                scrollView,
-                Positioned(
-                  right: 12,
-                  top: kToolbarHeight +
-                      MediaQuery.of(context).padding.top +
-                      12,
-                  width: 192,
-                  child: _WebSidebarNav(
-                    l10n: l10n,
-                    onAccount: () => _scrollTo(_keyAccount),
-                    onPreferences: () => _scrollTo(_keyPreferences),
-                    onData: () => _scrollTo(_keyData),
-                    onSharing: () => _scrollTo(_keySharing),
-                    onNotifications: () => _scrollTo(_keyNotifications),
-                    onLogout: () => _scrollTo(_keyLogout),
+    if (kIsWeb) {
+      return Scaffold(
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Fixed left sidebar ──────────────────────────────────
+            SizedBox(
+              width: 260,
+              child: _WebFullSidebar(
+                photoUrl: user?.photoUrl,
+                displayName: displayName,
+                email: email,
+                initials: initials,
+                l10n: l10n,
+                onAccount: () => _scrollTo(_keyAccount),
+                onPreferences: () => _scrollTo(_keyPreferences),
+                onData: () => _scrollTo(_keyData),
+                onSharing: () => _scrollTo(_keySharing),
+                onNotifications: () => _scrollTo(_keyNotifications),
+                onLogout: () =>
+                    ref.read(authNotifierProvider.notifier).signOut(),
+                onEditProfile: () => showDialog(
+                  context: context,
+                  builder: (_) =>
+                      _EditProfileDialog(currentName: displayName),
+                ),
+                onBack: () =>
+                    ref.read(mainTabIndexProvider.notifier).state = 0,
+              ),
+            ),
+            // ── Scrollable main content ─────────────────────────────
+            Expanded(
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(32, 32, 32, 48),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 700),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: settingsContent,
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            )
-          : scrollView,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          sliverAppBar,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
+            sliver: SliverList.list(children: settingsContent),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2190,7 +2221,15 @@ class _NotificationDetectionSectionState
 // Web sidebar navigation (visible only on web)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _WebSidebarNav extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Full left sidebar for web layout
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WebFullSidebar extends StatelessWidget {
+  final String? photoUrl;
+  final String displayName;
+  final String email;
+  final String initials;
   final AppLocalizations l10n;
   final VoidCallback onAccount;
   final VoidCallback onPreferences;
@@ -2198,8 +2237,14 @@ class _WebSidebarNav extends StatelessWidget {
   final VoidCallback onSharing;
   final VoidCallback onNotifications;
   final VoidCallback onLogout;
+  final VoidCallback onEditProfile;
+  final VoidCallback onBack;
 
-  const _WebSidebarNav({
+  const _WebFullSidebar({
+    required this.photoUrl,
+    required this.displayName,
+    required this.email,
+    required this.initials,
     required this.l10n,
     required this.onAccount,
     required this.onPreferences,
@@ -2207,67 +2252,167 @@ class _WebSidebarNav extends StatelessWidget {
     required this.onSharing,
     required this.onNotifications,
     required this.onLogout,
+    required this.onEditProfile,
+    required this.onBack,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-              child: Text(
-                'Navegação',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                  letterSpacing: 0.8,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_kDarkBlue, _kBlue],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Back to home ─────────────────────────────────────────
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              child: TextButton.icon(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 14, color: Colors.white70),
+                label: const Text('Início',
+                    style: TextStyle(color: Colors.white70, fontSize: 13)),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 ),
               ),
             ),
-            _SidebarItem(
-              icon: Icons.person_outline,
-              label: 'Conta',
-              onTap: onAccount,
+          ),
+
+          // ── User profile header ───────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    UserAvatar(
+                      photoUrl: photoUrl,
+                      initials: initials,
+                      radius: 40,
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      textStyle: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Positioned(
+                      right: 60,
+                      bottom: 0,
+                      child: GestureDetector(
+                        onTap: onEditProfile,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.edit, size: 13,
+                              color: _kDarkBlue),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  displayName.isNotEmpty ? displayName : l10n.noName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  email,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 11,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            _SidebarItem(
-              icon: Icons.tune_rounded,
-              label: 'Preferências',
-              onTap: onPreferences,
+          ),
+          Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
+          const SizedBox(height: 8),
+
+          // ── Nav label ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text(
+              'NAVEGAÇÃO',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.white.withValues(alpha: 0.4),
+                letterSpacing: 1.2,
+              ),
             ),
-            _SidebarItem(
-              icon: Icons.account_balance_wallet_outlined,
-              label: 'Dados',
-              onTap: onData,
-            ),
-            _SidebarItem(
-              icon: Icons.people_outline,
-              label: 'Compartilhamento',
-              onTap: onSharing,
-            ),
-            _SidebarItem(
-              icon: Icons.notifications_none_rounded,
-              label: 'Notificações',
-              onTap: onNotifications,
-            ),
-            const Divider(height: 16, indent: 12, endIndent: 12),
-            _SidebarItem(
-              icon: Icons.logout_rounded,
-              label: 'Sair',
-              onTap: onLogout,
-              color: Colors.red.shade400,
-            ),
-          ],
-        ),
+          ),
+
+          // ── Nav items ─────────────────────────────────────────────
+          _SidebarItem(
+            icon: Icons.person_outline,
+            label: 'Conta',
+            onTap: onAccount,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          _SidebarItem(
+            icon: Icons.tune_rounded,
+            label: 'Preferências',
+            onTap: onPreferences,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          _SidebarItem(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Dados',
+            onTap: onData,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          _SidebarItem(
+            icon: Icons.people_outline,
+            label: 'Compartilhamento',
+            onTap: onSharing,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          _SidebarItem(
+            icon: Icons.notifications_none_rounded,
+            label: 'Notificações',
+            onTap: onNotifications,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+
+          const Spacer(),
+          Divider(
+              color: Colors.white.withValues(alpha: 0.15),
+              height: 1,
+              indent: 16,
+              endIndent: 16),
+          _SidebarItem(
+            icon: Icons.logout_rounded,
+            label: 'Sair',
+            onTap: onLogout,
+            color: Colors.red.shade300,
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }

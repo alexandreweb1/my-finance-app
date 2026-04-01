@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/services/local_notification_service.dart';
 import '../../../../core/services/notification_listener_service.dart';
 import '../../../../core/services/notification_permission_dialog.dart';
@@ -11,6 +12,7 @@ import '../../../../core/services/notification_suggestion.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
@@ -20,8 +22,6 @@ import 'dashboard_screen.dart';
 
 const _kGreen = Color(0xFF00D887);
 
-/// Allows other screens to programmatically switch the main tab.
-final mainTabIndexProvider = StateProvider<int>((ref) => 0);
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -33,11 +33,19 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen> {
   int _currentIndex = 0;
 
-  static const _screens = [
+  static const _mobileScreens = [
     DashboardScreen(),
     TransactionsScreen(),
     PlanningScreen(),
     ReportsScreen(),
+  ];
+
+  static const _webScreens = [
+    DashboardScreen(),
+    TransactionsScreen(),
+    PlanningScreen(),
+    ReportsScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -149,13 +157,18 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         selectedIcon: const Icon(Icons.bar_chart_rounded),
                         label: Text(l10n.navReports),
                       ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.settings_outlined),
+                        selectedIcon: const Icon(Icons.settings_rounded),
+                        label: Text(l10n.settings),
+                      ),
                     ],
                   ),
                   const VerticalDivider(width: 1, thickness: 1),
                   Expanded(
                     child: IndexedStack(
                       index: _currentIndex,
-                      children: _screens,
+                      children: _webScreens,
                     ),
                   ),
                 ],
@@ -174,7 +187,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           Expanded(
             child: IndexedStack(
               index: _currentIndex,
-              children: _screens,
+              children: _mobileScreens,
             ),
           ),
         ],

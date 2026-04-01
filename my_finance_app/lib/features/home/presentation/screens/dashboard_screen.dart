@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +18,7 @@ import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../providers/dashboard_provider.dart';
+import '../../../../core/providers/navigation_provider.dart';
 import 'main_screen.dart';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -67,10 +69,17 @@ class DashboardScreen extends ConsumerWidget {
             transactions: visibleTxs,
             userInitials: initials,
             userPhotoUrl: user?.photoUrl,
-            onSettingsTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
+            onSettingsTap: () {
+              if (kIsWeb) {
+                ref.read(mainTabIndexProvider.notifier).state = 4;
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const SettingsScreen()),
+                );
+              }
+            },
           ),
 
           const SizedBox(height: 20),

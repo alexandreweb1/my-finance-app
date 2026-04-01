@@ -63,6 +63,12 @@ service cloud.firestore {
       allow create:               if isSignedIn() && (isCreatingOwnDoc() || isCollaboratorCreatingMastersDoc());
     }
 
+    // ── /goals/{goalId} ──────────────────────────────────────────────────────
+    match /goals/{goalId} {
+      allow read, update, delete: if isSignedIn() && (isOwnerOfExistingDoc() || isCollaboratorOfOwner());
+      allow create:               if isSignedIn() && (isCreatingOwnDoc() || isCollaboratorCreatingMastersDoc());
+    }
+
     // ── /subscriptions/{userId} ───────────────────────────────────────────────
     // Document ID == userId; only the owner can read/write their subscription.
     match /subscriptions/{userId} {
