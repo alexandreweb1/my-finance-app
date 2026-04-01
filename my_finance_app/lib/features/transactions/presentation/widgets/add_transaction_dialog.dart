@@ -276,7 +276,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       context: context,
       initialDate: _date,
       firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -437,6 +437,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _amountController,
+                  autofocus: true,
                   keyboardType: TextInputType.number,
                   inputFormatters: [MoneyInputFormatter()],
                   textAlign: TextAlign.center,
@@ -487,6 +488,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 // ── Title field (optional) ───────────────────────────────
                 TextFormField(
                   controller: _titleController,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: InputDecoration(
                     labelText: l10n.titleField,
                     border: const OutlineInputBorder(),

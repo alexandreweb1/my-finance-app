@@ -31,7 +31,7 @@ class AppLocalizations {
   }
 
   // ── App ──────────────────────────────────────────────────────────────────
-  String get appTitle => _t('My Finance App', 'My Finance App', 'My Finance App');
+  String get appTitle => _t('Fintab', 'Fintab', 'Fintab');
 
   // ── Navigation ───────────────────────────────────────────────────────────
   String get navHome => _t('Início', 'Home', 'Inicio');

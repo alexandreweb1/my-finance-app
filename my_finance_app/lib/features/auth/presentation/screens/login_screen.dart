@@ -89,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 18),
                         const Text(
-                          'My Finance',
+                          'Fintab',
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,

@@ -98,7 +98,7 @@ class MyFinanceApp extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider);
 
     return MaterialApp(
-      title: 'My Finance App',
+      title: 'Fintab',
       debugShowCheckedModeBanner: false,
       theme: _lightTheme,
       darkTheme: _darkTheme,
@@ -213,7 +213,7 @@ class _SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'My Finance App',
+              'Fintab',
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall

@@ -89,7 +89,9 @@ class TransactionListTile extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      transaction.title,
+                      transaction.title.isNotEmpty
+                          ? transaction.title
+                          : transaction.category,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,

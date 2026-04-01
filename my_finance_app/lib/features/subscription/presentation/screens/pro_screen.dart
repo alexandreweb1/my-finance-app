@@ -57,7 +57,7 @@ class ProScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'My Finance Pro',
+                        'Fintab Pro',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
