@@ -10,6 +10,7 @@ import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/transaction_list_tile.dart';
+import '../widgets/transaction_table.dart';
 
 // Number of months to show in the quick picker
 const _kPickerMonths = 24;
@@ -225,7 +226,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             fmt: fmt,
           ),
 
-          // ── Transaction list ───────────────────────────────────────────
+          // ── Transaction list / table ───────────────────────────────────
           Expanded(
             child: txs.isEmpty
                 ? Center(
@@ -238,17 +239,25 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         const SizedBox(height: 12),
                         Text(
                           l10n.noTransactions,
-                          style:
-                              TextStyle(color: Colors.grey.shade500),
+                          style: TextStyle(color: Colors.grey.shade500),
                         ),
                       ],
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: txs.length,
-                    itemBuilder: (ctx, i) =>
-                        TransactionListTile(transaction: txs[i]),
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Telas largas (web / tablet ≥ 720px) → tabela
+                      if (constraints.maxWidth >= 720) {
+                        return TransactionTable(transactions: txs);
+                      }
+                      // Mobile → lista original
+                      return ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 80),
+                        itemCount: txs.length,
+                        itemBuilder: (ctx, i) =>
+                            TransactionListTile(transaction: txs[i]),
+                      );
+                    },
                   ),
           ),
         ],
