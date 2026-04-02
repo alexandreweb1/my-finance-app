@@ -92,6 +92,7 @@ class WalletsNotifier extends StateNotifier<AsyncValue<void>> {
     required String name,
     required int iconCodePoint,
     required int colorValue,
+    String currencyCode = '',
   }) async {
     state = const AsyncValue.loading();
     final wallet = WalletEntity(
@@ -100,6 +101,7 @@ class WalletsNotifier extends StateNotifier<AsyncValue<void>> {
       name: name,
       iconCodePoint: iconCodePoint,
       colorValue: colorValue,
+      currencyCode: currencyCode,
     );
     final result = await _addWallet(AddWalletParams(wallet: wallet));
     return result.fold(

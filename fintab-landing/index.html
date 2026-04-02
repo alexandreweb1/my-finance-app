@@ -130,11 +130,67 @@
       margin-bottom: 36px;
       line-height: 1.75;
     }
-    .hero-buttons {
+    /* ── STORE BADGES ── */
+    .store-badges {
       display: flex;
       gap: 14px;
       flex-wrap: wrap;
+      margin-bottom: 32px;
     }
+    .store-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 22px;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      min-width: 190px;
+    }
+    .store-btn:hover { transform: translateY(-3px); }
+    .store-btn-play {
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .store-btn-play:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .store-btn-web {
+      background: rgba(0,216,135,0.1);
+      border: 1.5px solid rgba(0,216,135,0.45);
+      box-shadow: 0 4px 20px rgba(0,216,135,0.12);
+    }
+    .store-btn-web:hover {
+      background: rgba(0,216,135,0.16);
+      box-shadow: 0 8px 32px rgba(0,216,135,0.22);
+    }
+    .store-btn-icon {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+    .store-btn-text {
+      display: flex;
+      flex-direction: column;
+    }
+    .store-btn-label {
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      color: rgba(240,244,255,0.6);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+    .store-btn-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f0f4ff;
+      line-height: 1;
+    }
+    .store-btn-web .store-btn-name { color: var(--green); }
+    .store-btn-web .store-btn-label { color: rgba(0,216,135,0.65); }
+
     .hero-trust {
       display: flex;
       align-items: center;
@@ -535,7 +591,7 @@
         gap: 48px;
       }
       .hero p { margin-left: auto; margin-right: auto; }
-      .hero-buttons { justify-content: center; }
+      .store-badges { justify-content: center; }
       .hero-trust { justify-content: center; flex-wrap: wrap; gap: 12px; }
       .hero-right { max-width: 420px; margin: 0 auto; }
     }
@@ -572,12 +628,34 @@
       Controle gastos, crie orçamentos e tome decisões com confiança —
       tudo em um app limpo e fácil de usar.
     </p>
-    <div class="hero-buttons">
-      <a href="https://my-finance-app-red-omega.vercel.app" class="btn-primary">
-        Começar grátis →
+    <div class="store-badges">
+      <!-- Google Play -->
+      <a href="https://play.google.com/store/apps/details?id=com.alexdev.myfinanceapp" class="store-btn store-btn-play" target="_blank" rel="noopener">
+        <svg class="store-btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.18 1C2.53 1.37 2 2.18 2 3.13V20.87C2 21.82 2.53 22.63 3.18 23L13.27 12L3.18 1Z" fill="rgba(240,244,255,0.7)"/>
+          <path d="M16.92 8.35L5.04 1.36L13.27 12L16.92 8.35Z" fill="rgba(240,244,255,0.85)"/>
+          <path d="M16.92 15.65L13.27 12L5.04 22.64L16.92 15.65Z" fill="rgba(240,244,255,0.85)"/>
+          <path d="M21.14 10.19C20.56 9.55 19.67 9.15 18.5 9.62L16.92 8.35L13.27 12L16.92 15.65L18.5 14.38C19.67 14.85 20.56 14.45 21.14 13.81C21.72 13.17 22 12.58 22 12C22 11.42 21.72 10.83 21.14 10.19Z" fill="rgba(240,244,255,0.95)"/>
+        </svg>
+        <div class="store-btn-text">
+          <span class="store-btn-label">Baixar na</span>
+          <span class="store-btn-name">Google Play</span>
+        </div>
       </a>
-      <a href="#features" class="btn-secondary">
-        Ver funcionalidades
+
+      <!-- Acesso Web -->
+      <a href="https://my-finance-app-red-omega.vercel.app" class="store-btn store-btn-web" target="_blank" rel="noopener">
+        <svg class="store-btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="9.5" stroke="#00D887" stroke-width="1.6"/>
+          <ellipse cx="12" cy="12" rx="3.5" ry="9.5" stroke="#00D887" stroke-width="1.6"/>
+          <path d="M2.5 12H21.5" stroke="#00D887" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M4.5 7.5H19.5" stroke="#00D887" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M4.5 16.5H19.5" stroke="#00D887" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        <div class="store-btn-text">
+          <span class="store-btn-label">Acessar pelo</span>
+          <span class="store-btn-name">Navegador Web</span>
+        </div>
       </a>
     </div>
     <div class="hero-trust">

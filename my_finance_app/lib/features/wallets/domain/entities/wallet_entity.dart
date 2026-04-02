@@ -7,6 +7,8 @@ class WalletEntity extends Equatable {
   final int iconCodePoint;
   final int colorValue;
   final bool isDefault;
+  /// ISO 4217 currency code (e.g. 'BRL', 'USD'). Empty = use app-level setting.
+  final String currencyCode;
 
   const WalletEntity({
     required this.id,
@@ -15,9 +17,10 @@ class WalletEntity extends Equatable {
     required this.iconCodePoint,
     required this.colorValue,
     this.isDefault = false,
+    this.currencyCode = '',
   });
 
   @override
   List<Object?> get props =>
-      [id, userId, name, iconCodePoint, colorValue, isDefault];
+      [id, userId, name, iconCodePoint, colorValue, isDefault, currencyCode];
 }

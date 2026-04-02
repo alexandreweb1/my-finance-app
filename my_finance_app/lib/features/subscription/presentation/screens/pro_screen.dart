@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../domain/entities/subscription_entity.dart';
 import '../providers/subscription_provider.dart';
 import '../widgets/pro_badge_widget.dart';
 
@@ -90,7 +91,7 @@ class ProScreen extends ConsumerWidget {
                 ],
 
                 // ── Funcionalidades Pro ──────────────────────────────────
-                const _FeaturesCard(),
+                _FeaturesCard(isPro: isPro),
                 const SizedBox(height: 20),
 
                 // ── Planos de preço ──────────────────────────────────────
@@ -232,10 +233,10 @@ class _ActivePlanCard extends StatelessWidget {
   const _ActivePlanCard({required this.subscription});
 
   String _planName() {
-    switch (subscription.type.name) {
-      case 'monthly':
+    switch (subscription.type) {
+      case SubscriptionType.monthly:
         return 'Pro Mensal';
-      case 'annual':
+      case SubscriptionType.annual:
         return 'Pro Anual';
       default:
         return 'Pro';
@@ -301,7 +302,8 @@ class _ActivePlanCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _FeaturesCard extends StatelessWidget {
-  const _FeaturesCard();
+  final bool isPro;
+  const _FeaturesCard({this.isPro = false});
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +318,7 @@ class _FeaturesCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'O que você ganha com o Pro:',
+              isPro ? 'Seus benefícios ativos:' : 'O que você ganha com o Pro:',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -325,32 +327,38 @@ class _FeaturesCard extends StatelessWidget {
             const _FeatureRow(
               icon: Icons.account_balance_wallet_rounded,
               title: 'Múltiplas carteiras',
-              description: 'Crie quantas carteiras quiser',
+              description:
+                  'Organize seu dinheiro em carteiras separadas: conta corrente, poupança, carteira física e muito mais. Sem limites.',
             ),
             const _FeatureRow(
               icon: Icons.category_rounded,
               title: 'Categorias personalizadas',
-              description: 'Categorias ilimitadas do seu jeito',
+              description:
+                  'Crie categorias ilimitadas com nome, ícone e cor personalizados para refletir exatamente seus hábitos de consumo.',
             ),
             const _FeatureRow(
               icon: Icons.calendar_month_rounded,
               title: 'Visão anual',
-              description: 'Analise o ano inteiro de uma vez',
+              description:
+                  'Analise o ano inteiro de uma vez com gráficos e resumos mensais comparativos de receitas e despesas.',
             ),
             const _FeatureRow(
               icon: Icons.pie_chart_outline_rounded,
               title: 'Orçamentos',
-              description: 'Defina limites por categoria e controle seus gastos',
+              description:
+                  'Defina um limite de gastos por categoria e acompanhe em tempo real quanto ainda resta para o mês.',
             ),
             const _FeatureRow(
               icon: Icons.savings_rounded,
               title: 'Metas financeiras',
-              description: 'Crie e acompanhe seus objetivos financeiros',
+              description:
+                  'Crie objetivos como viagem, reserva de emergência ou bem específico e acompanhe seu progresso mês a mês.',
             ),
             const _FeatureRow(
               icon: Icons.people_rounded,
               title: 'Compartilhamento',
-              description: 'Convide colaboradores para gerenciar juntos',
+              description:
+                  'Convide parceiros ou familiares para gerenciar as finanças juntos em tempo real na mesma conta.',
               isLast: true,
             ),
           ],

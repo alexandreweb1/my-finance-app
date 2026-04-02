@@ -1838,6 +1838,7 @@ class _AddWalletDialogState extends ConsumerState<_AddWalletDialog> {
   final _nameController = TextEditingController();
   int _iconCodePoint = 0xe4c9; // account_balance_wallet
   int _colorValue = 0xFF1976D2;
+  AppCurrency _currency = AppCurrency.brl;
   bool _isLoading = false;
 
   @override
@@ -1857,6 +1858,7 @@ class _AddWalletDialogState extends ConsumerState<_AddWalletDialog> {
           name: name,
           iconCodePoint: _iconCodePoint,
           colorValue: _colorValue,
+          currencyCode: _currency.code,
         );
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -1904,6 +1906,28 @@ class _AddWalletDialogState extends ConsumerState<_AddWalletDialog> {
               _ColorDots(
                   selected: _colorValue,
                   onSelected: (v) => setState(() => _colorValue = v)),
+              const SizedBox(height: 16),
+              Text('Moeda', style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<AppCurrency>(
+                initialValue: _currency,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: AppCurrency.values
+                    .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text('${c.symbol}  ${c.label}',
+                              overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (c) {
+                  if (c != null) setState(() => _currency = c);
+                },
+              ),
             ],
           ),
         ),
@@ -1942,6 +1966,7 @@ class _EditWalletDialogState extends ConsumerState<_EditWalletDialog> {
   late final TextEditingController _nameController;
   late int _iconCodePoint;
   late int _colorValue;
+  late AppCurrency _currency;
   bool _isLoading = false;
 
   @override
@@ -1950,6 +1975,8 @@ class _EditWalletDialogState extends ConsumerState<_EditWalletDialog> {
     _nameController = TextEditingController(text: widget.wallet.name);
     _iconCodePoint = widget.wallet.iconCodePoint;
     _colorValue = widget.wallet.colorValue;
+    _currency = AppCurrency.fromCode(
+        widget.wallet.currencyCode.isEmpty ? 'BRL' : widget.wallet.currencyCode);
   }
 
   @override
@@ -1968,6 +1995,7 @@ class _EditWalletDialogState extends ConsumerState<_EditWalletDialog> {
       iconCodePoint: _iconCodePoint,
       colorValue: _colorValue,
       isDefault: widget.wallet.isDefault,
+      currencyCode: _currency.code,
     );
     setState(() => _isLoading = true);
     final success =
@@ -2017,6 +2045,28 @@ class _EditWalletDialogState extends ConsumerState<_EditWalletDialog> {
               _ColorDots(
                   selected: _colorValue,
                   onSelected: (v) => setState(() => _colorValue = v)),
+              const SizedBox(height: 16),
+              Text('Moeda', style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<AppCurrency>(
+                initialValue: _currency,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: AppCurrency.values
+                    .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text('${c.symbol}  ${c.label}',
+                              overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (c) {
+                  if (c != null) setState(() => _currency = c);
+                },
+              ),
             ],
           ),
         ),
@@ -2104,56 +2154,71 @@ class _ProBannerCard extends ConsumerWidget {
     final subscription = ref.watch(subscriptionStreamProvider).value;
 
     if (isPro) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [_kGreen, _kGreenDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
+      return GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProScreen()),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.workspace_premium_rounded,
-                  color: Colors.white, size: 24),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_kGreen, _kGreenDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Plano Pro Ativo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  Text(
-                    subscription?.expiryDate != null
-                        ? 'Renova em ${_formatDate(subscription!.expiryDate!)}'
-                        : 'Acesso vitalício',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.workspace_premium_rounded,
+                    color: Colors.white, size: 24),
               ),
-            ),
-            const Icon(Icons.check_circle_rounded,
-                color: Colors.white, size: 22),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Plano Pro Ativo',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      subscription?.expiryDate != null
+                          ? 'Renova em ${_formatDate(subscription!.expiryDate!)}'
+                          : 'Acesso vitalício',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Ver meus benefícios',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 11,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: Colors.white, size: 22),
+            ],
+          ),
         ),
       );
     }

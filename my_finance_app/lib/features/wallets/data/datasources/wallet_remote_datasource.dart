@@ -93,6 +93,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
           iconCodePoint: 0xe4c9, // Icons.account_balance_wallet
           colorValue: 0xFF1976D2,
           isDefault: true,
+          currencyCode: 'BRL',
         ),
       ];
 }

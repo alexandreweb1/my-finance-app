@@ -7,12 +7,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum AppCurrency {
-  brl(code: 'BRL', symbol: 'R\$', locale: 'pt_BR', label: 'Real (BRL)'),
-  usd(code: 'USD', symbol: '\$', locale: 'en_US', label: 'Dollar (USD)'),
-  eur(code: 'EUR', symbol: '€', locale: 'eu', label: 'Euro (EUR)'),
-  gbp(code: 'GBP', symbol: '£', locale: 'en_GB', label: 'Pound (GBP)'),
-  ars(code: 'ARS', symbol: '\$', locale: 'es_AR', label: 'Peso Arg. (ARS)'),
-  mxn(code: 'MXN', symbol: '\$', locale: 'es_MX', label: 'Peso Mex. (MXN)');
+  brl(code: 'BRL', symbol: 'R\$', locale: 'pt_BR', label: 'Real Brasileiro (BRL)'),
+  usd(code: 'USD', symbol: 'US\$', locale: 'en_US', label: 'Dólar Americano (USD)'),
+  eur(code: 'EUR', symbol: '€', locale: 'de_DE', label: 'Euro (EUR)'),
+  gbp(code: 'GBP', symbol: '£', locale: 'en_GB', label: 'Libra Esterlina (GBP)'),
+  ars(code: 'ARS', symbol: '\$', locale: 'es_AR', label: 'Peso Argentino (ARS)'),
+  mxn(code: 'MXN', symbol: '\$', locale: 'es_MX', label: 'Peso Mexicano (MXN)'),
+  clp(code: 'CLP', symbol: '\$', locale: 'es_CL', label: 'Peso Chileno (CLP)'),
+  cop(code: 'COP', symbol: '\$', locale: 'es_CO', label: 'Peso Colombiano (COP)'),
+  pen(code: 'PEN', symbol: 'S/', locale: 'es_PE', label: 'Sol Peruano (PEN)'),
+  uyu(code: 'UYU', symbol: '\$', locale: 'es_UY', label: 'Peso Uruguaio (UYU)'),
+  cad(code: 'CAD', symbol: 'CA\$', locale: 'en_CA', label: 'Dólar Canadense (CAD)'),
+  aud(code: 'AUD', symbol: 'A\$', locale: 'en_AU', label: 'Dólar Australiano (AUD)'),
+  chf(code: 'CHF', symbol: 'CHF', locale: 'de_CH', label: 'Franco Suíço (CHF)'),
+  jpy(code: 'JPY', symbol: '¥', locale: 'ja_JP', label: 'Iene Japonês (JPY)'),
+  cny(code: 'CNY', symbol: '¥', locale: 'zh_CN', label: 'Yuan Chinês (CNY)'),
+  inr(code: 'INR', symbol: '₹', locale: 'hi_IN', label: 'Rupia Indiana (INR)'),
+  krw(code: 'KRW', symbol: '₩', locale: 'ko_KR', label: 'Won Coreano (KRW)'),
+  btc(code: 'BTC', symbol: '₿', locale: 'en_US', label: 'Bitcoin (BTC)');
 
   final String code;
   final String symbol;
