@@ -34,8 +34,12 @@ service cloud.firestore {
 
     // ── /users/{userId} ───────────────────────────────────────────────────────
     // Each user can only read / write their own profile document.
+    // Exception: the master may remove masterUserId from a collaborator's profile.
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn()
+        && resource.data.masterUserId == request.auth.uid
+        && !('masterUserId' in request.resource.data);
     }
 
     // ── /transactions/{transactionId} ─────────────────────────────────────────

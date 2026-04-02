@@ -468,7 +468,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ]),
       const SizedBox(height: 12),
 
-      // Logout
+      // Logout + Delete account
       KeyedSubtree(
         key: _keyLogout,
         child: _SettingsCard(children: [
@@ -479,6 +479,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(color: Colors.red.shade600)),
             onTap: () =>
                 ref.read(authNotifierProvider.notifier).signOut(),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: _IconBadge(Icons.delete_forever_outlined,
+                color: Colors.red.shade900),
+            title: Text('Excluir conta',
+                style: TextStyle(color: Colors.red.shade900)),
+            onTap: () => showDialog(
+              context: context,
+              builder: (_) => const _DeleteAccountDialog(),
+            ),
           ),
         ]),
       ),
@@ -872,6 +883,112 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
                   width: 18,
                   child: CircularProgressIndicator(strokeWidth: 2))
               : Text(l10n.save),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete Account Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DeleteAccountDialog extends ConsumerStatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  ConsumerState<_DeleteAccountDialog> createState() =>
+      _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
+  final _passwordController = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    final hasPassword = ref.read(hasPasswordProviderProvider);
+    final password = hasPassword ? _passwordController.text.trim() : null;
+
+    if (hasPassword && (password == null || password.isEmpty)) return;
+
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .deleteAccount(password: password);
+
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop();
+    } else {
+      final err = ref.read(authNotifierProvider).errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(err ?? 'Erro ao excluir conta.'),
+          backgroundColor: Colors.red.shade700));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(authNotifierProvider).isLoading;
+    final hasPassword = ref.watch(hasPasswordProviderProvider);
+
+    return AlertDialog(
+      title: const Text('Excluir conta'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Esta ação é permanente e não pode ser desfeita. '
+              'Todos os seus dados serão excluídos.',
+            ),
+            if (hasPassword) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscure,
+                decoration: InputDecoration(
+                  labelText: 'Confirme sua senha',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        _obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Você será redirecionado para confirmar com o Google.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+          onPressed: isLoading ? null : _confirm,
+          child: isLoading
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Text('Excluir conta'),
         ),
       ],
     );

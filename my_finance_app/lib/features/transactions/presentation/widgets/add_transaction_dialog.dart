@@ -566,8 +566,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  key: ValueKey(_category),
-                  initialValue: categories.contains(_category) ? _category : null,
+                  value: categories.contains(_category) ? _category : null,
                   decoration: InputDecoration(
                     labelText: l10n.categoryField,
                     border: const OutlineInputBorder(),

@@ -30,4 +30,6 @@ abstract class AuthRepository {
       String currentPassword, String newPassword);
 
   Future<Either<Failure, void>> linkEmailPassword(String password);
+
+  Future<Either<Failure, void>> deleteAccount({String? password});
 }

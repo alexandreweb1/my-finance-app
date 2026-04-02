@@ -338,6 +338,16 @@ class _FeaturesCard extends StatelessWidget {
               description: 'Analise o ano inteiro de uma vez',
             ),
             const _FeatureRow(
+              icon: Icons.pie_chart_outline_rounded,
+              title: 'Orçamentos',
+              description: 'Defina limites por categoria e controle seus gastos',
+            ),
+            const _FeatureRow(
+              icon: Icons.savings_rounded,
+              title: 'Metas financeiras',
+              description: 'Crie e acompanhe seus objetivos financeiros',
+            ),
+            const _FeatureRow(
               icon: Icons.people_rounded,
               title: 'Compartilhamento',
               description: 'Convide colaboradores para gerenciar juntos',

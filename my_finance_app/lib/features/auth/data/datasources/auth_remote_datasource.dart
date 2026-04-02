@@ -33,6 +33,10 @@ abstract class AuthRemoteDataSource {
   /// Links an email+password credential to the current (Google) account,
   /// enabling dual sign-in for the same Firebase user.
   Future<void> linkEmailPassword(String password);
+
+  /// Deletes the current user's Firebase Auth account.
+  /// [password] is required for email/password users; pass null for Google-only users.
+  Future<void> deleteAccount({String? password});
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -235,6 +239,50 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await user.linkWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       throw AuthException(e.message ?? 'Erro ao definir senha.');
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      throw AuthException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> deleteAccount({String? password}) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw const AuthException('Usuário não autenticado.');
+
+      // Re-authenticate before deleting (Firebase security requirement)
+      final hasPassword =
+          user.providerData.any((p) => p.providerId == 'password');
+      if (hasPassword) {
+        if (password == null || password.isEmpty) {
+          throw const AuthException('Senha obrigatória para confirmar exclusão.');
+        }
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        );
+        await user.reauthenticateWithCredential(credential);
+      } else {
+        // Google-only user — re-authenticate with Google
+        final googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) throw const AuthException('Autenticação cancelada.');
+        final googleAuth = await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        await user.reauthenticateWithCredential(credential);
+      }
+
+      await user.delete();
+      // Explicitly sign out to guarantee authStateChanges emits null
+      // (user.delete() alone may not always trigger the stream on all platforms).
+      try { await _firebaseAuth.signOut(); } catch (_) {}
+      _googleSignIn.signOut().ignore();
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(e.message ?? 'Erro ao excluir conta.');
     } on AuthException {
       rethrow;
     } catch (e) {

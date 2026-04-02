@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../features/subscription/presentation/providers/subscription_provider.dart';
+import '../../../../features/subscription/presentation/widgets/pro_gate_widget.dart';
 import '../providers/goals_provider.dart';
 import '../widgets/add_goal_dialog.dart';
 import '../widgets/goal_card.dart';
@@ -18,7 +20,7 @@ class GoalsScreen extends ConsumerWidget {
       data: (goals) {
         if (goals.isEmpty) {
           return _EmptyGoals(
-            onAdd: () => _openAddDialog(context),
+            onAdd: () => _openAddDialog(context, ref),
           );
         }
 
@@ -44,7 +46,7 @@ class GoalsScreen extends ConsumerWidget {
               right: 16,
               child: FloatingActionButton.extended(
                 heroTag: 'add_goal',
-                onPressed: () => _openAddDialog(context),
+                onPressed: () => _openAddDialog(context, ref),
                 icon: const Icon(Icons.add),
                 label: const Text('Nova meta'),
                 backgroundColor: const Color(0xFF00D887),
@@ -57,7 +59,16 @@ class GoalsScreen extends ConsumerWidget {
     );
   }
 
-  void _openAddDialog(BuildContext context) {
+  void _openAddDialog(BuildContext context, WidgetRef ref) {
+    if (!ref.read(isProProvider)) {
+      showProGateBottomSheet(
+        context,
+        featureName: 'Metas financeiras',
+        featureDescription: 'Crie e acompanhe metas financeiras personalizadas.',
+        featureIcon: Icons.savings_rounded,
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (_) => const AddGoalDialog(),
