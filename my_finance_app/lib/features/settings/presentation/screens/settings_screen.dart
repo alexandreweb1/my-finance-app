@@ -623,6 +623,7 @@ class _CurrencyDialog extends ConsumerWidget {
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
       content: SizedBox(
         width: 320,
+        height: 360,
         child: RadioGroup<AppCurrency>(
           groupValue: current,
           onChanged: (v) {
@@ -631,8 +632,7 @@ class _CurrencyDialog extends ConsumerWidget {
               Navigator.of(context).pop();
             }
           },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: ListView(
             children: AppCurrency.values
                 .map((currency) => RadioListTile<AppCurrency>(
                       value: currency,
@@ -1218,7 +1218,7 @@ class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
     return AlertDialog(
       title: Text('${l10n.newCategoryTitle} – $typeLabel'),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1324,7 +1324,7 @@ class _EditCategoryDialogState extends ConsumerState<_EditCategoryDialog> {
     return AlertDialog(
       title: Text(l10n.editCategory),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1879,7 +1879,7 @@ class _AddWalletDialogState extends ConsumerState<_AddWalletDialog> {
     return AlertDialog(
       title: Text(l10n.newWallet),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2019,7 +2019,7 @@ class _EditWalletDialogState extends ConsumerState<_EditWalletDialog> {
     return AlertDialog(
       title: Text(l10n.editWallet),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

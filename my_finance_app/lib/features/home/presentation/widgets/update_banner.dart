@@ -98,7 +98,9 @@ class _UpdateBannerState extends ConsumerState<UpdateBanner>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          l10n.updateAvailable,
+                          info.message.isNotEmpty
+                              ? info.message
+                              : l10n.updateAvailable,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,

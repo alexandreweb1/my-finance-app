@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/navigation_provider.dart';
+import '../../../../core/services/app_update_service.dart';
+import '../../../../core/services/in_app_update_service.dart';
 import '../../../../core/services/local_notification_service.dart';
 import '../../../../core/services/notification_listener_service.dart';
 import '../../../../core/services/notification_permission_dialog.dart';
@@ -52,6 +54,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   void initState() {
     super.initState();
     _initNotificationFeature();
+    _initInAppUpdate();
+  }
+
+  /// Opção 1 — Google Play In-App Update (Android only).
+  /// Runs silently; Play Store shows its own UI when an update is available.
+  Future<void> _initInAppUpdate() async {
+    await InAppUpdateService.instance.checkAndPrompt();
   }
 
   Future<void> _initNotificationFeature() async {
@@ -89,6 +98,15 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     ref.watch(walletsSeedProvider);
     ref.watch(iapInitProvider); // inicializa IAP e restaura compras ao logar
     final l10n = AppLocalizations.of(context);
+
+    // Opção 2 — Firestore update check: força atualização via Play Store se necessário
+    ref.listen<AsyncValue<AppUpdateInfo>>(appUpdateProvider, (_, next) {
+      next.whenData((info) {
+        if (info.forceUpdate) {
+          InAppUpdateService.instance.checkAndPrompt(forceImmediate: true);
+        }
+      });
+    });
 
     // Listen for external navigation (e.g. from dashboard cards)
     ref.listen<int>(mainTabIndexProvider, (_, next) {
