@@ -15,6 +15,9 @@ class TransactionEntity extends Equatable {
   final String walletId;
   /// Optional ID of a savings goal this transaction contributes to.
   final String? goalId;
+  /// True when the transaction was auto-created from a notification and
+  /// still needs the user to confirm/categorise it.
+  final bool isPending;
 
   const TransactionEntity({
     required this.id,
@@ -27,6 +30,7 @@ class TransactionEntity extends Equatable {
     this.description,
     this.walletId = '',
     this.goalId,
+    this.isPending = false,
   });
 
   bool get isIncome => type == TransactionType.income;
@@ -34,5 +38,5 @@ class TransactionEntity extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, userId, title, amount, type, category, date, description, walletId, goalId];
+      [id, userId, title, amount, type, category, date, description, walletId, goalId, isPending];
 }

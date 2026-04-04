@@ -37,13 +37,18 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
-        // MethodChannel: permission helpers
+        // MethodChannel: permission helpers + bank filter
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, permissionChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isPermissionGranted" -> result.success(isNotificationListenerEnabled())
                     "openPermissionSettings" -> {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        result.success(null)
+                    }
+                    "setAllowedPackages" -> {
+                        val packages = call.argument<List<String>>("packages") ?: emptyList()
+                        NotificationMonitorService.allowedPackages = packages.toSet()
                         result.success(null)
                     }
                     else -> result.notImplemented()

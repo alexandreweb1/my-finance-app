@@ -14,6 +14,7 @@ class TransactionModel extends TransactionEntity {
     super.description,
     super.walletId,
     super.goalId,
+    super.isPending,
   });
 
   factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
@@ -31,6 +32,7 @@ class TransactionModel extends TransactionEntity {
       description: data['description'] as String?,
       walletId: data['walletId'] as String? ?? '',
       goalId: data['goalId'] as String?,
+      isPending: data['isPending'] as bool? ?? false,
     );
   }
 
@@ -45,6 +47,7 @@ class TransactionModel extends TransactionEntity {
       'description': description,
       'walletId': walletId,
       'goalId': goalId,
+      'isPending': isPending,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -61,6 +64,7 @@ class TransactionModel extends TransactionEntity {
       description: entity.description,
       walletId: entity.walletId,
       goalId: entity.goalId,
+      isPending: entity.isPending,
     );
   }
 }

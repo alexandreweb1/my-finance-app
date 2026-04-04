@@ -18,6 +18,8 @@ import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../recurring/presentation/providers/recurring_provider.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../transactions/domain/entities/transaction_entity.dart';
+import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
 import '../../../transactions/presentation/widgets/add_transaction_dialog.dart';
 import '../widgets/update_banner.dart';
@@ -86,11 +88,38 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _startListening() {
+    // Sync allowed bank packages to native service
+    final allowedBanks = ref.read(allowedBanksProvider);
+    NotificationListenerBridge.setAllowedPackages(allowedBanks.toList());
+
     NotificationListenerBridge.suggestionStream.listen((suggestion) {
       // Check again in case user disabled while app was open
       if (!ref.read(notificationDetectionEnabledProvider)) return;
-      LocalNotificationService.instance.showSuggestion(suggestion);
+
+      final autoSave = ref.read(notificationAutoSaveProvider);
+      if (autoSave) {
+        // Auto-save: create a pending transaction immediately
+        _autoSaveTransaction(suggestion);
+      } else {
+        // Normal mode: show local notification suggestion
+        LocalNotificationService.instance.showSuggestion(suggestion);
+      }
     });
+  }
+
+  Future<void> _autoSaveTransaction(NotificationSuggestion suggestion) async {
+    final type = suggestion.type ?? TransactionType.expense;
+    await ref.read(transactionsNotifierProvider.notifier).add(
+      title: suggestion.rawText.length > 60
+          ? suggestion.rawText.substring(0, 60)
+          : suggestion.rawText,
+      amount: suggestion.amount,
+      type: type,
+      category: 'A categorizar',
+      date: DateTime.now(),
+      description: 'Via ${suggestion.sourceApp}',
+      isPending: true,
+    );
   }
 
   @override
@@ -108,6 +137,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           InAppUpdateService.instance.checkAndPrompt(forceImmediate: true);
         }
       });
+    });
+
+    // Sync allowed banks to native service whenever they change
+    ref.listen<Set<String>>(allowedBanksProvider, (_, next) {
+      NotificationListenerBridge.setAllowedPackages(next.toList());
     });
 
     // Listen for external navigation (e.g. from dashboard cards)

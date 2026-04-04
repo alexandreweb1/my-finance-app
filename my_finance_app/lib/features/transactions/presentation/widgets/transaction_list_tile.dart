@@ -17,6 +17,7 @@ class TransactionListTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isIncome = transaction.isIncome;
+    final isPending = transaction.isPending;
     final color = isIncome ? _kGreen : _kRed;
     final sign = isIncome ? '+' : '-';
     final fmt = ref.watch(currencyFormatterProvider);
@@ -88,16 +89,40 @@ class TransactionListTile extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      transaction.title.isNotEmpty
-                          ? transaction.title
-                          : transaction.category,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: colorScheme.onSurface,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            transaction.title.isNotEmpty
+                                ? transaction.title
+                                : transaction.category,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isPending)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade700.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Categorizar',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.orange.shade700,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(

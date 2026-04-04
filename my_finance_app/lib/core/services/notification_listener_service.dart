@@ -40,6 +40,16 @@ class NotificationListenerBridge {
     } catch (_) {}
   }
 
+  /// Sends the list of allowed bank package names to the native service.
+  static Future<void> setAllowedPackages(List<String> packages) async {
+    if (!_isAndroid) return;
+    try {
+      await _methodChannel.invokeMethod('setAllowedPackages', {
+        'packages': packages,
+      });
+    } catch (_) {}
+  }
+
   static bool get _isAndroid =>
       defaultTargetPlatform == TargetPlatform.android;
 }
