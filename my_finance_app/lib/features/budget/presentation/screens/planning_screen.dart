@@ -9,6 +9,7 @@ import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../../core/utils/money_input_formatter.dart';
 import '../../../goals/presentation/screens/goals_screen.dart';
+import '../../../recurring/presentation/screens/recurring_screen.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../domain/entities/budget_entity.dart';
@@ -29,7 +30,7 @@ class PlanningScreen extends ConsumerWidget {
           a.budget.categoryName.compareTo(b.budget.categoryName));
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.planning),
@@ -38,6 +39,7 @@ class PlanningScreen extends ConsumerWidget {
             tabs: [
               Tab(text: 'Orçamentos'),
               Tab(text: 'Metas'),
+              Tab(text: 'Recorrências'),
             ],
           ),
         ),
@@ -80,6 +82,13 @@ class PlanningScreen extends ConsumerWidget {
             ),
             // ── Metas tab ──────────────────────────────────────────
             const GoalsScreen(),
+            // ── Recorrências tab ──────────────────────────────────
+            const ProGateWidget(
+              featureName: 'Recorrências',
+              featureDescription: 'Cadastre transações automáticas que se repetem todo mês.',
+              featureIcon: Icons.repeat_rounded,
+              child: RecurringScreen(),
+            ),
           ],
         ),
       ),

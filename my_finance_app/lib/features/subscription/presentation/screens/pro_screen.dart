@@ -359,6 +359,12 @@ class _FeaturesCard extends StatelessWidget {
               title: 'Compartilhamento',
               description:
                   'Convide parceiros ou familiares para gerenciar as finanças juntos em tempo real na mesma conta.',
+            ),
+            const _FeatureRow(
+              icon: Icons.repeat_rounded,
+              title: 'Transações recorrentes',
+              description:
+                  'Cadastre despesas e receitas que se repetem automaticamente — aluguel, salário, assinaturas e mais.',
               isLast: true,
             ),
           ],

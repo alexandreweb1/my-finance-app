@@ -15,6 +15,7 @@ import '../../../budget/presentation/screens/planning_screen.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../recurring/presentation/providers/recurring_provider.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../../transactions/presentation/screens/transactions_screen.dart';
@@ -97,6 +98,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     ref.watch(categoriesSeedProvider);
     ref.watch(walletsSeedProvider);
     ref.watch(iapInitProvider); // inicializa IAP e restaura compras ao logar
+    ref.watch(recurringGeneratorProvider); // gera transações de recorrências pendentes
     final l10n = AppLocalizations.of(context);
 
     // Opção 2 — Firestore update check: força atualização via Play Store se necessário

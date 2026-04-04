@@ -16,3 +16,4 @@ vantagens** em `lib/features/subscription/presentation/screens/pro_screen.dart`
 | Orçamentos | `planning_screen.dart` (ProGateWidget no tab) |
 | Metas financeiras | `goals_screen.dart` (_openAddDialog) |
 | Compartilhamento | `settings_screen.dart` |
+| Transações recorrentes | `planning_screen.dart` (ProGateWidget no tab) |
