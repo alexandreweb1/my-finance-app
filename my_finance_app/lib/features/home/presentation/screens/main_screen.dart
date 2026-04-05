@@ -35,8 +35,10 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+  bool _listeningStarted = false;
 
   static const _mobileScreens = [
     DashboardScreen(),
@@ -56,8 +58,25 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initNotificationFeature();
     _initInAppUpdate();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When app returns to foreground, re-sync banks and the EventChannel
+    // will flush any buffered events automatically via onListen.
+    if (state == AppLifecycleState.resumed && _listeningStarted) {
+      final allowedBanks = ref.read(allowedBanksProvider);
+      NotificationListenerBridge.setAllowedPackages(allowedBanks.toList());
+    }
   }
 
   /// Opção 1 — Google Play In-App Update (Android only).
@@ -88,6 +107,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _startListening() {
+    _listeningStarted = true;
+
     // Sync allowed bank packages to native service
     final allowedBanks = ref.read(allowedBanksProvider);
     NotificationListenerBridge.setAllowedPackages(allowedBanks.toList());

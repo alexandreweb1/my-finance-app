@@ -3,6 +3,7 @@ package com.alexdev.myfinanceapp
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -17,6 +18,8 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val TAG = "MainActivity"
+
         /// Static sink: NotificationMonitorService posts events here directly.
         var notificationEventSink: EventChannel.EventSink? = null
     }
@@ -31,9 +34,20 @@ class MainActivity : FlutterActivity() {
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                     notificationEventSink = events
+                    Log.d(TAG, "EventSink connected")
+
+                    // Flush any buffered events captured while the sink was null
+                    val pending = NotificationMonitorService.consumePendingEvents(applicationContext)
+                    if (pending.isNotEmpty()) {
+                        Log.d(TAG, "Flushing ${pending.size} pending events")
+                        for (event in pending) {
+                            events?.success(event)
+                        }
+                    }
                 }
                 override fun onCancel(arguments: Any?) {
                     notificationEventSink = null
+                    Log.d(TAG, "EventSink disconnected")
                 }
             })
 
@@ -48,7 +62,8 @@ class MainActivity : FlutterActivity() {
                     }
                     "setAllowedPackages" -> {
                         val packages = call.argument<List<String>>("packages") ?: emptyList()
-                        NotificationMonitorService.allowedPackages = packages.toSet()
+                        NotificationMonitorService.saveAllowedPackages(applicationContext, packages)
+                        Log.d(TAG, "setAllowedPackages: ${packages.size} packages")
                         result.success(null)
                     }
                     else -> result.notImplemented()
