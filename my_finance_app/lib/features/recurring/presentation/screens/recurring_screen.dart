@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/recurring_transaction_entity.dart';
 import '../providers/recurring_provider.dart';
@@ -49,7 +50,7 @@ class RecurringScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Erro: $e')),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => showDialog(
+        onPressed: () => showAnimatedDialog(
           context: context,
           builder: (_) => const AddRecurringDialog(),
         ),
@@ -89,7 +90,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
-            onPressed: () => showDialog(
+            onPressed: () => showAnimatedDialog(
               context: context,
               builder: (_) => const AddRecurringDialog(),
             ),
@@ -184,7 +185,7 @@ class _RecurringCard extends ConsumerWidget {
             color: Colors.red.shade400, size: 22),
       ),
       confirmDismiss: (_) async {
-        return await showDialog<bool>(
+        return await showAnimatedDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Excluir recorrência'),
@@ -210,7 +211,7 @@ class _RecurringCard extends ConsumerWidget {
         ref.read(recurringNotifierProvider.notifier).delete(recurring.id);
       },
       child: GestureDetector(
-        onTap: () => showDialog(
+        onTap: () => showAnimatedDialog(
           context: context,
           builder: (_) => AddRecurringDialog(recurring: recurring),
         ),

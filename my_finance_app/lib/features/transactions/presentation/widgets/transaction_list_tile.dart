@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
@@ -49,7 +50,7 @@ class TransactionListTile extends ConsumerWidget {
             .delete(transaction.id);
       },
       child: GestureDetector(
-        onTap: () => showDialog(
+        onTap: () => showAnimatedDialog(
           context: context,
           builder: (_) => AddTransactionDialog(transaction: transaction),
         ),

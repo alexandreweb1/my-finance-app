@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/providers/app_settings_provider.dart';
 import '../../../../core/services/notification_listener_service.dart';
 import '../../../../core/services/notification_providers.dart';
@@ -296,7 +297,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, color: Colors.white),
                     tooltip: l10n.editProfile,
-                    onPressed: () => showDialog(
+                    onPressed: () => showAnimatedDialog(
                       context: context,
                       builder: (_) =>
                           _EditProfileDialog(currentName: displayName),
@@ -486,7 +487,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 color: Colors.red.shade900),
             title: Text('Excluir conta',
                 style: TextStyle(color: Colors.red.shade900)),
-            onTap: () => showDialog(
+            onTap: () => showAnimatedDialog(
               context: context,
               builder: (_) => const _DeleteAccountDialog(),
             ),
@@ -516,7 +517,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onNotifications: () => _scrollTo(_keyNotifications),
                 onLogout: () =>
                     ref.read(authNotifierProvider.notifier).signOut(),
-                onEditProfile: () => showDialog(
+                onEditProfile: () => showAnimatedDialog(
                   context: context,
                   builder: (_) =>
                       _EditProfileDialog(currentName: displayName),
@@ -571,27 +572,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showChangePasswordDialog(BuildContext context) {
-    showDialog(
+    showAnimatedDialog(
         context: context, builder: (_) => const _ChangePasswordDialog());
   }
 
   void _showSetPasswordDialog(BuildContext context) {
-    showDialog(
+    showAnimatedDialog(
         context: context, builder: (_) => const _SetPasswordDialog());
   }
 
   void _showCurrencyDialog(BuildContext context, AppLocalizations l10n) {
-    showDialog(
+    showAnimatedDialog(
         context: context, builder: (ctx) => _CurrencyDialog(l10n: l10n));
   }
 
   void _showLanguageDialog(BuildContext context, AppLocalizations l10n) {
-    showDialog(
+    showAnimatedDialog(
         context: context, builder: (ctx) => _LanguageDialog(l10n: l10n));
   }
 
   void _showAppearanceDialog(BuildContext context, AppLocalizations l10n) {
-    showDialog(
+    showAnimatedDialog(
         context: context, builder: (ctx) => _AppearanceDialog(l10n: l10n));
   }
 
@@ -1137,7 +1138,7 @@ class _CategorySection extends ConsumerWidget {
                         icon: Icon(Icons.edit_outlined,
                             color: Theme.of(context).colorScheme.primary,
                             size: 20),
-                        onPressed: () => showDialog(
+                        onPressed: () => showAnimatedDialog(
                           context: context,
                           builder: (_) =>
                               _EditCategoryDialog(category: cat),
@@ -1159,7 +1160,7 @@ class _CategorySection extends ConsumerWidget {
           title: Text(type == CategoryType.expense
               ? l10n.addExpenseCategory
               : l10n.addIncomeCategory),
-          onTap: () => showDialog(
+          onTap: () => showAnimatedDialog(
             context: context,
             builder: (_) => _AddCategoryDialog(type: type),
           ),
@@ -1418,7 +1419,7 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
   }
 
   Future<void> _confirmLeave() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAnimatedDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Sair da conta compartilhada'),
@@ -1765,7 +1766,7 @@ class _WalletSection extends ConsumerWidget {
                   icon: Icon(Icons.edit_outlined,
                       color: Theme.of(context).colorScheme.primary,
                       size: 20),
-                  onPressed: () => showDialog(
+                  onPressed: () => showAnimatedDialog(
                     context: context,
                     builder: (_) => _EditWalletDialog(wallet: w),
                   ),
@@ -1811,7 +1812,7 @@ class _WalletSection extends ConsumerWidget {
                 );
                 return;
               }
-              showDialog(
+              showAnimatedDialog(
                 context: context,
                 builder: (_) => const _AddWalletDialog(),
               );
@@ -2434,7 +2435,7 @@ class _NotificationDetectionSectionState
   }
 
   void _showBankSelectionDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+    showAnimatedDialog(
       context: context,
       builder: (ctx) => const _BankSelectionDialog(),
     );

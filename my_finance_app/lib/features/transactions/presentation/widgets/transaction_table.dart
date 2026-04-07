@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
@@ -85,7 +86,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                 onEnter: (_) => setState(() => _hoveredId = tx.id),
                 onExit: (_) => setState(() => _hoveredId = null),
                 child: GestureDetector(
-                  onTap: () => showDialog(
+                  onTap: () => showAnimatedDialog(
                     context: context,
                     builder: (_) => AddTransactionDialog(transaction: tx),
                   ),
@@ -292,7 +293,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                                     size: 18, color: cs.onSurfaceVariant),
                                 onSelected: (value) {
                                   if (value == 'edit') {
-                                    showDialog(
+                                    showAnimatedDialog(
                                       context: context,
                                       builder: (_) =>
                                           AddTransactionDialog(transaction: tx),

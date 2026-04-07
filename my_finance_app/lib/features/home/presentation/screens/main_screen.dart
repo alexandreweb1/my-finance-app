@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/navigation_provider.dart';
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/services/app_update_service.dart';
 import '../../../../core/services/in_app_update_service.dart';
 import '../../../../core/services/local_notification_service.dart';
@@ -41,6 +42,22 @@ class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _listeningStarted = false;
+  double _tabOpacity = 1.0;
+  bool _tabAnimating = false;
+
+  Future<void> _changeTab(int newIndex) async {
+    if (newIndex == _currentIndex || _tabAnimating) return;
+    _tabAnimating = true;
+    setState(() => _tabOpacity = 0.0);
+    await Future<void>.delayed(const Duration(milliseconds: 130));
+    if (!mounted) { _tabAnimating = false; return; }
+    setState(() {
+      _currentIndex = newIndex;
+      _tabOpacity = 1.0;
+    });
+    ref.read(mainTabIndexProvider.notifier).state = newIndex;
+    _tabAnimating = false;
+  }
 
   static const _mobileScreens = [
     DashboardScreen(),
@@ -214,7 +231,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
     // Listen for external navigation (e.g. from dashboard cards)
     ref.listen<int>(mainTabIndexProvider, (_, next) {
-      if (next != _currentIndex) setState(() => _currentIndex = next);
+      if (next != _currentIndex) _changeTab(next);
     });
 
     // Open AddTransactionDialog when a notification suggestion is tapped
@@ -222,7 +239,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         (_, suggestion) {
       if (suggestion == null) return;
       ref.read(pendingSuggestionProvider.notifier).state = null;
-      showDialog<void>(
+      showAnimatedDialog<void>(
         context: context,
         builder: (_) => AddTransactionDialog(
           initialAmount: suggestion.amount,
@@ -241,15 +258,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 children: [
                   NavigationRail(
                     selectedIndex: _currentIndex,
-                    onDestinationSelected: (i) {
-                      setState(() => _currentIndex = i);
-                      ref.read(mainTabIndexProvider.notifier).state = i;
-                    },
+                    onDestinationSelected: _changeTab,
                     labelType: NavigationRailLabelType.all,
                     leading: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: FloatingActionButton(
-                        onPressed: () => showDialog(
+                        onPressed: () => showAnimatedDialog(
                           context: context,
                           builder: (_) => const AddTransactionDialog(),
                         ),
@@ -288,9 +302,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
                   ),
                   const VerticalDivider(width: 1, thickness: 1),
                   Expanded(
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: _webScreens,
+                    child: AnimatedOpacity(
+                      opacity: _tabOpacity,
+                      duration: const Duration(milliseconds: 130),
+                      curve: Curves.easeOut,
+                      child: IndexedStack(
+                        index: _currentIndex,
+                        children: _webScreens,
+                      ),
                     ),
                   ),
                 ],
@@ -307,9 +326,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
         children: [
           const UpdateBanner(),
           Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _mobileScreens,
+            child: AnimatedOpacity(
+              opacity: _tabOpacity,
+              duration: const Duration(milliseconds: 130),
+              curve: Curves.easeOut,
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _mobileScreens,
+              ),
             ),
           ),
         ],
@@ -339,10 +363,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               label: l10n.navHome,
               index: 0,
               currentIndex: _currentIndex,
-              onTap: (i) {
-                setState(() => _currentIndex = i);
-                ref.read(mainTabIndexProvider.notifier).state = i;
-              },
+              onTap: _changeTab,
             ),
             _NavItem(
               icon: Icons.receipt_long_outlined,
@@ -350,10 +371,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               label: l10n.navStatement,
               index: 1,
               currentIndex: _currentIndex,
-              onTap: (i) {
-                setState(() => _currentIndex = i);
-                ref.read(mainTabIndexProvider.notifier).state = i;
-              },
+              onTap: _changeTab,
             ),
             const SizedBox(width: 56),
             _NavItem(
@@ -362,10 +380,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               label: l10n.navPlanning,
               index: 2,
               currentIndex: _currentIndex,
-              onTap: (i) {
-                setState(() => _currentIndex = i);
-                ref.read(mainTabIndexProvider.notifier).state = i;
-              },
+              onTap: _changeTab,
             ),
             _NavItem(
               icon: Icons.bar_chart_outlined,
@@ -373,10 +388,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               label: l10n.navReports,
               index: 3,
               currentIndex: _currentIndex,
-              onTap: (i) {
-                setState(() => _currentIndex = i);
-                ref.read(mainTabIndexProvider.notifier).state = i;
-              },
+              onTap: _changeTab,
             ),
           ],
         ),
@@ -391,7 +403,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final int index;
   final int currentIndex;
-  final ValueChanged<int> onTap;
+  final Future<void> Function(int) onTap;
 
   const _NavItem({
     required this.icon,

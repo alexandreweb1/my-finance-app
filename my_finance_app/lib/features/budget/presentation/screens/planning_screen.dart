@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/selected_month_provider.dart';
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
@@ -65,14 +64,23 @@ class PlanningScreen extends ConsumerWidget {
                               itemCount: sortedSummaries.length + 2,
                               itemBuilder: (ctx, i) {
                                 if (i == 0) {
-                                  return _BudgetSummaryCard(
-                                      summaries: sortedSummaries);
+                                  return _AnimatedListItem(
+                                    index: 0,
+                                    child: _BudgetSummaryCard(
+                                        summaries: sortedSummaries),
+                                  );
                                 }
                                 if (i == sortedSummaries.length + 1) {
-                                  return _AddBudgetButton(month: selectedMonth);
+                                  return _AnimatedListItem(
+                                    index: i,
+                                    child: _AddBudgetButton(month: selectedMonth),
+                                  );
                                 }
-                                return _BudgetCard(
-                                    summary: sortedSummaries[i - 1]);
+                                return _AnimatedListItem(
+                                  index: i,
+                                  child: _BudgetCard(
+                                      summary: sortedSummaries[i - 1]),
+                                );
                               },
                             ),
                       loading: () =>
@@ -156,12 +164,12 @@ class _BudgetSummaryCard extends ConsumerWidget {
     final remaining = totalPlanned - totalSpent;
     final isOver = totalSpent > totalPlanned;
 
-    final progress =
-        totalPlanned > 0 ? (totalSpent / totalPlanned).clamp(0.0, 1.0) : 0.0;
-    final progressColor = _progressColor(progress);
+    final rawProgress = totalPlanned > 0 ? totalSpent / totalPlanned : 0.0;
+    final progress = rawProgress.clamp(0.0, 1.0);
+    final progressColor = _statusColor(progress, isOver);
 
     final cs = Theme.of(context).colorScheme;
-    final pct = (progress * 100).toStringAsFixed(0);
+    final pct = (rawProgress * 100).toStringAsFixed(0);
 
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -199,8 +207,9 @@ class _BudgetSummaryCard extends ConsumerWidget {
             Row(
               children: [
                 Expanded(
-                  child: _GradientProgressBar(
+                  child: _StatusProgressBar(
                     progress: progress,
+                    isOverBudget: isOver,
                     height: 12,
                   ),
                 ),
@@ -209,7 +218,7 @@ class _BudgetSummaryCard extends ConsumerWidget {
                   '$pct%',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: _progressColor(progress),
+                    color: progressColor,
                     fontSize: 13,
                   ),
                 ),
@@ -317,7 +326,7 @@ class _BudgetCard extends ConsumerWidget {
     final fmt = ref.watch(currencyFormatterProvider);
     final budget = summary.budget;
     final cs = Theme.of(context).colorScheme;
-    final pctColor = _progressColor(summary.progress);
+    final pctColor = _statusColor(summary.progress, summary.isOverBudget);
 
     // Try to find the category to get icon & color
     final categories = ref.watch(expenseCategoriesProvider);
@@ -384,7 +393,7 @@ class _BudgetCard extends ConsumerWidget {
                 IconButton(
                   icon: Icon(Icons.edit_outlined,
                       color: cs.primary, size: 20),
-                  onPressed: () => showDialog(
+                  onPressed: () => showAnimatedDialog(
                     context: context,
                     builder: (_) => _AddBudgetDialog(
                       month: budget.month,
@@ -407,9 +416,10 @@ class _BudgetCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 10),
-            // ── Gradient progress bar ──
-            _GradientProgressBar(
+            // ── Status progress bar ──
+            _StatusProgressBar(
               progress: summary.progress,
+              isOverBudget: summary.isOverBudget,
               height: 10,
             ),
             const SizedBox(height: 8),
@@ -496,7 +506,7 @@ class _EmptyBudgets extends ConsumerWidget {
     final dateLoc = ref.read(dateLocaleProvider);
     final currentMonthLabel = DateFormat('MMMM yyyy', dateLoc).format(month).capitalizeMonth();
 
-    final choice = await showDialog<String>(
+    final choice = await showAnimatedDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('${l10n.createBudgetsFor} $currentMonthLabel'),
@@ -537,7 +547,7 @@ class _EmptyBudgets extends ConsumerWidget {
     if (choice == null || !context.mounted) return;
 
     if (choice == 'manual') {
-      await showDialog(
+      await showAnimatedDialog(
         context: context,
         builder: (_) => _AddBudgetDialog(month: month),
       );
@@ -641,7 +651,7 @@ class _EmptyBudgets extends ConsumerWidget {
       (i) => DateFormat('MMMM', dateLoc).format(DateTime(2000, i + 1)).capitalizeMonth(),
     );
 
-    return showDialog<DateTime>(
+    return showAnimatedDialog<DateTime>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
@@ -749,7 +759,7 @@ class _AddBudgetDialogState extends ConsumerState<_AddBudgetDialog> {
   }
 
   Future<void> _delete() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAnimatedDialog<bool>(
       context: context,
       builder: (ctx) {
         final l10n = AppLocalizations.of(ctx);
@@ -990,39 +1000,70 @@ class _BudgetOptionTile extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gradient Progress Bar — green → yellow → red with animated fill
+// 3-Status Progress Bar — empty / green / red
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Returns a color that transitions green → yellow → red based on [progress] (0..1).
-Color _progressColor(double progress) {
-  if (progress <= 0.5) {
-    return Color.lerp(Colors.green.shade500, Colors.amber.shade600, progress * 2)!;
-  }
-  return Color.lerp(Colors.amber.shade600, Colors.red.shade600, (progress - 0.5) * 2)!;
+/// Returns the status color for a budget item.
+/// - Gray  → no spending yet
+/// - Green → within budget
+/// - Red   → over budget
+Color _statusColor(double progress, bool isOverBudget) {
+  if (progress <= 0.001) return Colors.grey.shade400;
+  if (isOverBudget) return Colors.red.shade600;
+  return Colors.green.shade500;
 }
 
-class _GradientProgressBar extends StatelessWidget {
-  final double progress; // 0.0 – 1.0 (clamped)
+/// 3-state animated progress bar.
+///
+/// - **Empty**  (progress ≈ 0): shows only the gray track.
+/// - **Green**  (progress > 0 and not over): green fill.
+/// - **Red**    (isOverBudget): red fill (clamped to 100% visually).
+class _StatusProgressBar extends StatelessWidget {
+  final double progress;    // 0.0–1.0 (clamped ratio)
+  final bool isOverBudget;
   final double height;
 
-  const _GradientProgressBar({required this.progress, this.height = 10});
+  const _StatusProgressBar({
+    required this.progress,
+    required this.isOverBudget,
+    this.height = 10,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final clamped = progress.clamp(0.0, 1.0);
+    final trackColor = cs.surfaceContainerHighest;
+    final radius = BorderRadius.circular(height / 2);
+
+    if (progress <= 0.001) {
+      return Container(
+        height: height,
+        decoration: BoxDecoration(color: trackColor, borderRadius: radius),
+      );
+    }
+
+    final fillColor =
+        isOverBudget ? Colors.red.shade600 : Colors.green.shade500;
 
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: clamped),
+      tween: Tween(begin: 0, end: progress),
       duration: const Duration(milliseconds: 700),
       curve: Curves.easeOutCubic,
       builder: (context, value, _) {
-        return CustomPaint(
-          size: Size(double.infinity, height),
-          painter: _GradientBarPainter(
-            progress: value,
-            trackColor: cs.surfaceContainerHighest,
-            borderRadius: height / 2,
+        return ClipRRect(
+          borderRadius: radius,
+          child: Stack(
+            children: [
+              Container(
+                height: height,
+                width: double.infinity,
+                color: trackColor,
+              ),
+              FractionallySizedBox(
+                widthFactor: value,
+                child: Container(height: height, color: fillColor),
+              ),
+            ],
           ),
         );
       },
@@ -1030,54 +1071,58 @@ class _GradientProgressBar extends StatelessWidget {
   }
 }
 
-class _GradientBarPainter extends CustomPainter {
-  final double progress;
-  final Color trackColor;
-  final double borderRadius;
+// ─────────────────────────────────────────────────────────────────────────────
+// Staggered list animation wrapper
+// ─────────────────────────────────────────────────────────────────────────────
 
-  _GradientBarPainter({
-    required this.progress,
-    required this.trackColor,
-    required this.borderRadius,
-  });
+class _AnimatedListItem extends StatefulWidget {
+  final Widget child;
+  final int index;
+
+  const _AnimatedListItem({required this.child, required this.index});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final trackRRect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(borderRadius),
+  State<_AnimatedListItem> createState() => _AnimatedListItemState();
+}
+
+class _AnimatedListItemState extends State<_AnimatedListItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
     );
-    canvas.drawRRect(trackRRect, Paint()..color = trackColor);
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
 
-    if (progress <= 0) return;
-
-    final fillWidth = math.max(size.height, size.width * progress);
-    final fillRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, fillWidth, size.height),
-      Radius.circular(borderRadius),
-    );
-
-    final gradient = LinearGradient(
-      colors: [
-        Colors.green.shade400,
-        Colors.amber.shade500,
-        Colors.red.shade500,
-      ],
-      stops: const [0.0, 0.55, 1.0],
-    );
-
-    final paint = Paint()
-      ..shader = gradient.createShader(Offset.zero & size);
-
-    canvas.save();
-    canvas.clipRRect(fillRect);
-    canvas.drawRect(Offset.zero & size, paint);
-    canvas.restore();
+    final delay = Duration(milliseconds: 55 * widget.index.clamp(0, 8));
+    Future.delayed(delay, () {
+      if (mounted) _ctrl.forward();
+    });
   }
 
   @override
-  bool shouldRepaint(_GradientBarPainter old) =>
-      old.progress != progress || old.trackColor != trackColor;
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1095,7 +1140,7 @@ class _AddBudgetButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: OutlinedButton.icon(
-        onPressed: () => showDialog(
+        onPressed: () => showAnimatedDialog(
           context: context,
           builder: (_) => _AddBudgetDialog(month: month),
         ),

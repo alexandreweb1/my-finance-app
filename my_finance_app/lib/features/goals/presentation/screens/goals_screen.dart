@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/animated_dialog.dart';
 import '../../../../features/subscription/presentation/providers/subscription_provider.dart';
 import '../../../../features/subscription/presentation/widgets/pro_gate_widget.dart';
 import '../providers/goals_provider.dart';
@@ -33,7 +34,7 @@ class GoalsScreen extends ConsumerWidget {
                 final goal = goals[i];
                 return GoalCard(
                   goal: goal,
-                  onEdit: () => showDialog(
+                  onEdit: () => showAnimatedDialog(
                     context: context,
                     builder: (_) => AddGoalDialog(goal: goal),
                   ),
@@ -69,7 +70,7 @@ class GoalsScreen extends ConsumerWidget {
       );
       return;
     }
-    showDialog(
+    showAnimatedDialog(
       context: context,
       builder: (_) => const AddGoalDialog(),
     );
@@ -77,7 +78,7 @@ class GoalsScreen extends ConsumerWidget {
 
   Future<void> _confirmDelete(
       BuildContext context, WidgetRef ref, String goalId) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAnimatedDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir meta'),
