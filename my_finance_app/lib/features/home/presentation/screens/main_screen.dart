@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/utils/animated_dialog.dart';
+import '../../../notification_backlog/presentation/providers/backlog_provider.dart';
 import '../../../../core/services/app_update_service.dart';
 import '../../../../core/services/in_app_update_service.dart';
 import '../../../../core/services/local_notification_service.dart';
@@ -136,6 +137,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
       // Check again in case user disabled while app was open
       if (!ref.read(notificationDetectionEnabledProvider)) return;
 
+      // ── Backlog: persist every received notification independently ──────────
+      // Fire-and-forget — does not affect the auto-save / notification flow.
+      ref.read(backlogNotifierProvider.notifier).addFromSuggestion(suggestion);
+
+      // ── Existing flow — unchanged ───────────────────────────────────────────
       final autoSave = ref.read(notificationAutoSaveProvider);
       if (autoSave) {
         // Auto-save: create a pending transaction immediately

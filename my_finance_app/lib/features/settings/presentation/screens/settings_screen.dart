@@ -20,6 +20,8 @@ import '../../../subscription/presentation/providers/subscription_provider.dart'
 import '../../../subscription/presentation/screens/pro_screen.dart';
 import '../../../subscription/presentation/widgets/pro_badge_widget.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
+import '../../../notification_backlog/presentation/providers/backlog_provider.dart';
+import '../../../notification_backlog/presentation/screens/backlog_screen.dart';
 import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 
@@ -2431,6 +2433,38 @@ class _NotificationDetectionSectionState
               ref.read(notificationAutoSaveProvider.notifier).setValue(v),
         ),
       ],
+
+      // ── Backlog tile — always visible ─────────────────────────────────────
+      const Divider(height: 1, indent: 56),
+      Consumer(
+        builder: (ctx, r, _) {
+          final count = r.watch(unimportedBacklogCountProvider);
+          return ListTile(
+            leading: const _IconBadge(
+              Icons.inbox_outlined,
+              color: Color(0xFF26C6DA),
+            ),
+            title: const Text('Histórico de notificações'),
+            subtitle: Text(
+              count > 0
+                  ? '$count ${count == 1 ? 'notificação pendente' : 'notificações pendentes'}'
+                  : 'Todas revisadas',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: count > 0
+                ? Badge(
+                    label: Text('$count'),
+                    child: const Icon(Icons.chevron_right, size: 20),
+                  )
+                : const Icon(Icons.chevron_right, size: 20),
+            onTap: () => Navigator.of(ctx).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const BacklogScreen(),
+              ),
+            ),
+          );
+        },
+      ),
     ]);
   }
 
