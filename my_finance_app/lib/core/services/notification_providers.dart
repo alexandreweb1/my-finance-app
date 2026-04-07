@@ -44,6 +44,8 @@ const kKnownBanks = <BankApp>[
   BankApp('br.com.daycoval.daymove', 'Daycoval'),
   BankApp('com.bancodigimais.app', 'Digio'),
   BankApp('br.com.ame', 'Ame Digital'),
+  BankApp('com.samsung.android.spay', 'Samsung Wallet / Samsung Pay'),
+  BankApp('com.google.android.apps.walletnfcrel', 'Google Wallet'),
 ];
 
 // ── Detection toggle ─────────────────────────────────────────────────────────

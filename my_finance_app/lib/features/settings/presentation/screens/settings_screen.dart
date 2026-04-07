@@ -1149,9 +1149,37 @@ class _CategorySection extends ConsumerWidget {
                       IconButton(
                         icon: Icon(Icons.delete_outline,
                             color: Colors.red.shade400, size: 20),
-                        onPressed: () => ref
-                            .read(categoriesNotifierProvider.notifier)
-                            .delete(cat.id),
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Excluir categoria'),
+                              content: Text(
+                                  'Deseja excluir a categoria "${cat.name}"?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                      backgroundColor: Theme.of(ctx)
+                                          .colorScheme
+                                          .error),
+                                  onPressed: () =>
+                                      Navigator.of(ctx).pop(true),
+                                  child: const Text('Excluir'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            ref
+                                .read(categoriesNotifierProvider.notifier)
+                                .delete(cat.id);
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -1776,9 +1804,34 @@ class _WalletSection extends ConsumerWidget {
                 IconButton(
                   icon: Icon(Icons.delete_outline,
                       color: Colors.red.shade400, size: 20),
-                  onPressed: () => ref
-                      .read(walletsNotifierProvider.notifier)
-                      .delete(w.id),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Excluir carteira'),
+                        content:
+                            Text('Deseja excluir a carteira "${w.name}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(ctx).colorScheme.error),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Excluir'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      ref
+                          .read(walletsNotifierProvider.notifier)
+                          .delete(w.id);
+                    }
+                  },
                 ),
               ],
             ],

@@ -211,8 +211,34 @@ class _BacklogItemCard extends ConsumerWidget {
               Row(
                 children: [
                   OutlinedButton(
-                    onPressed: () =>
-                        ref.read(backlogNotifierProvider.notifier).dismiss(item.id),
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Ignorar notificação'),
+                          content: const Text(
+                              'Deseja ignorar e remover esta notificação?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                  backgroundColor:
+                                      Theme.of(ctx).colorScheme.error),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Ignorar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        ref
+                            .read(backlogNotifierProvider.notifier)
+                            .dismiss(item.id);
+                      }
+                    },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       visualDensity: VisualDensity.compact,
@@ -247,8 +273,34 @@ class _BacklogItemCard extends ConsumerWidget {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () =>
-                        ref.read(backlogNotifierProvider.notifier).dismiss(item.id),
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Remover notificação'),
+                          content: const Text(
+                              'Deseja remover esta notificação do histórico?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                  backgroundColor:
+                                      Theme.of(ctx).colorScheme.error),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Remover'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        ref
+                            .read(backlogNotifierProvider.notifier)
+                            .dismiss(item.id);
+                      }
+                    },
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       visualDensity: VisualDensity.compact,

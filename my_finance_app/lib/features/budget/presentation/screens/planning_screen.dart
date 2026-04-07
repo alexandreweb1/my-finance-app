@@ -407,8 +407,32 @@ class _BudgetCard extends ConsumerWidget {
                 IconButton(
                   icon: Icon(Icons.delete_outline,
                       color: cs.error, size: 20),
-                  onPressed: () =>
-                      ref.read(budgetNotifierProvider.notifier).delete(budget.id),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Excluir orçamento'),
+                        content: Text(
+                            'Deseja excluir o orçamento de "${budget.categoryName}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(ctx).colorScheme.error),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Excluir'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      ref.read(budgetNotifierProvider.notifier).delete(budget.id);
+                    }
+                  },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   visualDensity: VisualDensity.compact,

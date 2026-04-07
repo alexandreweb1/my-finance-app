@@ -44,6 +44,30 @@ class TransactionListTile extends ConsumerWidget {
         child: Icon(Icons.delete_outline_rounded,
             color: Colors.red.shade400, size: 22),
       ),
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Excluir transação'),
+            content: Text(
+              'Deseja excluir "${transaction.title.isNotEmpty ? transaction.title : transaction.category}"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Excluir'),
+              ),
+            ],
+          ),
+        );
+      },
       onDismissed: (_) {
         ref
             .read(transactionsNotifierProvider.notifier)
