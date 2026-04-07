@@ -319,6 +319,28 @@ final statementAnnualExpenseProvider = Provider<double>((ref) {
       .fold(0.0, (sum, t) => sum + t.amount);
 });
 
+/// Expenses for the current calendar month (uses DateTime.now(), not the selected statement month).
+final currentCalendarMonthExpenseProvider = Provider<double>((ref) {
+  final transactions = ref.watch(visibleTransactionsProvider);
+  final now = DateTime.now();
+  return transactions
+      .where((t) =>
+          t.isExpense && t.date.year == now.year && t.date.month == now.month)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+/// Expenses for the previous calendar month (uses DateTime.now(), not the selected statement month).
+final previousCalendarMonthExpenseProvider = Provider<double>((ref) {
+  final transactions = ref.watch(visibleTransactionsProvider);
+  final now = DateTime.now();
+  final prevYear = now.month == 1 ? now.year - 1 : now.year;
+  final prevMonth = now.month == 1 ? 12 : now.month - 1;
+  return transactions
+      .where((t) =>
+          t.isExpense && t.date.year == prevYear && t.date.month == prevMonth)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
 /// All-time balance per wallet ID (key '' = transactions without wallet / "Geral").
 final walletBalancesProvider = Provider<Map<String, double>>((ref) {
   final transactions = ref.watch(visibleTransactionsProvider);

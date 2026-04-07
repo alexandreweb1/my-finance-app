@@ -344,6 +344,19 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       return;
     }
 
+    // Snapshot for smart monthly alert (only for new expenses in the current calendar month)
+    final now = DateTime.now();
+    final isCurrentMonthExpense = !_isEditing &&
+        _type == TransactionType.expense &&
+        _date.year == now.year &&
+        _date.month == now.month;
+    final prevMonthExpense = isCurrentMonthExpense
+        ? ref.read(previousCalendarMonthExpenseProvider)
+        : 0.0;
+    final curMonthExpense = isCurrentMonthExpense
+        ? ref.read(currentCalendarMonthExpenseProvider)
+        : 0.0;
+
     final notifier = ref.read(transactionsNotifierProvider.notifier);
     final bool success;
 
@@ -377,6 +390,37 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     if (!mounted) return;
     if (success) {
+      // Smart alert: notify when expenses exceed last month's total
+      if (isCurrentMonthExpense && prevMonthExpense > 0) {
+        final newTotal = curMonthExpense + amount;
+        if (newTotal > prevMonthExpense) {
+          final diff = newTotal - prevMonthExpense;
+          final justCrossed = curMonthExpense <= prevMonthExpense;
+          final message = justCrossed
+              ? 'Suas despesas ultrapassaram o mês passado em R\$ ${doubleToMoneyText(diff)}!'
+              : 'Atenção! R\$ ${doubleToMoneyText(diff)} acima das despesas do mês passado.';
+          final messenger = ScaffoldMessenger.of(context);
+          Navigator.of(context).pop();
+          messenger
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Colors.white, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(message)),
+                  ],
+                ),
+                backgroundColor: Colors.orange.shade800,
+                duration: const Duration(seconds: 5),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          return;
+        }
+      }
       Navigator.of(context).pop();
     } else {
       final errorMsg =
