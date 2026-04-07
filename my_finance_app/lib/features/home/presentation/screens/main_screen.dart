@@ -123,6 +123,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
       await showNotificationPermissionDialogIfNeeded(context);
     }
 
+    // Wait for the effective user id to be available before listening,
+    // so pending events aren't flushed into a void.
+    while (mounted && ref.read(effectiveUserIdProvider).isEmpty) {
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    if (!mounted) return;
+
     _startListening();
   }
 

@@ -85,6 +85,13 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // ── /notification_backlog/{docId} ────────────────────────────────────────
+    // Only the owning user can read/write their own backlog items.
+    match /notification_backlog/{docId} {
+      allow read, update, delete: if isSignedIn() && isOwnerOfExistingDoc();
+      allow create:               if isSignedIn() && isCreatingOwnDoc();
+    }
+
     // ── /invitations/{invitationId} ───────────────────────────────────────────
     // Master: can create, read, update and delete their own invitations.
     // Invitee: can read and update (accept/decline) invitations sent to their email.
