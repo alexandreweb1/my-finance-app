@@ -162,6 +162,22 @@ final statementMinAmountFilterProvider = StateProvider<double?>((ref) => null);
 /// Maximum transaction amount. Null = no maximum.
 final statementMaxAmountFilterProvider = StateProvider<double?>((ref) => null);
 
+/// Set of tags to show. Empty = all tags.
+final statementTagFilterProvider = StateProvider<Set<String>>(
+  (ref) => <String>{},
+);
+
+/// All unique tags across all transactions (for filter UI).
+final allTagsProvider = Provider<List<String>>((ref) {
+  final txs = ref.watch(visibleTransactionsProvider);
+  final tags = <String>{};
+  for (final t in txs) {
+    tags.addAll(t.tags);
+  }
+  final list = tags.toList()..sort();
+  return list;
+});
+
 /// Count of currently active filters.
 final statementActiveFilterCountProvider = Provider<int>((ref) {
   int n = 0;
@@ -170,6 +186,7 @@ final statementActiveFilterCountProvider = Provider<int>((ref) {
   if (ref.watch(statementWalletFilterProvider).isNotEmpty) n++;
   if (ref.watch(statementMinAmountFilterProvider) != null) n++;
   if (ref.watch(statementMaxAmountFilterProvider) != null) n++;
+  if (ref.watch(statementTagFilterProvider).isNotEmpty) n++;
   return n;
 });
 
@@ -193,6 +210,7 @@ final statementDisplayTransactionsProvider =
   final minAmount = ref.watch(statementMinAmountFilterProvider);
   final maxAmount = ref.watch(statementMaxAmountFilterProvider);
   final searchQuery = ref.watch(statementSearchQueryProvider);
+  final tagFilter = ref.watch(statementTagFilterProvider);
 
   List<TransactionEntity> txs;
   if (dateRange != null) {
@@ -227,6 +245,9 @@ final statementDisplayTransactionsProvider =
   if (searchQuery.isNotEmpty) {
     final q = searchQuery.toLowerCase();
     txs = txs.where((t) => t.title.toLowerCase().contains(q)).toList();
+  }
+  if (tagFilter.isNotEmpty) {
+    txs = txs.where((t) => t.tags.any((tag) => tagFilter.contains(tag))).toList();
   }
   return txs;
 });
@@ -334,6 +355,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
     String walletId = '',
     String? goalId,
     bool isPending = false,
+    List<String> tags = const [],
   }) async {
     state = const AsyncValue.loading();
     final transaction = TransactionEntity(
@@ -348,6 +370,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
       walletId: walletId,
       goalId: goalId,
       isPending: isPending,
+      tags: tags,
     );
     final result = await _addTransaction(
         AddTransactionParams(transaction: transaction));

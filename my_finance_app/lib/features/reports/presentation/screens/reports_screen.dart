@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../recurring/presentation/providers/recurring_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
@@ -36,7 +37,7 @@ class ReportsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
-  int _mainTab = 0; // 0=pie  1=line  2=bar
+  int _mainTab = 0; // 0=pie  1=line  2=bar  3=cashflow
   int _pieSubTab = 0; // 0=expense/cat  1=expense/wallet  2=income/cat
   int _lineSubTab = 1; // 0=semana  1=mês  2=ano
   int _barSubTab = 0; // 0=balanço mensal  1=fluxo anual  2=dia semana
@@ -107,6 +108,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       isSelected: _mainTab == 2,
                       onTap: () => setState(() => _mainTab = 2),
                     ),
+                    _IconTab(
+                      icon: Icons.waterfall_chart_rounded,
+                      label: 'Fluxo',
+                      isSelected: _mainTab == 3,
+                      onTap: () => setState(() => _mainTab = 3),
+                    ),
                   ],
                 ),
               ),
@@ -136,6 +143,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         return _buildLineTab(context, allTxs, fmt, dateLoc, cs);
       case 2:
         return _buildBarTab(context, allTxs, fmt, dateLoc, cs);
+      case 3:
+        return _buildCashFlowTab(context, allTxs, fmt, dateLoc, cs);
       default:
         return const SizedBox.shrink();
     }
@@ -576,6 +585,214 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         fmt: fmt,
       );
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CASH FLOW TAB
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildCashFlowTab(
+    BuildContext context,
+    List<TransactionEntity> allTxs,
+    String Function(double) fmt,
+    String dateLoc,
+    ColorScheme cs,
+  ) {
+    final selectedMonth = ref.watch(transactionsSelectedMonthProvider);
+    final isCurrentMonth = selectedMonth.year == DateTime.now().year &&
+        selectedMonth.month == DateTime.now().month;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildPeriodNav(
+          label: DateFormat('MMMM yyyy', dateLoc)
+              .format(selectedMonth)
+              .toUpperCase(),
+          onPrev: () => ref
+              .read(transactionsSelectedMonthProvider.notifier)
+              .state = DateTime(selectedMonth.year, selectedMonth.month - 1, 1),
+          onNext: isCurrentMonth
+              ? null
+              : () => ref
+                  .read(transactionsSelectedMonthProvider.notifier)
+                  .state =
+                  DateTime(selectedMonth.year, selectedMonth.month + 1, 1),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+          child: _buildCashFlowContent(
+              context, allTxs, fmt, dateLoc, selectedMonth, cs),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCashFlowContent(
+    BuildContext context,
+    List<TransactionEntity> allTxs,
+    String Function(double) fmt,
+    String dateLoc,
+    DateTime selectedMonth,
+    ColorScheme cs,
+  ) {
+    final now = DateTime.now();
+    final isCurrentMonth = selectedMonth.year == now.year &&
+        selectedMonth.month == now.month;
+    final daysInMonth =
+        DateUtils.getDaysInMonth(selectedMonth.year, selectedMonth.month);
+
+    // Saldo acumulado até o início do mês (histórico real)
+    final balanceBeforeMonth = allTxs
+        .where((t) =>
+            t.date.isBefore(DateTime(selectedMonth.year, selectedMonth.month, 1)))
+        .fold<double>(0, (s, t) => t.isIncome ? s + t.amount : s - t.amount);
+
+    // Pontos reais: saldo acumulado dia a dia dentro do mês
+    final int lastRealDay = isCurrentMonth ? now.day : daysInMonth;
+    final realPoints = <_CashFlowPoint>[];
+    double runningBalance = balanceBeforeMonth;
+    for (int d = 1; d <= lastRealDay; d++) {
+      for (final t in allTxs.where((t) =>
+          t.date.year == selectedMonth.year &&
+          t.date.month == selectedMonth.month &&
+          t.date.day == d)) {
+        runningBalance += t.isIncome ? t.amount : -t.amount;
+      }
+      final showLabel = (d == 1 || d % 7 == 0 || d == lastRealDay);
+      realPoints.add(_CashFlowPoint(
+        day: d,
+        balance: runningBalance,
+        label: showLabel ? '$d' : '',
+        isProjected: false,
+      ));
+    }
+
+    // Pontos projetados: usa recorrências ativas
+    final recurrences = ref.watch(activeRecurrencesProvider);
+    final projectedPoints = <_CashFlowPoint>[];
+    if (isCurrentMonth && lastRealDay < daysInMonth) {
+      double projBalance = runningBalance;
+      for (int d = lastRealDay + 1; d <= daysInMonth; d++) {
+        final dayDate = DateTime(selectedMonth.year, selectedMonth.month, d);
+        for (final r in recurrences) {
+          final next = r.nextOccurrence(afterDate: dayDate.subtract(const Duration(days: 1)));
+          if (next != null &&
+              next.year == dayDate.year &&
+              next.month == dayDate.month &&
+              next.day == dayDate.day) {
+            projBalance += r.isIncome ? r.amount : -r.amount;
+          }
+        }
+        final showLabel = (d % 7 == 0 || d == daysInMonth);
+        projectedPoints.add(_CashFlowPoint(
+          day: d,
+          balance: projBalance,
+          label: showLabel ? '$d' : '',
+          isProjected: true,
+        ));
+      }
+    }
+
+    final allPoints = [...realPoints, ...projectedPoints];
+    if (allPoints.isEmpty) {
+      return _emptyState(context, Icons.waterfall_chart_rounded);
+    }
+
+    // KPIs
+    final currentBalance = realPoints.isNotEmpty
+        ? realPoints.last.balance
+        : balanceBeforeMonth;
+    final projectedEnd = projectedPoints.isNotEmpty
+        ? projectedPoints.last.balance
+        : currentBalance;
+
+    final monthIncome = allTxs
+        .where((t) =>
+            t.isIncome &&
+            t.date.year == selectedMonth.year &&
+            t.date.month == selectedMonth.month)
+        .fold<double>(0, (s, t) => s + t.amount);
+    final monthExpense = allTxs
+        .where((t) =>
+            t.isExpense &&
+            t.date.year == selectedMonth.year &&
+            t.date.month == selectedMonth.month)
+        .fold<double>(0, (s, t) => s + t.amount);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── KPI cards ──
+        Row(
+          children: [
+            Expanded(
+              child: _CashFlowKpiCard(
+                icon: Icons.account_balance_wallet_outlined,
+                label: isCurrentMonth ? 'Saldo atual' : 'Saldo final',
+                value: fmt(currentBalance),
+                color: currentBalance >= 0
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFEF4444),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (isCurrentMonth && projectedPoints.isNotEmpty) ...[
+              Expanded(
+                child: _CashFlowKpiCard(
+                  icon: Icons.trending_up_rounded,
+                  label: 'Projetado fim mês',
+                  value: fmt(projectedEnd),
+                  color: projectedEnd >= 0
+                      ? const Color(0xFF6366F1)
+                      : const Color(0xFFEF4444),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: _CashFlowKpiCard(
+                icon: Icons.swap_vert_rounded,
+                label: 'Fluxo líquido',
+                value: fmt(monthIncome - monthExpense),
+                color: monthIncome >= monthExpense
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFEF4444),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // ── Gráfico ──
+        SizedBox(
+          height: 260,
+          child: _CashFlowChart(
+            points: allPoints,
+            fmt: fmt,
+          ),
+        ),
+        const SizedBox(height: 12),
+        // ── Legenda ──
+        Row(
+          children: [
+            const _LegendDot(color: Color(0xFF6366F1), label: 'Saldo real'),
+            const SizedBox(width: 16),
+            if (projectedPoints.isNotEmpty)
+              _LegendDot(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                  label: 'Projeção',
+                  dashed: true),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // ── Receita / Despesa do mês ──
+        _CashFlowIncomeExpenseRow(
+          income: monthIncome,
+          expense: monthExpense,
+          fmt: fmt,
+        ),
+      ],
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1375,4 +1592,428 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DonutPainter oldDelegate) =>
       oldDelegate.slices != slices;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cash Flow — Data & Widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CashFlowPoint {
+  final int day;
+  final double balance;
+  final String label;
+  final bool isProjected;
+
+  const _CashFlowPoint({
+    required this.day,
+    required this.balance,
+    required this.label,
+    required this.isProjected,
+  });
+}
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+
+class _CashFlowKpiCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _CashFlowKpiCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Income / Expense summary row ──────────────────────────────────────────────
+
+class _CashFlowIncomeExpenseRow extends StatelessWidget {
+  final double income;
+  final double expense;
+  final String Function(double) fmt;
+
+  const _CashFlowIncomeExpenseRow({
+    required this.income,
+    required this.expense,
+    required this.fmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _IncExpItem(
+              icon: Icons.arrow_downward_rounded,
+              label: 'Receitas',
+              value: fmt(income),
+              color: const Color(0xFF10B981),
+            ),
+          ),
+          Container(width: 1, height: 36, color: cs.outlineVariant),
+          Expanded(
+            child: _IncExpItem(
+              icon: Icons.arrow_upward_rounded,
+              label: 'Despesas',
+              value: fmt(expense),
+              color: const Color(0xFFEF4444),
+            ),
+          ),
+          Container(width: 1, height: 36, color: cs.outlineVariant),
+          Expanded(
+            child: _IncExpItem(
+              icon: Icons.account_balance_outlined,
+              label: 'Resultado',
+              value: fmt((income - expense).abs()),
+              color: income >= expense
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFFEF4444),
+              prefix: income >= expense ? '+' : '-',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IncExpItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final String prefix;
+
+  const _IncExpItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.prefix = '',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 3),
+        Text(label,
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+        const SizedBox(height: 2),
+        Text(
+          '$prefix$value',
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.bold, color: color),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+// ── Legend Dot ─────────────────────────────────────────────────────────────────
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  final bool dashed;
+
+  const _LegendDot({
+    required this.color,
+    required this.label,
+    this.dashed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CustomPaint(
+          size: const Size(24, 3),
+          painter: _LineSamplePainter(color: color, dashed: dashed),
+        ),
+        const SizedBox(width: 6),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+      ],
+    );
+  }
+}
+
+class _LineSamplePainter extends CustomPainter {
+  final Color color;
+  final bool dashed;
+
+  const _LineSamplePainter({required this.color, required this.dashed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    if (!dashed) {
+      canvas.drawLine(Offset(0, size.height / 2),
+          Offset(size.width, size.height / 2), paint);
+    } else {
+      double x = 0;
+      while (x < size.width) {
+        canvas.drawLine(Offset(x, size.height / 2),
+            Offset(math.min(x + 4, size.width), size.height / 2), paint);
+        x += 7;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LineSamplePainter old) =>
+      old.color != color || old.dashed != dashed;
+}
+
+// ── Cash Flow Chart ────────────────────────────────────────────────────────────
+
+class _CashFlowChart extends StatelessWidget {
+  final List<_CashFlowPoint> points;
+  final String Function(double) fmt;
+
+  const _CashFlowChart({required this.points, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return CustomPaint(
+      size: const Size(double.infinity, 260),
+      painter: _CashFlowPainter(
+        points: points,
+        labelColor: cs.onSurfaceVariant,
+        zeroLineColor: cs.outlineVariant,
+        fmt: fmt,
+      ),
+    );
+  }
+}
+
+class _CashFlowPainter extends CustomPainter {
+  final List<_CashFlowPoint> points;
+  final Color labelColor;
+  final Color zeroLineColor;
+  final String Function(double) fmt;
+
+  static const _lineColor = Color(0xFF6366F1);
+  static const _projColor = Color(0x666366F1);
+  static const _posAreaColor = Color(0x196366F1);
+  static const _negAreaColor = Color(0x19EF4444);
+
+  const _CashFlowPainter({
+    required this.points,
+    required this.labelColor,
+    required this.zeroLineColor,
+    required this.fmt,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+
+    const double topPad = 24;
+    const double bottomPad = 28;
+    const double leftPad = 56;
+    const double rightPad = 12;
+
+    final chartW = size.width - leftPad - rightPad;
+    final chartH = size.height - topPad - bottomPad;
+
+    final values = points.map((p) => p.balance).toList();
+    final minVal = values.reduce(math.min);
+    final maxVal = values.reduce(math.max);
+
+    final range = (maxVal - minVal).abs();
+    final pad = range == 0 ? 100.0 : range * 0.15;
+    final yMin = minVal - pad;
+    final yMax = maxVal + pad;
+    final yRange = yMax - yMin;
+
+    double toX(int i) =>
+        leftPad + (points.length == 1 ? chartW / 2 : (i / (points.length - 1)) * chartW);
+    double toY(double v) =>
+        topPad + chartH - ((v - yMin) / yRange) * chartH;
+
+    // Zero line
+    if (yMin < 0 && yMax > 0) {
+      final zy = toY(0);
+      canvas.drawLine(
+        Offset(leftPad, zy),
+        Offset(leftPad + chartW, zy),
+        Paint()
+          ..color = zeroLineColor
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke,
+      );
+    }
+
+    final realPts = points.where((p) => !p.isProjected).toList();
+    final projPts = points.where((p) => p.isProjected).toList();
+
+    List<Offset> toOffsets(List<_CashFlowPoint> pts) => pts
+        .map((p) => Offset(toX(points.indexOf(p)), toY(p.balance)))
+        .toList();
+
+    void drawAreaLine(List<Offset> offsets, Color lineColor, Color areaPos,
+        Color areaNeg) {
+      if (offsets.length < 2) return;
+
+      final posPath = Path()..moveTo(offsets.first.dx, toY(0));
+      for (final o in offsets) {
+        posPath.lineTo(o.dx, o.dy);
+      }
+      posPath.lineTo(offsets.last.dx, toY(math.max(0, yMin)));
+      posPath.close();
+
+      final negPath = Path()..moveTo(offsets.first.dx, toY(0));
+      for (final o in offsets) {
+        negPath.lineTo(o.dx, o.dy);
+      }
+      negPath.lineTo(offsets.last.dx, toY(math.min(0, yMax)));
+      negPath.close();
+
+      canvas.drawPath(posPath, Paint()..color = areaPos);
+      canvas.drawPath(negPath, Paint()..color = areaNeg);
+
+      final linePath = Path()..moveTo(offsets.first.dx, offsets.first.dy);
+      for (int i = 1; i < offsets.length; i++) {
+        linePath.lineTo(offsets[i].dx, offsets[i].dy);
+      }
+      canvas.drawPath(
+        linePath,
+        Paint()
+          ..color = lineColor
+          ..strokeWidth = 2.5
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+
+    drawAreaLine(toOffsets(realPts), _lineColor, _posAreaColor, _negAreaColor);
+
+    if (projPts.isNotEmpty) {
+      final joinOffsets = [
+        if (realPts.isNotEmpty) toOffsets(realPts).last,
+        ...toOffsets(projPts),
+      ];
+      drawAreaLine(
+        joinOffsets,
+        _projColor,
+        _posAreaColor.withValues(alpha: 0.06),
+        _negAreaColor.withValues(alpha: 0.06),
+      );
+    }
+
+    // Y-axis labels
+    final labelStyle = TextStyle(fontSize: 10, color: labelColor);
+    for (int i = 0; i <= 4; i++) {
+      final v = yMin + (yRange * i / 4);
+      final y = toY(v);
+      _drawText(canvas, _compact(v), Offset(0, y - 6), leftPad - 4,
+          labelStyle, TextAlign.right);
+    }
+
+    // X-axis labels
+    for (final p in points) {
+      if (p.label.isEmpty) continue;
+      final idx = points.indexOf(p);
+      _drawText(
+        canvas,
+        p.label,
+        Offset(toX(idx) - 12, topPad + chartH + 5),
+        24,
+        labelStyle,
+        TextAlign.center,
+      );
+    }
+
+    // Today dot
+    if (realPts.isNotEmpty) {
+      final last = toOffsets(realPts).last;
+      canvas.drawCircle(last, 5, Paint()..color = _lineColor);
+      canvas.drawCircle(last, 3, Paint()..color = Colors.white);
+    }
+  }
+
+  String _compact(double val) {
+    if (val.abs() >= 1000000) return '${(val / 1000000).toStringAsFixed(1)}M';
+    if (val.abs() >= 1000) return '${(val / 1000).toStringAsFixed(0)}K';
+    return val.toStringAsFixed(0);
+  }
+
+  void _drawText(Canvas canvas, String text, Offset offset, double maxWidth,
+      TextStyle style, TextAlign align) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textAlign: align,
+    )..layout(maxWidth: maxWidth);
+    tp.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(_CashFlowPainter old) => old.points != points;
 }

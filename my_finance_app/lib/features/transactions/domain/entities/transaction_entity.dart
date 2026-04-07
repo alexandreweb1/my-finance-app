@@ -18,6 +18,8 @@ class TransactionEntity extends Equatable {
   /// True when the transaction was auto-created from a notification and
   /// still needs the user to confirm/categorise it.
   final bool isPending;
+  /// Free-form tags for extra classification beyond categories.
+  final List<String> tags;
 
   const TransactionEntity({
     required this.id,
@@ -31,6 +33,7 @@ class TransactionEntity extends Equatable {
     this.walletId = '',
     this.goalId,
     this.isPending = false,
+    this.tags = const [],
   });
 
   bool get isIncome => type == TransactionType.income;
@@ -38,5 +41,5 @@ class TransactionEntity extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, userId, title, amount, type, category, date, description, walletId, goalId, isPending];
+      [id, userId, title, amount, type, category, date, description, walletId, goalId, isPending, tags];
 }

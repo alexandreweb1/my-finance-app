@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/selected_month_provider.dart';
+import '../../../../core/utils/category_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
@@ -155,8 +158,7 @@ class _BudgetSummaryCard extends ConsumerWidget {
 
     final progress =
         totalPlanned > 0 ? (totalSpent / totalPlanned).clamp(0.0, 1.0) : 0.0;
-    final progressColor =
-        isOver ? Colors.red.shade600 : Colors.green.shade600;
+    final progressColor = _progressColor(progress);
 
     final cs = Theme.of(context).colorScheme;
     final pct = (progress * 100).toStringAsFixed(0);
@@ -193,16 +195,13 @@ class _BudgetSummaryCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 14),
-            // ── Barra de progresso + % ──
+            // ── Barra de progresso gradiente + % ──
             Row(
               children: [
                 Expanded(
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: cs.surfaceContainerHighest,
-                    color: progressColor,
-                    minHeight: 10,
-                    borderRadius: BorderRadius.circular(6),
+                  child: _GradientProgressBar(
+                    progress: progress,
+                    height: 12,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -210,7 +209,7 @@ class _BudgetSummaryCard extends ConsumerWidget {
                   '$pct%',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: progressColor,
+                    color: _progressColor(progress),
                     fontSize: 13,
                   ),
                 ),
@@ -249,7 +248,7 @@ class _BudgetSummaryCard extends ConsumerWidget {
                           ? l10n.budgetExceeded
                           : l10n.budgetRemaining,
                       value: fmt(remaining.abs()),
-                      valueColor: isOver ? Colors.red.shade600 : Colors.green.shade600,
+                      valueColor: progressColor,
                     ),
                   ),
                 ],
@@ -317,37 +316,74 @@ class _BudgetCard extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final fmt = ref.watch(currencyFormatterProvider);
     final budget = summary.budget;
-    final colorScheme = Theme.of(context).colorScheme;
-    final progressColor = summary.isOverBudget
-        ? Colors.red.shade600
-        : Colors.green.shade600;
+    final cs = Theme.of(context).colorScheme;
+    final pctColor = _progressColor(summary.progress);
+
+    // Try to find the category to get icon & color
+    final categories = ref.watch(expenseCategoriesProvider);
+    final cat = categories.cast<CategoryEntity?>().firstWhere(
+          (c) => c!.id == budget.categoryId,
+          orElse: () => null,
+        );
+    final catIcon =
+        cat != null ? (kCategoryIconMap[cat.iconCodePoint] ?? Icons.category) : Icons.category;
+    final catColor = cat != null ? Color(cat.colorValue) : cs.primary;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header: icon + name + percentage + actions ──
             Row(
               children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: catColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(catIcon, size: 20, color: catColor),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    budget.categoryName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 17),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        budget.categoryName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${fmt(summary.spentAmount)} / ${fmt(budget.limitAmount)}',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant),
+                      ),
+                    ],
                   ),
                 ),
                 Text(
                   '${summary.percentage.toStringAsFixed(0)}%',
                   style: TextStyle(
-                    color: progressColor,
+                    color: pctColor,
                     fontWeight: FontWeight.bold,
+                    fontSize: 15,
                   ),
                 ),
+                const SizedBox(width: 4),
                 IconButton(
                   icon: Icon(Icons.edit_outlined,
-                      color: colorScheme.primary, size: 20),
+                      color: cs.primary, size: 20),
                   onPressed: () => showDialog(
                     context: context,
                     builder: (_) => _AddBudgetDialog(
@@ -357,48 +393,47 @@ class _BudgetCard extends ConsumerWidget {
                   ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
-                const SizedBox(width: 4),
                 IconButton(
                   icon: Icon(Icons.delete_outline,
-                      color: colorScheme.error, size: 20),
+                      color: cs.error, size: 20),
                   onPressed: () =>
                       ref.read(budgetNotifierProvider.notifier).delete(budget.id),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: summary.progress,
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
-              color: progressColor,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
+            const SizedBox(height: 10),
+            // ── Gradient progress bar ──
+            _GradientProgressBar(
+              progress: summary.progress,
+              height: 10,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            // ── Remaining label ──
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  '${l10n.spent}: ${fmt(summary.spentAmount)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                Icon(
+                  summary.isOverBudget
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline,
+                  size: 14,
+                  color: pctColor,
                 ),
+                const SizedBox(width: 4),
                 Text(
-                  '${l10n.budgetRemaining}: ${fmt(summary.remaining.abs())}',
+                  summary.isOverBudget
+                      ? '${l10n.budgetExceeded} ${fmt(summary.remaining.abs())}'
+                      : '${l10n.budgetRemaining}: ${fmt(summary.remaining)}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: summary.isOverBudget
-                        ? Colors.red.shade600
-                        : Colors.green.shade600,
+                    color: pctColor,
                     fontWeight: FontWeight.w600,
                   ),
-                ),
-                Text(
-                  '${l10n.limitLabel}: ${fmt(budget.limitAmount)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -948,6 +983,101 @@ class _BudgetOptionTile extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add-budget button rendered at the bottom of the budget list
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gradient Progress Bar — green → yellow → red with animated fill
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Returns a color that transitions green → yellow → red based on [progress] (0..1).
+Color _progressColor(double progress) {
+  if (progress <= 0.5) {
+    return Color.lerp(Colors.green.shade500, Colors.amber.shade600, progress * 2)!;
+  }
+  return Color.lerp(Colors.amber.shade600, Colors.red.shade600, (progress - 0.5) * 2)!;
+}
+
+class _GradientProgressBar extends StatelessWidget {
+  final double progress; // 0.0 – 1.0 (clamped)
+  final double height;
+
+  const _GradientProgressBar({required this.progress, this.height = 10});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final clamped = progress.clamp(0.0, 1.0);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: clamped),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return CustomPaint(
+          size: Size(double.infinity, height),
+          painter: _GradientBarPainter(
+            progress: value,
+            trackColor: cs.surfaceContainerHighest,
+            borderRadius: height / 2,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GradientBarPainter extends CustomPainter {
+  final double progress;
+  final Color trackColor;
+  final double borderRadius;
+
+  _GradientBarPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.borderRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final trackRRect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(borderRadius),
+    );
+    canvas.drawRRect(trackRRect, Paint()..color = trackColor);
+
+    if (progress <= 0) return;
+
+    final fillWidth = math.max(size.height, size.width * progress);
+    final fillRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, fillWidth, size.height),
+      Radius.circular(borderRadius),
+    );
+
+    final gradient = LinearGradient(
+      colors: [
+        Colors.green.shade400,
+        Colors.amber.shade500,
+        Colors.red.shade500,
+      ],
+      stops: const [0.0, 0.55, 1.0],
+    );
+
+    final paint = Paint()
+      ..shader = gradient.createShader(Offset.zero & size);
+
+    canvas.save();
+    canvas.clipRRect(fillRect);
+    canvas.drawRect(Offset.zero & size, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_GradientBarPainter old) =>
+      old.progress != progress || old.trackColor != trackColor;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

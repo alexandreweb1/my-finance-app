@@ -22,13 +22,28 @@ class TransactionsScreen extends ConsumerStatefulWidget {
   ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
-class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
+    with SingleTickerProviderStateMixin {
   bool _isSearching = false;
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
+  late final TabController _tabController;
+  int _selectedTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      setState(() => _selectedTab = _tabController.index);
+      if (_tabController.index != 0 && _isSearching) _closeSearch();
+    });
+  }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -74,192 +89,211 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       appBar: AppBar(
         title: Text(l10n.navStatement),
         centerTitle: false,
-        actions: [
-          IconButton(
-            tooltip: 'Pesquisar lançamento',
-            icon: Icon(
-              _isSearching ? Icons.search_off : Icons.search,
-              color: _isSearching ? cs.primary : null,
-            ),
-            onPressed: _isSearching ? _closeSearch : _openSearch,
-          ),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              PopupMenuButton<String>(
-                tooltip: l10n.moreOptions,
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'dateRange':
-                      _showDateRangePicker(context, ref);
-                    case 'annual':
-                      if (!isAnnual && !ref.read(isProProvider)) {
-                        showProGateBottomSheet(
-                          context,
-                          featureName: 'Visão Anual',
-                          featureDescription:
-                              'Analise todas as suas transações do ano de uma vez.',
-                          featureIcon: Icons.calendar_month_rounded,
-                        );
-                        return;
-                      }
-                      ref.read(statementIsAnnualProvider.notifier).state =
-                          !isAnnual;
-                    case 'filters':
-                      _showFilterSheet(context);
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  PopupMenuItem(
-                    value: 'dateRange',
-                    child: _MenuItemRow(
-                      icon: Icons.date_range_rounded,
-                      label: l10n.customPeriod,
-                      active: dateRange != null,
-                    ),
+        actions: _selectedTab == 0
+            ? [
+                IconButton(
+                  tooltip: 'Pesquisar lançamento',
+                  icon: Icon(
+                    _isSearching ? Icons.search_off : Icons.search,
+                    color: _isSearching ? cs.primary : null,
                   ),
-                  PopupMenuItem(
-                    value: 'annual',
-                    enabled: dateRange == null,
-                    child: _MenuItemRow(
-                      icon: isAnnual
-                          ? Icons.calendar_view_day_outlined
-                          : Icons.calendar_month_outlined,
-                      label: isAnnual ? l10n.monthlyView : l10n.annualView,
-                      disabled: dateRange != null,
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'filters',
-                    child: _MenuItemRow(
-                      icon: Icons.tune_rounded,
-                      label: l10n.filterTitle,
-                      active: hasFilters,
-                      badge: hasFilters ? '$activeFilterCount' : null,
-                    ),
-                  ),
-                ],
-              ),
-              if (hasFilters || dateRange != null)
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: IgnorePointer(
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: cs.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
+                  onPressed: _isSearching ? _closeSearch : _openSearch,
                 ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Search bar ─────────────────────────────────────────────────
-          if (_isSearching)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: TextField(
-                controller: _searchController,
-                focusNode: _searchFocus,
-                decoration: InputDecoration(
-                  hintText: 'Pesquisar por título...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            ref
-                                .read(statementSearchQueryProvider.notifier)
-                                .state = '';
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: cs.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  isDense: true,
-                ),
-                onChanged: (value) {
-                  ref.read(statementSearchQueryProvider.notifier).state = value;
-                },
-              ),
-            ),
-
-          // ── Period selector OR active date-range chip ───────────────────
-          if (dateRange != null)
-            _DateRangeBar(dateRange: dateRange, dateLoc: dateLoc)
-          else
-            _PeriodSelector(
-              label: periodLabel,
-              isAnnual: isAnnual,
-              month: selectedMonth,
-              dateLoc: dateLoc,
-              onPrev: () => ref
-                  .read(transactionsSelectedMonthProvider.notifier)
-                  .state = DateTime(
-                      selectedMonth.year, selectedMonth.month - 1, 1),
-              onNext: () => ref
-                  .read(transactionsSelectedMonthProvider.notifier)
-                  .state = DateTime(
-                      selectedMonth.year, selectedMonth.month + 1, 1),
-              onPickMonth: () => _showMonthPicker(context, ref, dateLoc),
-            ),
-
-          // ── Summary card (income/expense tappable to filter) ───────────
-          _SummaryCard(
-            balance: balance,
-            income: income,
-            expense: expense,
-            fmt: fmt,
-          ),
-
-          // ── Transaction list / table ───────────────────────────────────
-          Expanded(
-            child: txs.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.receipt_long_outlined,
-                            size: 56,
-                            color: Theme.of(context).colorScheme.outlineVariant),
-                        const SizedBox(height: 12),
-                        Text(
-                          l10n.noTransactions,
-                          style: TextStyle(color: Colors.grey.shade500),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PopupMenuButton<String>(
+                      tooltip: l10n.moreOptions,
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'dateRange':
+                            _showDateRangePicker(context, ref);
+                          case 'annual':
+                            if (!isAnnual && !ref.read(isProProvider)) {
+                              showProGateBottomSheet(
+                                context,
+                                featureName: 'Visão Anual',
+                                featureDescription:
+                                    'Analise todas as suas transações do ano de uma vez.',
+                                featureIcon: Icons.calendar_month_rounded,
+                              );
+                              return;
+                            }
+                            ref.read(statementIsAnnualProvider.notifier).state =
+                                !isAnnual;
+                          case 'filters':
+                            _showFilterSheet(context);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          value: 'dateRange',
+                          child: _MenuItemRow(
+                            icon: Icons.date_range_rounded,
+                            label: l10n.customPeriod,
+                            active: dateRange != null,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'annual',
+                          enabled: dateRange == null,
+                          child: _MenuItemRow(
+                            icon: isAnnual
+                                ? Icons.calendar_view_day_outlined
+                                : Icons.calendar_month_outlined,
+                            label: isAnnual ? l10n.monthlyView : l10n.annualView,
+                            disabled: dateRange != null,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'filters',
+                          child: _MenuItemRow(
+                            icon: Icons.tune_rounded,
+                            label: l10n.filterTitle,
+                            active: hasFilters,
+                            badge: hasFilters ? '$activeFilterCount' : null,
+                          ),
                         ),
                       ],
                     ),
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      // Telas largas (web / tablet ≥ 720px) → tabela
-                      if (constraints.maxWidth >= 720) {
-                        return TransactionTable(transactions: txs);
-                      }
-                      // Mobile → lista original
-                      return ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 80),
-                        itemCount: txs.length,
-                        itemBuilder: (ctx, i) =>
-                            TransactionListTile(transaction: txs[i]),
-                      );
+                    if (hasFilters || dateRange != null)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: IgnorePointer(
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ]
+            : null,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Extrato'),
+            Tab(text: 'Patrimônio'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ── Tab 0: Extrato ─────────────────────────────────────────────
+          Column(
+            children: [
+              // ── Search bar ─────────────────────────────────────────────
+              if (_isSearching)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    decoration: InputDecoration(
+                      hintText: 'Pesquisar por título...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                ref
+                                    .read(statementSearchQueryProvider.notifier)
+                                    .state = '';
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: cs.surfaceContainerHighest,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      isDense: true,
+                    ),
+                    onChanged: (value) {
+                      ref.read(statementSearchQueryProvider.notifier).state =
+                          value;
                     },
                   ),
+                ),
+
+              // ── Period selector OR active date-range chip ───────────────
+              if (dateRange != null)
+                _DateRangeBar(dateRange: dateRange, dateLoc: dateLoc)
+              else
+                _PeriodSelector(
+                  label: periodLabel,
+                  isAnnual: isAnnual,
+                  month: selectedMonth,
+                  dateLoc: dateLoc,
+                  onPrev: () => ref
+                      .read(transactionsSelectedMonthProvider.notifier)
+                      .state = DateTime(
+                          selectedMonth.year, selectedMonth.month - 1, 1),
+                  onNext: () => ref
+                      .read(transactionsSelectedMonthProvider.notifier)
+                      .state = DateTime(
+                          selectedMonth.year, selectedMonth.month + 1, 1),
+                  onPickMonth: () => _showMonthPicker(context, ref, dateLoc),
+                ),
+
+              // ── Summary card ────────────────────────────────────────────
+              _SummaryCard(
+                balance: balance,
+                income: income,
+                expense: expense,
+                fmt: fmt,
+              ),
+
+              // ── Transaction list / table ─────────────────────────────────
+              Expanded(
+                child: txs.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.receipt_long_outlined,
+                                size: 56,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant),
+                            const SizedBox(height: 12),
+                            Text(
+                              l10n.noTransactions,
+                              style: TextStyle(color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          if (constraints.maxWidth >= 720) {
+                            return TransactionTable(transactions: txs);
+                          }
+                          return ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 80),
+                            itemCount: txs.length,
+                            itemBuilder: (ctx, i) =>
+                                TransactionListTile(transaction: txs[i]),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
+
+          // ── Tab 1: Patrimônio ──────────────────────────────────────────
+          const _PatrimonioTab(),
         ],
       ),
     );
@@ -864,6 +898,166 @@ class _SummaryItem extends StatelessWidget {
   }
 }
 
+// ─── Patrimônio Tab ───────────────────────────────────────────────────────────
+class _PatrimonioTab extends ConsumerWidget {
+  const _PatrimonioTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fmt = ref.watch(currencyFormatterProvider);
+    final balances = ref.watch(walletBalancesProvider);
+    final walletsAsync = ref.watch(walletsStreamProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    final wallets = walletsAsync.value ?? [];
+
+    // Build list of (wallet, balance) pairs; include "Geral" if needed
+    final List<({String id, String name, int iconCodePoint, int colorValue, double balance})> entries = [];
+
+    for (final w in wallets) {
+      entries.add((
+        id: w.id,
+        name: w.name,
+        iconCodePoint: w.iconCodePoint,
+        colorValue: w.colorValue,
+        balance: balances[w.id] ?? 0.0,
+      ));
+    }
+
+    // Transactions without a wallet (walletId == '')
+    final geralBalance = balances[''] ?? 0.0;
+    if (geralBalance != 0.0 || wallets.isEmpty) {
+      entries.add((
+        id: '',
+        name: 'Geral',
+        iconCodePoint: Icons.account_balance_wallet_outlined.codePoint,
+        colorValue: cs.primary.toARGB32(),
+        balance: geralBalance,
+      ));
+    }
+
+    final totalPatrimonio = balances.values.fold(0.0, (a, b) => a + b);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      children: [
+        // ── Total card ───────────────────────────────────────────────────
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+            child: Column(
+              children: [
+                Text(
+                  'Patrimônio Total',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  fmt(totalPatrimonio),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: totalPatrimonio >= 0
+                            ? Colors.green.shade700
+                            : Colors.red.shade700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Saldo acumulado de todas as carteiras',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── Section title ────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Saldo por carteira',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+
+        // ── Wallet rows ──────────────────────────────────────────────────
+        if (walletsAsync.isLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (entries.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Text(
+                'Nenhuma carteira encontrada.',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ),
+          )
+        else
+          ...entries.map((e) => _WalletBalanceTile(entry: e, fmt: fmt)),
+      ],
+    );
+  }
+}
+
+class _WalletBalanceTile extends StatelessWidget {
+  final ({
+    String id,
+    String name,
+    int iconCodePoint,
+    int colorValue,
+    double balance
+  }) entry;
+  final String Function(double) fmt;
+
+  const _WalletBalanceTile({required this.entry, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = Color(entry.colorValue);
+    final isPositive = entry.balance >= 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.15),
+          child: Icon(
+            IconData(entry.iconCodePoint, fontFamily: 'MaterialIcons'),
+            color: color,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          entry.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          'Saldo final',
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+        ),
+        trailing: Text(
+          fmt(entry.balance),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
 class _FilterSheet extends ConsumerStatefulWidget {
   const _FilterSheet();
@@ -876,6 +1070,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   late TransactionType? _type;
   late Set<String> _categories;
   late Set<String> _wallets;
+  late Set<String> _selectedTags;
   final _minCtrl = TextEditingController();
   final _maxCtrl = TextEditingController();
 
@@ -885,6 +1080,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     _type = ref.read(statementTypeFilterProvider);
     _categories = Set.from(ref.read(statementCategoryFilterProvider));
     _wallets = Set.from(ref.read(statementWalletFilterProvider));
+    _selectedTags = Set.from(ref.read(statementTagFilterProvider));
     final min = ref.read(statementMinAmountFilterProvider);
     final max = ref.read(statementMaxAmountFilterProvider);
     if (min != null) _minCtrl.text = _fmt(min);
@@ -908,6 +1104,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
       _type != null ||
       _categories.isNotEmpty ||
       _wallets.isNotEmpty ||
+      _selectedTags.isNotEmpty ||
       _minCtrl.text.isNotEmpty ||
       _maxCtrl.text.isNotEmpty;
 
@@ -915,6 +1112,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     ref.read(statementTypeFilterProvider.notifier).state = _type;
     ref.read(statementCategoryFilterProvider.notifier).state = _categories;
     ref.read(statementWalletFilterProvider.notifier).state = _wallets;
+    ref.read(statementTagFilterProvider.notifier).state = _selectedTags;
     ref.read(statementMinAmountFilterProvider.notifier).state =
         _parse(_minCtrl.text);
     ref.read(statementMaxAmountFilterProvider.notifier).state =
@@ -927,6 +1125,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
       _type = null;
       _categories = <String>{};
       _wallets = <String>{};
+      _selectedTags = <String>{};
       _minCtrl.clear();
       _maxCtrl.clear();
     });
@@ -1035,6 +1234,27 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     ),
                   ),
                 ],
+
+                // ── Tags ──
+                Builder(builder: (ctx) {
+                  final availableTags = ref.watch(allTagsProvider);
+                  if (availableTags.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: _FilterSection(
+                      title: 'Tags',
+                      child: _MultiSelectDropdown(
+                        placeholder: 'Tags',
+                        options: availableTags
+                            .map((t) => _SelectOption(id: t, label: t))
+                            .toList(),
+                        selected: _selectedTags,
+                        onChanged: (v) => setState(() => _selectedTags = v),
+                        leadingIcon: Icons.label_outline_rounded,
+                      ),
+                    ),
+                  );
+                }),
 
                 // ── Faixa de valor ──
                 const SizedBox(height: 20),

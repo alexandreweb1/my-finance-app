@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/providers/dashboard_config_provider.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/user_avatar.dart';
@@ -18,8 +19,8 @@ import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../providers/dashboard_provider.dart';
+import '../widgets/dashboard_extra_cards.dart';
 import '../../../../core/providers/navigation_provider.dart';
-import 'main_screen.dart';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const _kNavy = Color(0xFF1A2B4A);
@@ -43,6 +44,7 @@ class DashboardScreen extends ConsumerWidget {
     final visibleTxs = ref.watch(visibleTransactionsProvider);
     final budgetSummaries = ref.watch(dashboardBudgetSummaryProvider);
     final selectedMonth = ref.watch(dashboardSelectedMonthProvider);
+    final config = ref.watch(dashboardConfigProvider);
 
     final l10n = AppLocalizations.of(context);
     final dateLoc = ref.watch(dateLocaleProvider);
@@ -53,10 +55,8 @@ class DashboardScreen extends ConsumerWidget {
     final monthLabel =
         DateFormat('MMM yyyy', dateLoc).format(selectedMonth).capitalizeMonth();
 
-    // Use theme-aware surface color so dark mode works correctly.
-    // _kLightBg is kept for the light-mode tinted background via
-    // a surfaceTint-aware overlay instead of a hardcoded constant.
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: isDark ? null : _kLightBg,
       body: ListView(
@@ -80,34 +80,58 @@ class DashboardScreen extends ConsumerWidget {
                 );
               }
             },
+            onCustomizeTap: () => _showCustomizeSheet(context),
           ),
 
           const SizedBox(height: 20),
 
-          _IncomeExpenseRow(income: income, expense: expense),
-
-          const SizedBox(height: 24),
-
-          if (budgetSummaries.isNotEmpty) ...[
-            _SectionHeader(
-              title: l10n.budgets,
-              subtitle: monthLabel,
-            ),
-            const SizedBox(height: 8),
-            _DashboardBudgetSummary(summaries: budgetSummaries),
-            const SizedBox(height: 24),
+          // ── Seções dinâmicas ordenadas pelo usuário ──
+          for (final section in config.visibleSections) ...[
+            if (section == DashboardSection.incomeExpense) ...[
+              _IncomeExpenseRow(income: income, expense: expense),
+              const SizedBox(height: 24),
+            ],
+            if (section == DashboardSection.budgets &&
+                budgetSummaries.isNotEmpty) ...[
+              _SectionHeader(title: l10n.budgets, subtitle: monthLabel),
+              const SizedBox(height: 8),
+              _DashboardBudgetSummary(summaries: budgetSummaries),
+              const SizedBox(height: 24),
+            ],
+            if (section == DashboardSection.wallets) ...[
+              const _SectionHeader(title: 'Saldo por carteira', subtitle: ''),
+              const SizedBox(height: 8),
+              const _WalletBalancesSection(),
+              const SizedBox(height: 24),
+            ],
+            if (section == DashboardSection.recentTransactions) ...[
+              const _SectionHeader(
+                  title: 'Últimas Transações', subtitle: ''),
+              const SizedBox(height: 8),
+              const DashboardRecentTransactions(),
+              const SizedBox(height: 24),
+            ],
+            if (section == DashboardSection.upcomingRecurring) ...[
+              const _SectionHeader(
+                  title: 'Próximas Recorrências', subtitle: ''),
+              const SizedBox(height: 8),
+              const DashboardUpcomingRecurring(),
+              const SizedBox(height: 24),
+            ],
           ],
 
-          const _SectionHeader(
-            title: 'Saldo por carteira',
-            subtitle: '',
-          ),
-          const SizedBox(height: 8),
-          const _WalletBalancesSection(),
-
-          const SizedBox(height: 100),
+          const SizedBox(height: 80),
         ],
       ),
+    );
+  }
+
+  void _showCustomizeSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _CustomizeDashboardSheet(),
     );
   }
 
@@ -135,6 +159,7 @@ class _DarkHeader extends ConsumerWidget {
   final String userInitials;
   final String? userPhotoUrl;
   final VoidCallback onSettingsTap;
+  final VoidCallback onCustomizeTap;
 
   const _DarkHeader({
     required this.name,
@@ -144,6 +169,7 @@ class _DarkHeader extends ConsumerWidget {
     required this.userInitials,
     this.userPhotoUrl,
     required this.onSettingsTap,
+    required this.onCustomizeTap,
   });
 
   @override
@@ -183,6 +209,18 @@ class _DarkHeader extends ConsumerWidget {
                     ),
                   ),
                 ),
+                GestureDetector(
+                  onTap: onCustomizeTap,
+                  child: Tooltip(
+                    message: 'Personalizar dashboard',
+                    child: Icon(
+                      Icons.tune_rounded,
+                      color: Colors.white.withValues(alpha: 0.75),
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 if (pendingInvites.isNotEmpty) ...[
                   _NotificationBell(count: pendingInvites.length),
                   const SizedBox(width: 8),
@@ -1234,5 +1272,190 @@ class _InvitationCardState extends ConsumerState<_InvitationCard> {
         ],
       ),
     );
+  }
+}
+
+// ─── Customize Dashboard Bottom Sheet ────────────────────────────────────────
+
+class _CustomizeDashboardSheet extends ConsumerStatefulWidget {
+  const _CustomizeDashboardSheet();
+
+  @override
+  ConsumerState<_CustomizeDashboardSheet> createState() =>
+      _CustomizeDashboardSheetState();
+}
+
+class _CustomizeDashboardSheetState
+    extends ConsumerState<_CustomizeDashboardSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final config = ref.watch(dashboardConfigProvider);
+    final notifier = ref.read(dashboardConfigProvider.notifier);
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: cs.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Icon(Icons.tune_rounded, color: cs.primary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Personalizar Dashboard',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    notifier.reset();
+                  },
+                  child: const Text('Resetar'),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Arraste para reordenar • Toque no olho para mostrar/ocultar',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Reorderable list
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            onReorder: (oldIndex, newIndex) =>
+                notifier.reorder(oldIndex, newIndex),
+            children: [
+              for (final section in config.order)
+                _SectionTile(
+                  key: ValueKey(section),
+                  section: section,
+                  isVisible: config.isVisible(section),
+                  onToggle: () => notifier.toggle(section),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Pronto'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTile extends StatelessWidget {
+  final DashboardSection section;
+  final bool isVisible;
+  final VoidCallback onToggle;
+
+  const _SectionTile({
+    super.key,
+    required this.section,
+    required this.isVisible,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListTile(
+      key: key,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+      leading: Icon(
+        _sectionIcon(section),
+        color: isVisible ? cs.primary : cs.onSurfaceVariant,
+        size: 22,
+      ),
+      title: Text(
+        section.label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: isVisible ? cs.onSurface : cs.onSurfaceVariant,
+        ),
+      ),
+      subtitle: Text(
+        section.description,
+        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: onToggle,
+            child: Icon(
+              isVisible
+                  ? Icons.visibility_rounded
+                  : Icons.visibility_off_rounded,
+              color: isVisible ? cs.primary : cs.onSurfaceVariant,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.drag_handle_rounded,
+              color: cs.onSurfaceVariant, size: 22),
+        ],
+      ),
+    );
+  }
+
+  IconData _sectionIcon(DashboardSection s) {
+    switch (s) {
+      case DashboardSection.incomeExpense:
+        return Icons.swap_vert_rounded;
+      case DashboardSection.budgets:
+        return Icons.pie_chart_outline_rounded;
+      case DashboardSection.wallets:
+        return Icons.account_balance_wallet_outlined;
+      case DashboardSection.recentTransactions:
+        return Icons.receipt_long_outlined;
+      case DashboardSection.upcomingRecurring:
+        return Icons.repeat_rounded;
+    }
   }
 }

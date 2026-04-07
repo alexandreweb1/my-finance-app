@@ -44,6 +44,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
+  final _tagController = TextEditingController();
 
   TransactionType _type = TransactionType.expense;
   String? _category;
@@ -51,6 +52,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   String? _suggestedCategory;
   String _walletId = '';
   String? _goalId;
+  List<String> _tags = [];
 
   bool get _isEditing => widget.transaction != null;
 
@@ -125,6 +127,15 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   void _dismissSuggestion() => setState(() => _suggestedCategory = null);
+
+  void _addTag() {
+    final tag = _tagController.text.trim();
+    if (tag.isEmpty || _tags.contains(tag)) return;
+    setState(() {
+      _tags.add(tag);
+      _tagController.clear();
+    });
+  }
 
   // --- New category dialog ---
 
@@ -255,6 +266,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       _date = t.date;
       _walletId = t.walletId;
       _goalId = t.goalId;
+      _tags = [...t.tags];
     }
     // Pre-fill from notification suggestion
     if (!_isEditing) {
@@ -272,6 +284,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -346,6 +359,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         description: widget.transaction!.description,
         walletId: _walletId,
         goalId: _type == TransactionType.income ? _goalId : null,
+        tags: _tags,
       );
       success = await notifier.update(updated);
     } else {
@@ -357,6 +371,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         date: _date,
         walletId: _walletId,
         goalId: _type == TransactionType.income ? _goalId : null,
+        tags: _tags,
       );
     }
 
@@ -721,6 +736,41 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       ),
                     ],
                     onChanged: (v) => setState(() => _goalId = v),
+                  ),
+                ],
+                // ── Tags (Pro) ──
+                if (ref.watch(isProProvider)) ...[
+                  const SizedBox(height: 12),
+                  // Existing tags chips
+                  if (_tags.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _tags.map((tag) => Chip(
+                          label: Text(tag, style: const TextStyle(fontSize: 12)),
+                          deleteIcon: const Icon(Icons.close, size: 14),
+                          onDeleted: () => setState(() => _tags.remove(tag)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        )).toList(),
+                      ),
+                    ),
+                  // Add tag input
+                  TextFormField(
+                    controller: _tagController,
+                    decoration: InputDecoration(
+                      labelText: 'Tags (opcional)',
+                      hintText: 'Digite e pressione Enter',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.label_outline_rounded, size: 20),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.add, size: 20),
+                        onPressed: _addTag,
+                      ),
+                    ),
+                    onFieldSubmitted: (_) => _addTag(),
                   ),
                 ],
                 if (_isEditing) ...[

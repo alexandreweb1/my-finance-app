@@ -185,6 +185,30 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                if (tx.tags.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 3),
+                                    child: Wrap(
+                                      spacing: 4,
+                                      runSpacing: 2,
+                                      children: tx.tags.map((tag) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: cs.primaryContainer.withValues(alpha: 0.5),
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: Text(
+                                          tag,
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                            color: cs.onPrimaryContainer,
+                                          ),
+                                        ),
+                                      )).toList(),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),

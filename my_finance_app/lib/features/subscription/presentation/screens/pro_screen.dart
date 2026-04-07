@@ -365,6 +365,12 @@ class _FeaturesCard extends StatelessWidget {
               title: 'Transações recorrentes',
               description:
                   'Cadastre despesas e receitas que se repetem automaticamente — aluguel, salário, assinaturas e mais.',
+            ),
+            const _FeatureRow(
+              icon: Icons.label_outline_rounded,
+              title: 'Tags / Etiquetas',
+              description:
+                  'Classifique transações com tags livres além da categoria — filtre e organize como quiser.',
               isLast: true,
             ),
           ],

@@ -9,6 +9,8 @@ import '../../../../core/services/in_app_update_service.dart';
 import '../../../../core/services/local_notification_service.dart';
 import '../../../../core/services/notification_listener_service.dart';
 import '../../../../core/services/notification_permission_dialog.dart';
+import '../../../../core/services/home_widget_service.dart';
+import '../providers/dashboard_provider.dart';
 import '../../../../core/services/notification_providers.dart';
 import '../../../../core/services/notification_suggestion.dart';
 import '../../../budget/presentation/screens/planning_screen.dart';
@@ -149,6 +151,51 @@ class _MainScreenState extends ConsumerState<MainScreen>
     ref.watch(walletsSeedProvider);
     ref.watch(iapInitProvider); // inicializa IAP e restaura compras ao logar
     ref.watch(recurringGeneratorProvider); // gera transações de recorrências pendentes
+
+    // Sync home screen widgets whenever financial data changes
+    if (!kIsWeb) {
+      final balance = ref.watch(balanceProvider);
+      final monthIncome = ref.watch(dashboardMonthIncomeProvider);
+      final monthExpense = ref.watch(dashboardMonthExpenseProvider);
+      final recentTxs = ref.watch(visibleTransactionsProvider);
+      final recurrences = ref.watch(activeRecurrencesProvider);
+      final now = DateTime.now();
+
+      final recent = ([...recentTxs]..sort((a, b) => b.date.compareTo(a.date)))
+          .take(5)
+          .map((t) => {
+                'title': t.title,
+                'amount': t.amount,
+                'isIncome': t.isIncome,
+                'date': t.date.toIso8601String(),
+              })
+          .toList();
+
+      final upcoming = <Map<String, dynamic>>[];
+      for (final r in recurrences) {
+        final next = r.nextOccurrence(
+            afterDate: now.subtract(const Duration(days: 1)));
+        if (next != null) {
+          upcoming.add({
+            'title': r.title,
+            'amount': r.amount,
+            'isIncome': r.isIncome,
+            'date': next.toIso8601String(),
+          });
+        }
+      }
+      upcoming.sort((a, b) =>
+          (a['date'] as String).compareTo(b['date'] as String));
+
+      HomeWidgetService.updateAll(
+        balance: balance,
+        monthIncome: monthIncome,
+        monthExpense: monthExpense,
+        monthLabel: '${now.month}/${now.year}',
+        recentTransactions: recent,
+        upcomingRecurring: upcoming.take(5).toList(),
+      );
+    }
     final l10n = AppLocalizations.of(context);
 
     // Opção 2 — Firestore update check: força atualização via Play Store se necessário
