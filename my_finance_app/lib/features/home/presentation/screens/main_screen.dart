@@ -28,6 +28,7 @@ import '../../../transactions/presentation/screens/transactions_screen.dart';
 import '../../../transactions/presentation/widgets/add_transaction_dialog.dart';
 import '../widgets/update_banner.dart';
 import 'dashboard_screen.dart';
+import '../../../../core/providers/effective_user_provider.dart';
 
 const _kGreen = Color(0xFF00D887);
 
