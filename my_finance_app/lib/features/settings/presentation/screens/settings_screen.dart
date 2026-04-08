@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
@@ -142,6 +143,30 @@ class _IconPickerGrid extends StatelessWidget {
 
 const _kBlue = Color(0xFF1E88E5);
 const _kDarkBlue = Color(0xFF0D47A1);
+
+class _AppVersionLabel extends StatelessWidget {
+  const _AppVersionLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        final info = snapshot.data!;
+        return Center(
+          child: Text(
+            'v${info.version}+${info.buildNumber}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 class _SettingsCard extends StatelessWidget {
   final List<Widget> children;
@@ -496,6 +521,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ]),
       ),
+      const SizedBox(height: 16),
+
+      // App version
+      const _AppVersionLabel(),
     ];
 
     if (kIsWeb) {
