@@ -21,28 +21,32 @@ class NotificationListenerBridge {
   ///
   /// Individual events that fail JSON parsing are skipped (not fatal).
   static Stream<NotificationSuggestion> get suggestionStream {
-    if (!_isAndroid) return const Stream.empty();
+    if (!_isAndroid) {
+      debugPrint('[NotifBridge] Not Android — returning empty stream');
+      return const Stream.empty();
+    }
 
-    _rawStream ??= _eventChannel
-        .receiveBroadcastStream()
-        .map((event) => event as String)
-        .asBroadcastStream();
+    if (_rawStream == null) {
+      debugPrint('[NotifBridge] Creating new EventChannel subscription');
+      _rawStream = _eventChannel
+          .receiveBroadcastStream()
+          .map((event) => event as String)
+          .asBroadcastStream();
+    }
 
     return _rawStream!.transform(
       StreamTransformer<String, NotificationSuggestion>.fromHandlers(
         handleData: (data, sink) {
           try {
+            debugPrint('[NotifBridge] Raw event received: $data');
             final map = jsonDecode(data) as Map<String, dynamic>;
             sink.add(NotificationSuggestion.fromJson(map));
           } catch (e) {
             debugPrint('[NotifBridge] Failed to parse event: $e');
-            // Skip this event — do NOT close the stream.
           }
         },
         handleError: (error, stackTrace, sink) {
           debugPrint('[NotifBridge] Stream error: $error');
-          // Forward the error so the listener can handle/retry,
-          // but don't break the transformer.
           sink.addError(error, stackTrace);
         },
       ),

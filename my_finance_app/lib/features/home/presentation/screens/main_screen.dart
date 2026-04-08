@@ -45,7 +45,6 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
-  bool _listeningStarted = false;
   double _tabOpacity = 1.0;
   bool _tabAnimating = false;
   StreamSubscription<NotificationSuggestion>? _notifSub;
@@ -97,10 +96,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // If the stream died while in background, restart it
-      if (_listeningStarted && _notifSub == null) {
-        debugPrint('[Notif] Stream was dead on resume — restarting');
+    if (state == AppLifecycleState.resumed && !kIsWeb) {
+      final enabled = ref.read(notificationDetectionEnabledProvider);
+      if (enabled && _notifSub == null) {
+        debugPrint('[Notif] Resuming — restarting stream');
         _startListening();
       }
     }
@@ -110,72 +109,85 @@ class _MainScreenState extends ConsumerState<MainScreen>
     await InAppUpdateService.instance.checkAndPrompt();
   }
 
+  // ── Notification pipeline ──────────────────────────────────────────────────
+
+  bool _notifInitDone = false;
+
   Future<void> _initNotificationFeature() async {
-    // Initialize local notifications and wire the tap handler
-    await LocalNotificationService.instance.init(
-      onSuggestionTap: (suggestion) {
-        if (mounted) {
-          ref.read(pendingSuggestionProvider.notifier).state = suggestion;
-        }
-      },
-    );
+    if (kIsWeb) return;
 
-    // Wait for the detection toggle to finish loading from SharedPreferences
-    await ref.read(notificationDetectionEnabledProvider.notifier).loaded;
+    // 1. Initialize local notification plugin (for showing suggestions)
+    try {
+      await LocalNotificationService.instance.init(
+        onSuggestionTap: (suggestion) {
+          if (mounted) {
+            ref.read(pendingSuggestionProvider.notifier).state = suggestion;
+          }
+        },
+      );
+      debugPrint('[Notif] Local notification service initialized');
+    } catch (e) {
+      debugPrint('[Notif] Local notification init failed: $e');
+    }
+
+    // 2. Wait for detection preference to load from disk
+    try {
+      await ref.read(notificationDetectionEnabledProvider.notifier).loaded;
+    } catch (e) {
+      debugPrint('[Notif] Failed to load detection pref: $e');
+    }
     if (!mounted) return;
 
+    _notifInitDone = true;
+
+    // 3. Start listening if detection is already enabled
+    _syncNotificationListening();
+
+    // 4. Show permission dialog if needed (non-blocking for the pipeline)
+    if (ref.read(notificationDetectionEnabledProvider)) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        await showNotificationPermissionDialogIfNeeded(context);
+      }
+    }
+  }
+
+  /// Starts or stops the notification stream based on the current toggle.
+  /// Called when: init completes, toggle changes, or app resumes.
+  void _syncNotificationListening() {
+    if (kIsWeb || !_notifInitDone) return;
     final enabled = ref.read(notificationDetectionEnabledProvider);
-    if (!enabled) return;
-
-    // Ask for Notification Access permission after a short delay
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      await showNotificationPermissionDialogIfNeeded(context);
+    debugPrint('[Notif] syncListening: enabled=$enabled, sub=${_notifSub != null}');
+    if (enabled && _notifSub == null) {
+      _startListening();
+    } else if (!enabled && _notifSub != null) {
+      _notifSub?.cancel();
+      _notifSub = null;
+      debugPrint('[Notif] Stopped listening (detection disabled)');
     }
-
-    // Wait for the effective user id to be available
-    while (mounted && ref.read(effectiveUserIdProvider).isEmpty) {
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-    if (!mounted) return;
-
-    _startListening();
   }
 
   void _startListening() {
-    // Cancel any previous subscription before creating a new one
     _notifSub?.cancel();
     _notifSub = null;
-    _listeningStarted = true;
+
+    debugPrint('[Notif] Starting stream subscription...');
 
     _notifSub = NotificationListenerBridge.suggestionStream.listen(
       (suggestion) {
         if (!mounted) return;
         if (!ref.read(notificationDetectionEnabledProvider)) return;
-
-        // Backlog: persist every received notification (fire-and-forget)
-        ref
-            .read(backlogNotifierProvider.notifier)
-            .addFromSuggestion(suggestion);
-
-        // Auto-save or show notification
-        final autoSave = ref.read(notificationAutoSaveProvider);
-        if (autoSave) {
-          _autoSaveTransaction(suggestion);
-        } else {
-          LocalNotificationService.instance.showSuggestion(suggestion);
-        }
+        _handleSuggestion(suggestion);
       },
       onError: (error) {
         debugPrint('[Notif] Stream error: $error — will retry in 3s');
         _notifSub?.cancel();
         _notifSub = null;
-        // Reset the cached stream so a fresh EventChannel subscription
-        // is created on retry, which also flushes buffered events.
         NotificationListenerBridge.resetStream();
         if (mounted) {
           Future.delayed(const Duration(seconds: 3), () {
-            if (mounted && _notifSub == null) {
+            if (mounted && _notifSub == null &&
+                ref.read(notificationDetectionEnabledProvider)) {
               debugPrint('[Notif] Retrying stream subscription...');
               _startListening();
             }
@@ -188,7 +200,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
         NotificationListenerBridge.resetStream();
         if (mounted) {
           Future.delayed(const Duration(seconds: 3), () {
-            if (mounted && _notifSub == null) {
+            if (mounted && _notifSub == null &&
+                ref.read(notificationDetectionEnabledProvider)) {
               debugPrint('[Notif] Retrying stream subscription...');
               _startListening();
             }
@@ -200,19 +213,45 @@ class _MainScreenState extends ConsumerState<MainScreen>
     debugPrint('[Notif] Listening started');
   }
 
+  void _handleSuggestion(NotificationSuggestion suggestion) {
+    debugPrint('[Notif] Received: amount=${suggestion.amount}, '
+        'type=${suggestion.type?.name}, source=${suggestion.sourceApp}');
+
+    // Backlog: persist (fire-and-forget, needs userId)
+    final userId = ref.read(effectiveUserIdProvider);
+    if (userId.isNotEmpty) {
+      ref.read(backlogNotifierProvider.notifier).addFromSuggestion(suggestion);
+    } else {
+      debugPrint('[Notif] Skipping backlog — userId not available yet');
+    }
+
+    // Always show a local notification so the user can tap to launch
+    LocalNotificationService.instance.showSuggestion(suggestion);
+
+    // Auto-save as pending transaction if enabled (needs userId)
+    if (ref.read(notificationAutoSaveProvider) && userId.isNotEmpty) {
+      _autoSaveTransaction(suggestion);
+    }
+  }
+
   Future<void> _autoSaveTransaction(NotificationSuggestion suggestion) async {
-    final type = suggestion.type ?? TransactionType.expense;
-    await ref.read(transactionsNotifierProvider.notifier).add(
-      title: suggestion.rawText.length > 60
-          ? suggestion.rawText.substring(0, 60)
-          : suggestion.rawText,
-      amount: suggestion.amount,
-      type: type,
-      category: 'A categorizar',
-      date: DateTime.now(),
-      description: 'Via ${suggestion.sourceApp}',
-      isPending: true,
-    );
+    try {
+      final type = suggestion.type ?? TransactionType.expense;
+      await ref.read(transactionsNotifierProvider.notifier).add(
+        title: suggestion.rawText.length > 60
+            ? suggestion.rawText.substring(0, 60)
+            : suggestion.rawText,
+        amount: suggestion.amount,
+        type: type,
+        category: 'A categorizar',
+        date: DateTime.now(),
+        description: 'Via ${suggestion.sourceApp}',
+        isPending: true,
+      );
+      debugPrint('[Notif] Auto-saved transaction: ${suggestion.amount}');
+    } catch (e) {
+      debugPrint('[Notif] Auto-save failed: $e');
+    }
   }
 
   @override
@@ -221,6 +260,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
     ref.watch(walletsSeedProvider);
     ref.watch(iapInitProvider); // inicializa IAP e restaura compras ao logar
     ref.watch(recurringGeneratorProvider); // gera transações de recorrências pendentes
+
+    // React to detection toggle changes (start/stop listener dynamically)
+    ref.listen<bool>(notificationDetectionEnabledProvider, (_, next) {
+      _syncNotificationListening();
+      if (next && !kIsWeb) {
+        showNotificationPermissionDialogIfNeeded(context);
+      }
+    });
 
     // Sync home screen widgets whenever financial data changes
     if (!kIsWeb) {
