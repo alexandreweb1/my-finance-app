@@ -19,6 +19,28 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Capture suggestion from intent if launched via notification tap
+        consumeSuggestionFromIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // App was already running — notification tapped while in foreground/background
+        consumeSuggestionFromIntent(intent)
+    }
+
+    /**
+     * Extracts the suggestion JSON from the intent extras and stores it
+     * so Flutter can retrieve it via MethodChannel.
+     */
+    private fun consumeSuggestionFromIntent(intent: Intent?) {
+        val json = intent?.getStringExtra(NotificationMonitorService.EXTRA_SUGGESTION_JSON)
+        if (json != null) {
+            Log.d(TAG, "Consumed suggestion from intent: $json")
+            pendingSuggestionJson = json
+            // Clear from intent so it's not re-consumed on config change
+            intent.removeExtra(NotificationMonitorService.EXTRA_SUGGESTION_JSON)
+        }
     }
 
     companion object {
@@ -28,6 +50,11 @@ class MainActivity : FlutterActivity() {
         /// @Volatile ensures visibility across threads (service vs activity).
         @Volatile
         var notificationEventSink: EventChannel.EventSink? = null
+
+        /// Suggestion JSON set when the user taps a native notification.
+        /// Consumed once by Flutter via MethodChannel.
+        @Volatile
+        var pendingSuggestionJson: String? = null
     }
 
     private val permissionChannel = "com.alexdev.myfinanceapp/notification_permission"
@@ -58,7 +85,7 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
-        // MethodChannel: permission helpers + bank filter
+        // MethodChannel: permission helpers + intent suggestion consumption
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, permissionChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -66,6 +93,12 @@ class MainActivity : FlutterActivity() {
                     "openPermissionSettings" -> {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         result.success(null)
+                    }
+                    "consumeIntentSuggestion" -> {
+                        val json = pendingSuggestionJson
+                        pendingSuggestionJson = null
+                        Log.d(TAG, "consumeIntentSuggestion: ${json ?: "null"}")
+                        result.success(json)
                     }
                     else -> result.notImplemented()
                 }

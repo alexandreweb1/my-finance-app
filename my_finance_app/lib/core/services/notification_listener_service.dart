@@ -76,6 +76,24 @@ class NotificationListenerBridge {
     } catch (_) {}
   }
 
+  /// Consumes a suggestion that was stored in the Android intent when the
+  /// user tapped a native notification (app may have been closed at the time).
+  /// Returns null if there is nothing pending.
+  static Future<NotificationSuggestion?> consumeIntentSuggestion() async {
+    if (!_isAndroid) return null;
+    try {
+      final json =
+          await _methodChannel.invokeMethod<String>('consumeIntentSuggestion');
+      if (json == null) return null;
+      debugPrint('[NotifBridge] Intent suggestion consumed: $json');
+      final map = jsonDecode(json) as Map<String, dynamic>;
+      return NotificationSuggestion.fromJson(map);
+    } catch (e) {
+      debugPrint('[NotifBridge] consumeIntentSuggestion error: $e');
+      return null;
+    }
+  }
+
   static bool get _isAndroid =>
       defaultTargetPlatform == TargetPlatform.android;
 }

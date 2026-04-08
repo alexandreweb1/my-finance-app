@@ -10,7 +10,6 @@ import '../../../../core/utils/animated_dialog.dart';
 import '../../../notification_backlog/presentation/providers/backlog_provider.dart';
 import '../../../../core/services/app_update_service.dart';
 import '../../../../core/services/in_app_update_service.dart';
-import '../../../../core/services/local_notification_service.dart';
 import '../../../../core/services/notification_listener_service.dart';
 import '../../../../core/services/notification_permission_dialog.dart';
 import '../../../../core/services/home_widget_service.dart';
@@ -102,6 +101,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
         debugPrint('[Notif] Resuming — restarting stream');
         _startListening();
       }
+      // Check if the user tapped a native notification while app was in background
+      _checkIntentSuggestion();
     }
   }
 
@@ -116,21 +117,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   Future<void> _initNotificationFeature() async {
     if (kIsWeb) return;
 
-    // 1. Initialize local notification plugin (for showing suggestions)
-    try {
-      await LocalNotificationService.instance.init(
-        onSuggestionTap: (suggestion) {
-          if (mounted) {
-            ref.read(pendingSuggestionProvider.notifier).state = suggestion;
-          }
-        },
-      );
-      debugPrint('[Notif] Local notification service initialized');
-    } catch (e) {
-      debugPrint('[Notif] Local notification init failed: $e');
-    }
-
-    // 2. Wait for detection preference to load from disk
+    // 1. Wait for detection preference to load from disk
     try {
       await ref.read(notificationDetectionEnabledProvider.notifier).loaded;
     } catch (e) {
@@ -140,8 +127,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
     _notifInitDone = true;
 
-    // 3. Start listening if detection is already enabled
+    // 2. Start listening if detection is already enabled
     _syncNotificationListening();
+
+    // 3. Check if the app was opened via a native notification tap
+    await _checkIntentSuggestion();
 
     // 4. Show permission dialog if needed (non-blocking for the pipeline)
     if (ref.read(notificationDetectionEnabledProvider)) {
@@ -149,6 +139,21 @@ class _MainScreenState extends ConsumerState<MainScreen>
       if (mounted) {
         await showNotificationPermissionDialogIfNeeded(context);
       }
+    }
+  }
+
+  /// Checks if the app was opened/resumed via a native notification tap
+  /// and opens the AddTransactionDialog with pre-filled data.
+  Future<void> _checkIntentSuggestion() async {
+    try {
+      final suggestion =
+          await NotificationListenerBridge.consumeIntentSuggestion();
+      if (suggestion != null && mounted) {
+        debugPrint('[Notif] Opening dialog from intent suggestion');
+        ref.read(pendingSuggestionProvider.notifier).state = suggestion;
+      }
+    } catch (e) {
+      debugPrint('[Notif] checkIntentSuggestion error: $e');
     }
   }
 
@@ -225,8 +230,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
       debugPrint('[Notif] Skipping backlog — userId not available yet');
     }
 
-    // Always show a local notification so the user can tap to launch
-    LocalNotificationService.instance.showSuggestion(suggestion);
+    // Native Android notification is already shown by NotificationMonitorService
+    // (works even when app is closed). No need for flutter_local_notifications here.
 
     // Auto-save as pending transaction if enabled (needs userId)
     if (ref.read(notificationAutoSaveProvider) && userId.isNotEmpty) {
