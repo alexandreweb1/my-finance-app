@@ -67,12 +67,6 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         result.success(null)
                     }
-                    "setAllowedPackages" -> {
-                        val packages = call.argument<List<String>>("packages") ?: emptyList()
-                        NotificationMonitorService.saveAllowedPackages(applicationContext, packages)
-                        Log.d(TAG, "setAllowedPackages: ${packages.size} packages")
-                        result.success(null)
-                    }
                     else -> result.notImplemented()
                 }
             }

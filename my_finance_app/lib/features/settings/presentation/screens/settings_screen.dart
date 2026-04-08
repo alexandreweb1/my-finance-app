@@ -2401,7 +2401,6 @@ class _NotificationDetectionSectionState
   Widget build(BuildContext context) {
     final enabled = ref.watch(notificationDetectionEnabledProvider);
     final autoSave = ref.watch(notificationAutoSaveProvider);
-    final allowedBanks = ref.watch(allowedBanksProvider);
     final cs = Theme.of(context).colorScheme;
 
     return _SettingsCard(children: [
@@ -2455,21 +2454,6 @@ class _NotificationDetectionSectionState
                 },
         ),
         const Divider(height: 1, indent: 56),
-        // ── Bank selection ──
-        ListTile(
-          leading: const _IconBadge(
-            Icons.account_balance_outlined,
-            color: Color(0xFF7E57C2),
-          ),
-          title: const Text('Bancos monitorados'),
-          subtitle: Text(
-            '${allowedBanks.length} de ${kKnownBanks.length} bancos selecionados',
-            style: const TextStyle(fontSize: 12),
-          ),
-          trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
-          onTap: () => _showBankSelectionDialog(context, ref),
-        ),
-        const Divider(height: 1, indent: 56),
         // ── Auto-save toggle ──
         SwitchListTile(
           secondary: const _IconBadge(
@@ -2521,100 +2505,6 @@ class _NotificationDetectionSectionState
     ]);
   }
 
-  void _showBankSelectionDialog(BuildContext context, WidgetRef ref) {
-    showAnimatedDialog(
-      context: context,
-      builder: (ctx) => const _BankSelectionDialog(),
-    );
-  }
-}
-
-// ── Bank selection dialog ───────────────────────────────────────────────────
-
-class _BankSelectionDialog extends ConsumerWidget {
-  const _BankSelectionDialog();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final allowed = ref.watch(allowedBanksProvider);
-    final cs = Theme.of(context).colorScheme;
-    final allSelected = allowed.length == kKnownBanks.length;
-
-    return AlertDialog(
-      title: const Text('Bancos monitorados'),
-      content: SizedBox(
-        width: 480,
-        height: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Select all / none
-            Row(
-              children: [
-                TextButton.icon(
-                  onPressed: () => ref
-                      .read(allowedBanksProvider.notifier)
-                      .setAll(!allSelected),
-                  icon: Icon(
-                    allSelected
-                        ? Icons.deselect
-                        : Icons.select_all,
-                    size: 18,
-                  ),
-                  label: Text(allSelected
-                      ? 'Desmarcar todos'
-                      : 'Selecionar todos'),
-                ),
-                const Spacer(),
-                Text(
-                  '${allowed.length}/${kKnownBanks.length}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(),
-            // Bank list
-            Expanded(
-              child: ListView.builder(
-                itemCount: kKnownBanks.length,
-                itemBuilder: (ctx, i) {
-                  final bank = kKnownBanks[i];
-                  final isChecked = allowed.contains(bank.packageName);
-                  return CheckboxListTile(
-                    value: isChecked,
-                    title: Text(
-                      bank.displayName,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    subtitle: Text(
-                      bank.packageName,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    dense: true,
-                    onChanged: (_) => ref
-                        .read(allowedBanksProvider.notifier)
-                        .toggle(bank.packageName),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Feito'),
-        ),
-      ],
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

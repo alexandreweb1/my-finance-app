@@ -98,11 +98,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Re-sync banks on resume
-      if (_listeningStarted) {
-        final allowedBanks = ref.read(allowedBanksProvider);
-        NotificationListenerBridge.setAllowedPackages(allowedBanks.toList());
-      }
       // If the stream died while in background, restart it
       if (_listeningStarted && _notifSub == null) {
         debugPrint('[Notif] Stream was dead on resume — restarting');
@@ -152,10 +147,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
     _notifSub?.cancel();
     _notifSub = null;
     _listeningStarted = true;
-
-    // Sync allowed bank packages to native service
-    final allowedBanks = ref.read(allowedBanksProvider);
-    NotificationListenerBridge.setAllowedPackages(allowedBanks.toList());
 
     _notifSub = NotificationListenerBridge.suggestionStream.listen(
       (suggestion) {
@@ -284,11 +275,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
           InAppUpdateService.instance.checkAndPrompt(forceImmediate: true);
         }
       });
-    });
-
-    // Sync allowed banks to native service whenever they change
-    ref.listen<Set<String>>(allowedBanksProvider, (_, next) {
-      NotificationListenerBridge.setAllowedPackages(next.toList());
     });
 
     // Listen for external navigation (e.g. from dashboard cards)

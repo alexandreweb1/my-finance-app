@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/services/notification_providers.dart';
 import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
@@ -396,12 +395,8 @@ class _EmptyState extends StatelessWidget {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-/// Returns the user-friendly display name for a bank package name.
+/// Returns a user-friendly display name for a package name.
 String _bankDisplayName(String packageName) {
-  for (final bank in kKnownBanks) {
-    if (packageName.startsWith(bank.packageName)) return bank.displayName;
-  }
-  // Fallback: prettify the package name.
   final parts = packageName.split('.');
   return parts.isNotEmpty ? parts.last : packageName;
 }
