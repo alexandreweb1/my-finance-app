@@ -25,6 +25,8 @@ class MainActivity : FlutterActivity() {
         private const val TAG = "MainActivity"
 
         /// Static sink: NotificationMonitorService posts events here directly.
+        /// @Volatile ensures visibility across threads (service vs activity).
+        @Volatile
         var notificationEventSink: EventChannel.EventSink? = null
     }
 

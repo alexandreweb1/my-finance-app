@@ -59,8 +59,13 @@ final notificationDetectionEnabledProvider =
 
 class _NotificationDetectionNotifier extends StateNotifier<bool> {
   _NotificationDetectionNotifier() : super(true) {
-    _load();
+    _loaded = _load();
   }
+
+  late final Future<void> _loaded;
+
+  /// Completes when the initial value has been read from disk.
+  Future<void> get loaded => _loaded;
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
