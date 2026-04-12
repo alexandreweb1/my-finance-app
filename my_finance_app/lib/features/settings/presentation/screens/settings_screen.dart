@@ -22,7 +22,9 @@ import '../../../subscription/presentation/screens/pro_screen.dart';
 import '../../../subscription/presentation/widgets/pro_badge_widget.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../notification_backlog/presentation/providers/backlog_provider.dart';
+import '../../../../core/services/bank_filter_provider.dart';
 import '../../../notification_backlog/presentation/screens/backlog_screen.dart';
+import 'bank_filter_screen.dart';
 import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 
@@ -2481,6 +2483,33 @@ class _NotificationDetectionSectionState
               : () async {
                   await NotificationListenerBridge.openPermissionSettings();
                 },
+        ),
+        const Divider(height: 1, indent: 56),
+        // ── Bank filter ──
+        Consumer(
+          builder: (ctx, r, _) {
+            final blocked = r.watch(blockedBankPackagesProvider);
+            final count = blocked.length;
+            return ListTile(
+              leading: const _IconBadge(
+                Icons.account_balance_outlined,
+                color: Color(0xFF7E57C2),
+              ),
+              title: const Text('Bancos monitorados'),
+              subtitle: Text(
+                count > 0
+                    ? '$count ${count == 1 ? 'app bloqueado' : 'apps bloqueados'}'
+                    : 'Todos os apps ativos',
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => Navigator.of(ctx).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const BankFilterScreen(),
+                ),
+              ),
+            );
+          },
         ),
         const Divider(height: 1, indent: 56),
         // ── Auto-save toggle ──

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/navigation_provider.dart';
+import '../../../../core/services/bank_filter_provider.dart';
 import '../../../../core/utils/animated_dialog.dart';
 import '../../../notification_backlog/presentation/providers/backlog_provider.dart';
 import '../../../../core/services/app_update_service.dart';
@@ -117,11 +118,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
   Future<void> _initNotificationFeature() async {
     if (kIsWeb) return;
 
-    // 1. Wait for detection preference to load from disk
+    // 1. Wait for preferences to load from disk
     try {
       await ref.read(notificationDetectionEnabledProvider.notifier).loaded;
+      await ref.read(blockedBankPackagesProvider.notifier).loaded;
     } catch (e) {
-      debugPrint('[Notif] Failed to load detection pref: $e');
+      debugPrint('[Notif] Failed to load prefs: $e');
     }
     if (!mounted) return;
 
@@ -158,12 +160,16 @@ class _MainScreenState extends ConsumerState<MainScreen>
   }
 
   /// Starts or stops the notification stream based on the current toggle.
-  /// Called when: init completes, toggle changes, or app resumes.
+  /// Only subscribes to EventChannel when userId is available, so that
+  /// buffered events flushed by the native side are properly saved to
+  /// backlog and auto-saved as pending transactions.
   void _syncNotificationListening() {
     if (kIsWeb || !_notifInitDone) return;
     final enabled = ref.read(notificationDetectionEnabledProvider);
-    debugPrint('[Notif] syncListening: enabled=$enabled, sub=${_notifSub != null}');
-    if (enabled && _notifSub == null) {
+    final userId = ref.read(effectiveUserIdProvider);
+    debugPrint('[Notif] syncListening: enabled=$enabled, '
+        'userId=${userId.isNotEmpty}, sub=${_notifSub != null}');
+    if (enabled && _notifSub == null && userId.isNotEmpty) {
       _startListening();
     } else if (!enabled && _notifSub != null) {
       _notifSub?.cancel();
@@ -222,7 +228,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
     debugPrint('[Notif] Received: amount=${suggestion.amount}, '
         'type=${suggestion.type?.name}, source=${suggestion.sourceApp}');
 
-    // Backlog: persist (fire-and-forget, needs userId)
+    // Check bank filter — skip if this app is blocked by the user
+    final blocked = ref.read(blockedBankPackagesProvider);
+    if (blocked.contains(suggestion.sourceApp)) {
+      debugPrint('[Notif] Blocked by bank filter: ${suggestion.sourceApp}');
+      return;
+    }
+
+    // Backlog: persist EVERY detected notification (fire-and-forget)
     final userId = ref.read(effectiveUserIdProvider);
     if (userId.isNotEmpty) {
       ref.read(backlogNotifierProvider.notifier).addFromSuggestion(suggestion);
@@ -271,6 +284,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
       _syncNotificationListening();
       if (next && !kIsWeb) {
         showNotificationPermissionDialogIfNeeded(context);
+      }
+    });
+
+    // Start listening once userId becomes available (so buffered events
+    // are properly saved to backlog + auto-saved as pending transactions)
+    ref.listen<String>(effectiveUserIdProvider, (prev, next) {
+      if ((prev == null || prev.isEmpty) && next.isNotEmpty) {
+        _syncNotificationListening();
       }
     });
 

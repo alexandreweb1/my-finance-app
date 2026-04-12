@@ -100,6 +100,13 @@ class MainActivity : FlutterActivity() {
                         Log.d(TAG, "consumeIntentSuggestion: ${json ?: "null"}")
                         result.success(json)
                     }
+                    "updateBlockedPackages" -> {
+                        val packages = (call.arguments as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+                        NotificationMonitorService.updateBlockedPackages(
+                            applicationContext, packages)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
