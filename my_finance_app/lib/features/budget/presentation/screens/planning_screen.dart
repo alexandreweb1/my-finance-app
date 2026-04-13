@@ -297,13 +297,16 @@ class _SummaryColumn extends StatelessWidget {
           style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 3),
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-            color: valueColor,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: valueColor,
+            ),
           ),
         ),
       ],
@@ -342,137 +345,157 @@ class _BudgetCard extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
-        ),
-        padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
-        child: Column(
-          children: [
-            // ── Header: icon + name + percentage + actions ──
-            Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 340;
+          final iconSize = isCompact ? 32.0 : 38.0;
+          final catFontSize = isCompact ? 13.0 : 15.0;
+          final pctFontSize = isCompact ? 13.0 : 15.0;
+          final hPad = isCompact ? 10.0 : 14.0;
+          final rPad = isCompact ? 6.0 : 10.0;
+          final iconSpacing = isCompact ? 8.0 : 12.0;
+
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            padding: EdgeInsets.fromLTRB(hPad, 14, rPad, 14),
+            child: Column(
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: catColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(catIcon, size: 20, color: catColor),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        budget.categoryName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15),
+                // ── Header: icon + name + percentage + actions ──
+                Row(
+                  children: [
+                    Container(
+                      width: iconSize,
+                      height: iconSize,
+                      decoration: BoxDecoration(
+                        color: catColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${fmt(summary.spentAmount)} / ${fmt(budget.limitAmount)}',
-                        style: TextStyle(
-                            fontSize: 12, color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '${summary.percentage.toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    color: pctColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: Icon(Icons.edit_outlined,
-                      color: cs.primary, size: 20),
-                  onPressed: () => showAnimatedDialog(
-                    context: context,
-                    builder: (_) => _AddBudgetDialog(
-                      month: budget.month,
-                      budget: budget,
+                      child: Icon(catIcon, size: isCompact ? 17.0 : 20.0, color: catColor),
                     ),
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete_outline,
-                      color: cs.error, size: 20),
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Excluir orçamento'),
-                        content: Text(
-                            'Deseja excluir o orçamento de "${budget.categoryName}"?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                            child: const Text('Cancelar'),
+                    SizedBox(width: iconSpacing),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            budget.categoryName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: catFontSize),
                           ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(ctx).colorScheme.error),
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                            child: const Text('Excluir'),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${fmt(summary.spentAmount)} / ${fmt(budget.limitAmount)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12, color: cs.onSurfaceVariant),
                           ),
                         ],
                       ),
-                    );
-                    if (confirmed == true) {
-                      ref.read(budgetNotifierProvider.notifier).delete(budget.id);
-                    }
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  visualDensity: VisualDensity.compact,
+                    ),
+                    Text(
+                      '${summary.percentage.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        color: pctColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: pctFontSize,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(Icons.edit_outlined,
+                          color: cs.primary, size: 20),
+                      onPressed: () => showAnimatedDialog(
+                        context: context,
+                        builder: (_) => _AddBudgetDialog(
+                          month: budget.month,
+                          budget: budget,
+                        ),
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete_outline,
+                          color: cs.error, size: 20),
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Excluir orçamento'),
+                            content: Text(
+                                'Deseja excluir o orçamento de "${budget.categoryName}"?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Cancelar'),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                    backgroundColor:
+                                        Theme.of(ctx).colorScheme.error),
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Excluir'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true) {
+                          ref.read(budgetNotifierProvider.notifier).delete(budget.id);
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // ── Status progress bar ──
+                _StatusProgressBar(
+                  progress: summary.progress,
+                  isOverBudget: summary.isOverBudget,
+                  height: 10,
+                ),
+                const SizedBox(height: 8),
+                // ── Remaining label ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(
+                      summary.isOverBudget
+                          ? Icons.warning_amber_rounded
+                          : Icons.check_circle_outline,
+                      size: 14,
+                      color: pctColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        summary.isOverBudget
+                            ? '${l10n.budgetExceeded} ${fmt(summary.remaining.abs())}'
+                            : '${l10n.budgetRemaining}: ${fmt(summary.remaining)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: pctColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            // ── Status progress bar ──
-            _StatusProgressBar(
-              progress: summary.progress,
-              isOverBudget: summary.isOverBudget,
-              height: 10,
-            ),
-            const SizedBox(height: 8),
-            // ── Remaining label ──
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Icon(
-                  summary.isOverBudget
-                      ? Icons.warning_amber_rounded
-                      : Icons.check_circle_outline,
-                  size: 14,
-                  color: pctColor,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  summary.isOverBudget
-                      ? '${l10n.budgetExceeded} ${fmt(summary.remaining.abs())}'
-                      : '${l10n.budgetRemaining}: ${fmt(summary.remaining)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: pctColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
