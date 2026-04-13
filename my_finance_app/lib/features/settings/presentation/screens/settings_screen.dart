@@ -187,6 +187,27 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
+class _MobileSectionLabel extends StatelessWidget {
+  final String label;
+  const _MobileSectionLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
 class _IconBadge extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -343,9 +364,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settingsContent = [
       // ── Banner Pro ─────────────────────────────────────────────────────
       const _ProBannerCard(),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Account
+      // ── CONTA ──────────────────────────────────────────────────────────
       KeyedSubtree(
         key: _keyAccount,
         child: _SettingsCard(children: [
@@ -369,9 +390,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
         ]),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Preferences
+      // ── GERAL ──────────────────────────────────────────────────────────
+      const _MobileSectionLabel('Geral'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keyPreferences,
         child: _SettingsCard(children: [
@@ -427,9 +450,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ]),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Data
+      // ── DADOS ──────────────────────────────────────────────────────────
+      const _MobileSectionLabel('Dados'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keyData,
         child: _SettingsCard(children: [
@@ -448,23 +473,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ]),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Sharing
+      // ── COMPARTILHAMENTO ───────────────────────────────────────────────
+      const _MobileSectionLabel('Compartilhamento'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keySharing,
         child: const _SharingSection(),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Notification Detection
+      // ── NOTIFICAÇÕES ───────────────────────────────────────────────────
+      const _MobileSectionLabel('Notificações'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keyNotifications,
         child: const _NotificationDetectionSection(),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Legal
+      // ── SOBRE ──────────────────────────────────────────────────────────
+      const _MobileSectionLabel('Sobre'),
+      const SizedBox(height: 6),
       _SettingsCard(children: [
         ListTile(
           leading: const _IconBadge(Icons.privacy_tip_outlined,
@@ -496,9 +527,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           },
         ),
       ]),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Logout + Delete account
+      // ── CONTA ──────────────────────────────────────────────────────────
       KeyedSubtree(
         key: _keyLogout,
         child: _SettingsCard(children: [
