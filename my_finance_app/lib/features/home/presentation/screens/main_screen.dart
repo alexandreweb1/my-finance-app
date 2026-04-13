@@ -121,7 +121,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     // 1. Wait for preferences to load from disk
     try {
       await ref.read(notificationDetectionEnabledProvider.notifier).loaded;
-      await ref.read(blockedBankPackagesProvider.notifier).loaded;
+      await ref.read(allowedAppPackagesProvider.notifier).loaded;
     } catch (e) {
       debugPrint('[Notif] Failed to load prefs: $e');
     }
@@ -228,10 +228,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
     debugPrint('[Notif] Received: amount=${suggestion.amount}, '
         'type=${suggestion.type?.name}, source=${suggestion.sourceApp}');
 
-    // Check bank filter — skip if this app is blocked by the user
-    final blocked = ref.read(blockedBankPackagesProvider);
-    if (blocked.contains(suggestion.sourceApp)) {
-      debugPrint('[Notif] Blocked by bank filter: ${suggestion.sourceApp}');
+    // Check app filter — skip if this app is not in the allowed list
+    final allowed = ref.read(allowedAppPackagesProvider);
+    if (!allowed.contains(suggestion.sourceApp)) {
+      debugPrint('[Notif] Not in allowed list: ${suggestion.sourceApp}');
       return;
     }
 

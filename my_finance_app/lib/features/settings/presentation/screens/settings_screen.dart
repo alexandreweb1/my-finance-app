@@ -2488,18 +2488,18 @@ class _NotificationDetectionSectionState
         // ── Bank filter ──
         Consumer(
           builder: (ctx, r, _) {
-            final blocked = r.watch(blockedBankPackagesProvider);
-            final count = blocked.length;
+            final allowed = r.watch(allowedAppPackagesProvider);
+            final count = allowed.length;
             return ListTile(
               leading: const _IconBadge(
                 Icons.account_balance_outlined,
                 color: Color(0xFF7E57C2),
               ),
-              title: const Text('Bancos monitorados'),
+              title: const Text('Apps monitorados'),
               subtitle: Text(
                 count > 0
-                    ? '$count ${count == 1 ? 'app bloqueado' : 'apps bloqueados'}'
-                    : 'Todos os apps ativos',
+                    ? '$count ${count == 1 ? 'app ativo' : 'apps ativos'}'
+                    : 'Nenhum app monitorado',
                 style: const TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.chevron_right, size: 20),

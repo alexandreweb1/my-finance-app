@@ -402,74 +402,77 @@ class _SparklineChartState extends ConsumerState<_SparklineChart> {
           scrollDirection: Axis.horizontal,
           child: SizedBox(
             width: totalWidth,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Chart area
-                SizedBox(
-                  height: 80,
-                  width: totalWidth,
-                  child: CustomPaint(
-                    painter: _SparklinePainter(
-                      incomeData: incomeData,
-                      expenseData: expenseData,
-                      selectedIndex: selectedIdx,
-                    ),
-                    size: const Size(totalWidth, 80),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                // Month labels row — each tappable
-                Row(
-                  children: List.generate(months.length, (i) {
-                    final month = months[i];
-                    final isSelected = i == selectedIdx;
-                    final label = DateFormat('MMM', dateLoc).format(month).capitalizeMonth();
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        ref
-                            .read(dashboardSelectedMonthProvider.notifier)
-                            .state = month;
-                      },
-                      child: SizedBox(
-                        width: _kMonthColWidth,
-                        height: 44,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              label,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white.withValues(alpha: 0.45),
-                                fontSize: 11,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? _kGreen
-                                    : Colors.transparent,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ),
+            child: SizedBox(
+              height: 80 + 6 + 44, // chart + gap + labels
+              child: Stack(
+                children: [
+                  // Chart area (not interactive, sits behind)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 80,
+                    child: CustomPaint(
+                      painter: _SparklinePainter(
+                        incomeData: incomeData,
+                        expenseData: expenseData,
+                        selectedIndex: selectedIdx,
                       ),
-                    );
-                  }),
-                ),
-              ],
+                      size: const Size(totalWidth, 80),
+                    ),
+                  ),
+                  // Full-height touch columns (chart + labels)
+                  Row(
+                    children: List.generate(months.length, (i) {
+                      final month = months[i];
+                      final isSelected = i == selectedIdx;
+                      final label = DateFormat('MMM', dateLoc).format(month).capitalizeMonth();
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          ref
+                              .read(dashboardSelectedMonthProvider.notifier)
+                              .state = month;
+                        },
+                        child: SizedBox(
+                          width: _kMonthColWidth,
+                          height: 80 + 6 + 44, // full height
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                label,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.45),
+                                  fontSize: 11,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? _kGreen
+                                      : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

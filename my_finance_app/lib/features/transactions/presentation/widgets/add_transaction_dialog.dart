@@ -44,6 +44,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _tagController = TextEditingController();
 
   TransactionType _type = TransactionType.expense;
@@ -260,7 +261,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       final t = widget.transaction!;
       _titleController.text = t.title;
       _amountController.text = doubleToMoneyText(t.amount);
-      // description preserved from original transaction
+      _descriptionController.text = t.description ?? '';
       _type = t.type;
       _category = t.category;
       _date = t.date;
@@ -284,6 +285,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
+    _descriptionController.dispose();
     _tagController.dispose();
     super.dispose();
   }
@@ -369,7 +371,9 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         type: _type,
         category: _category!,
         date: _date,
-        description: widget.transaction!.description,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
         walletId: _walletId,
         goalId: _type == TransactionType.income ? _goalId : null,
         tags: _tags,
@@ -382,6 +386,9 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         type: _type,
         category: _category!,
         date: _date,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
         walletId: _walletId,
         goalId: _type == TransactionType.income ? _goalId : null,
         tags: _tags,
@@ -782,6 +789,20 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     onChanged: (v) => setState(() => _goalId = v),
                   ),
                 ],
+                // ── Observação ──
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Observação (opcional)',
+                    hintText: 'Adicione uma nota...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.notes_rounded, size: 20),
+                  ),
+                  maxLines: 2,
+                  minLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                ),
                 // ── Tags (Pro) ──
                 if (ref.watch(isProProvider)) ...[
                   const SizedBox(height: 12),
