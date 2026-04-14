@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/providers/selected_month_provider.dart';
 import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/category_icons.dart';
@@ -341,9 +342,22 @@ class _BudgetCard extends ConsumerWidget {
         cat != null ? (kCategoryIconMap[cat.iconCodePoint] ?? Icons.category) : Icons.category;
     final catColor = cat != null ? Color(cat.colorValue) : cs.primary;
 
+    void navigateToTransactions() {
+      // Reset filters irrelevantes
+      ref.read(statementTypeFilterProvider.notifier).state = null;
+      ref.read(statementDateRangeProvider.notifier).state = null;
+      ref.read(statementIsAnnualProvider.notifier).state = false;
+      // Aplicar categoria e mês do orçamento
+      ref.read(statementCategoryFilterProvider.notifier).state = {budget.categoryName};
+      ref.read(selectedMonthProvider.notifier).state = budget.month;
+      // Navegar para o Extrato (tab 1)
+      ref.read(mainTabIndexProvider.notifier).state = 1;
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -355,7 +369,9 @@ class _BudgetCard extends ConsumerWidget {
           final rPad = isCompact ? 6.0 : 10.0;
           final iconSpacing = isCompact ? 8.0 : 12.0;
 
-          return Container(
+          return InkWell(
+            onTap: navigateToTransactions,
+            child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
@@ -490,10 +506,27 @@ class _BudgetCard extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    const Spacer(),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Ver lançamentos',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            size: 14, color: cs.primary),
+                      ],
+                    ),
                   ],
                 ),
               ],
             ),
+          ),
           );
         },
       ),

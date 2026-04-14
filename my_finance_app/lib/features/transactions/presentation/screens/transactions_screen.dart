@@ -772,21 +772,30 @@ class _SummaryCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 320;
+          final vPad = isCompact ? 14.0 : 20.0;
+          final hPad = isCompact ? 14.0 : 20.0;
+
+          return Padding(
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         child: Column(
           children: [
             Text(l10n.totalBalance,
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text(
-              fmt(balance),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isPositive
-                        ? Colors.green.shade700
-                        : Colors.red.shade700,
-                  ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                fmt(balance),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isPositive
+                          ? Colors.green.shade700
+                          : Colors.red.shade700,
+                    ),
+              ),
             ),
             const SizedBox(height: 16),
             Row(
@@ -836,6 +845,8 @@ class _SummaryCard extends ConsumerWidget {
             ],
           ],
         ),
+      );
+        },
       ),
     );
   }
@@ -877,20 +888,28 @@ class _SummaryItem extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 18),
             const SizedBox(width: 4),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
-                        ?.copyWith(color: Colors.grey.shade600)),
-                Text(
-                  value,
-                  style: TextStyle(
-                      color: color, fontWeight: FontWeight.bold),
-                ),
-              ],
+                        ?.copyWith(color: Colors.grey.shade600),
+                  ),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                          color: color, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
