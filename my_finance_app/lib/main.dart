@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:my_finance_app/features/auth/presentation/screens/register_screen.dart';
+import 'package:my_finance_app/features/home/presentation/screens/dashboard_screen.dart';
 
 import 'core/l10n/app_localizations.dart';
 import 'core/providers/app_settings_provider.dart';
@@ -140,7 +142,7 @@ class AppRouter extends ConsumerWidget {
 
     return authAsync.when(
       data: (UserEntity? user) =>
-          user != null ? const MainScreen() : const LoginScreen(),
+          user != null ? const MainScreen() : const DashboardScreen(),
       loading: () => const _SplashScreen(),
       error: (error, _) => _FirebaseErrorScreen(error: error.toString()),
     );
