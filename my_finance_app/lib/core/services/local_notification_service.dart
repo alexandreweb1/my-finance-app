@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'notification_suggestion.dart';
@@ -40,41 +41,45 @@ class LocalNotificationService {
 
   /// Shows a suggestion notification with pre-filled amount and type.
   Future<void> showSuggestion(NotificationSuggestion suggestion) async {
-    final typeLabel = suggestion.type?.name == 'expense'
-        ? 'despesa'
-        : suggestion.type?.name == 'income'
-            ? 'receita'
-            : null;
+    try {
+      final typeLabel = suggestion.type?.name == 'expense'
+          ? 'despesa'
+          : suggestion.type?.name == 'income'
+              ? 'receita'
+              : null;
 
-    final body = typeLabel != null
-        ? 'Toque para lançar como $typeLabel'
-        : 'Toque para registrar a transação';
+      final body = typeLabel != null
+          ? 'Toque para lançar como $typeLabel'
+          : 'Toque para registrar a transação';
 
-    final amountStr = suggestion.amount
-        .toStringAsFixed(2)
-        .replaceAll('.', ',');
+      final amountStr = suggestion.amount
+          .toStringAsFixed(2)
+          .replaceAll('.', ',');
 
-    const androidDetails = AndroidNotificationDetails(
-      _channelId,
-      _channelName,
-      channelDescription: _channelDesc,
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-    );
+      const androidDetails = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDesc,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      );
 
-    await _plugin.show(
-      suggestion.amount.hashCode,
-      '💰 Lançar R\$ $amountStr?',
-      body,
-      const NotificationDetails(android: androidDetails),
-      payload: jsonEncode({
-        'amount': suggestion.amount,
-        'type': suggestion.type?.name ?? 'unknown',
-        'text': suggestion.rawText,
-        'sourceApp': suggestion.sourceApp,
-      }),
-    );
+      await _plugin.show(
+        suggestion.amount.hashCode,
+        '💰 Lançar R\$ $amountStr?',
+        body,
+        const NotificationDetails(android: androidDetails),
+        payload: jsonEncode({
+          'amount': suggestion.amount,
+          'type': suggestion.type?.name ?? 'unknown',
+          'text': suggestion.rawText,
+          'sourceApp': suggestion.sourceApp,
+        }),
+      );
+    } catch (e) {
+      debugPrint('[LocalNotif] Failed to show suggestion: $e');
+    }
   }
 
   void _onNotificationResponse(NotificationResponse response) {

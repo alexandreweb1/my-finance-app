@@ -22,7 +22,9 @@ import '../../../subscription/presentation/screens/pro_screen.dart';
 import '../../../subscription/presentation/widgets/pro_badge_widget.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../notification_backlog/presentation/providers/backlog_provider.dart';
+import '../../../../core/services/bank_filter_provider.dart';
 import '../../../notification_backlog/presentation/screens/backlog_screen.dart';
+import 'bank_filter_screen.dart';
 import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 
@@ -185,6 +187,27 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
+class _MobileSectionLabel extends StatelessWidget {
+  final String label;
+  const _MobileSectionLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
 class _IconBadge extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -341,9 +364,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settingsContent = [
       // ── Banner Pro ─────────────────────────────────────────────────────
       const _ProBannerCard(),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Account
+      // ── CONTA ──────────────────────────────────────────────────────────
       KeyedSubtree(
         key: _keyAccount,
         child: _SettingsCard(children: [
@@ -367,9 +390,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
         ]),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Preferences
+      // ── GERAL ──────────────────────────────────────────────────────────
+      const _MobileSectionLabel('Geral'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keyPreferences,
         child: _SettingsCard(children: [
@@ -425,9 +450,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ]),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Data
+      // ── DADOS ──────────────────────────────────────────────────────────
+      const _MobileSectionLabel('Dados'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keyData,
         child: _SettingsCard(children: [
@@ -446,23 +473,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ]),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Sharing
+      // ── COMPARTILHAMENTO ───────────────────────────────────────────────
+      const _MobileSectionLabel('Compartilhamento'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keySharing,
         child: const _SharingSection(),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Notification Detection
+      // ── NOTIFICAÇÕES ───────────────────────────────────────────────────
+      const _MobileSectionLabel('Notificações'),
+      const SizedBox(height: 6),
       KeyedSubtree(
         key: _keyNotifications,
         child: const _NotificationDetectionSection(),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Legal
+      // ── SOBRE ──────────────────────────────────────────────────────────
+      const _MobileSectionLabel('Sobre'),
+      const SizedBox(height: 6),
       _SettingsCard(children: [
         ListTile(
           leading: const _IconBadge(Icons.privacy_tip_outlined,
@@ -494,9 +527,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           },
         ),
       ]),
-      const SizedBox(height: 12),
+      const SizedBox(height: 20),
 
-      // Logout + Delete account
+      // ── CONTA ──────────────────────────────────────────────────────────
       KeyedSubtree(
         key: _keyLogout,
         child: _SettingsCard(children: [
@@ -2481,6 +2514,33 @@ class _NotificationDetectionSectionState
               : () async {
                   await NotificationListenerBridge.openPermissionSettings();
                 },
+        ),
+        const Divider(height: 1, indent: 56),
+        // ── Bank filter ──
+        Consumer(
+          builder: (ctx, r, _) {
+            final allowed = r.watch(allowedAppPackagesProvider);
+            final count = allowed.length;
+            return ListTile(
+              leading: const _IconBadge(
+                Icons.account_balance_outlined,
+                color: Color(0xFF7E57C2),
+              ),
+              title: const Text('Apps monitorados'),
+              subtitle: Text(
+                count > 0
+                    ? '$count ${count == 1 ? 'app ativo' : 'apps ativos'}'
+                    : 'Nenhum app monitorado',
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => Navigator.of(ctx).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const BankFilterScreen(),
+                ),
+              ),
+            );
+          },
         ),
         const Divider(height: 1, indent: 56),
         // ── Auto-save toggle ──

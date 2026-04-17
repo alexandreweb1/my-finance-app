@@ -55,11 +55,16 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
             child: Row(
               children: [
-                _HeaderCell('Tipo', flex: 1),
+                _HeaderCell('Tipo', flex: 2),
+                const SizedBox(width: 12),
                 _HeaderCell('Descrição', flex: 4),
+                const SizedBox(width: 12),
                 _HeaderCell('Categoria', flex: 3),
+                const SizedBox(width: 12),
                 _HeaderCell('Carteira', flex: 2),
+                const SizedBox(width: 12),
                 _HeaderCell('Data', flex: 2),
+                const SizedBox(width: 12),
                 _HeaderCell('Valor', flex: 2, align: TextAlign.right),
                 const SizedBox(width: 40), // actions column
               ],
@@ -105,7 +110,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                         children: [
                           // Type badge
                           Expanded(
-                            flex: 1,
+                            flex: 2,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
@@ -136,6 +141,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 12),
 
                           // Description
                           Expanded(
@@ -213,6 +219,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 12),
 
                           // Category
                           Expanded(
@@ -235,12 +242,14 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 12),
 
                           // Wallet
                           Expanded(
                             flex: 2,
                             child: _WalletCell(walletId: tx.walletId),
                           ),
+                          const SizedBox(width: 12),
 
                           // Date + time
                           Expanded(
@@ -266,6 +275,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 12),
 
                           // Amount
                           Expanded(

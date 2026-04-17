@@ -30,11 +30,15 @@ class TransactionListTile extends ConsumerWidget {
         ? _kGreen.withValues(alpha: 0.15)
         : _kRed.withValues(alpha: 0.15);
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 390;
+    final hMargin = isCompact ? 12.0 : 20.0;
+
     return Dismissible(
       key: Key(transaction.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        margin: EdgeInsets.fromLTRB(hMargin, 0, hMargin, 10),
         decoration: BoxDecoration(
           color: Colors.red.shade700.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(16),
@@ -79,8 +83,9 @@ class TransactionListTile extends ConsumerWidget {
           builder: (_) => AddTransactionDialog(transaction: transaction),
         ),
         child: Container(
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          margin: EdgeInsets.fromLTRB(hMargin, 0, hMargin, 10),
+          padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 10.0 : 14.0, vertical: 12),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(16),
@@ -95,8 +100,8 @@ class TransactionListTile extends ConsumerWidget {
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: isCompact ? 36.0 : 44.0,
+                height: isCompact ? 36.0 : 44.0,
                 decoration: BoxDecoration(
                   color: iconBg,
                   borderRadius: BorderRadius.circular(13),
@@ -106,10 +111,10 @@ class TransactionListTile extends ConsumerWidget {
                       ? Icons.arrow_downward_rounded
                       : Icons.arrow_upward_rounded,
                   color: color,
-                  size: 20,
+                  size: isCompact ? 17.0 : 20.0,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isCompact ? 8.0 : 12.0),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,6 +158,8 @@ class TransactionListTile extends ConsumerWidget {
                     Text(
                       '${transaction.category} · '
                       '${CurrencyFormatter.formatDate(transaction.date, dateLoc)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
                         color: colorScheme.onSurfaceVariant,
@@ -185,13 +192,20 @@ class TransactionListTile extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                '$sign${fmt(transaction.amount)}',
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: isCompact ? 90.0 : 110.0),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '$sign${fmt(transaction.amount)}',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: isCompact ? 13.0 : 14.0,
+                    ),
+                  ),
                 ),
               ),
             ],
