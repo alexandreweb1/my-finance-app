@@ -16,7 +16,14 @@
       "Bash(head -5 grep -n \"CFBundleName\\\\|CFBundleDisplayName\" \"c:/Users/alexa/Documents/Projetos/personal-manage/my_finance_app/ios/Runner/Info.plist\")",
       "Bash(grep -rn \"androidx.core\\\\|core-ktx\" c:/Users/alexa/Documents/Projetos/personal-manage/my_finance_app/android/ --include=*.gradle --include=*.kts)",
       "Bash(grep -E \"\\\\.\\(dart|kt|java\\)$\")",
-      "Bash(grep -E \"\\\\.dart$\")"
+      "Bash(grep -E \"\\\\.dart$\")",
+      "Read(//c/src/flutter/bin/**)",
+      "Bash(where.exe flutter *)",
+      "Read(//c/Users/alexa/AppData/Local/Pub/**)",
+      "Read(//c/Users/alexa/AppData/Local/Android/**)",
+      "Read(//c/Program Files/Android/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c//**)"
     ]
   }
 }
