@@ -34,11 +34,24 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Pull Vercel Project Settings
+        working-directory: my_finance_app
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
       - name: Prepare Vercel Build Output
         working-directory: my_finance_app
         run: |
+          echo "==> build/web contents:"
+          ls -la build/web | head -30
+          echo "==> build/web size:"
+          du -sh build/web
+
+          rm -rf .vercel/output
           mkdir -p .vercel/output/static
-          cp -r build/web/. .vercel/output/static/
+          cp -rv build/web/. .vercel/output/static/ > /dev/null
           cat > .vercel/output/config.json <<'EOF'
           {
             "version": 3,
@@ -48,6 +61,11 @@ jobs:
             ]
           }
           EOF
+
+          echo "==> .vercel/output/static contents:"
+          ls -la .vercel/output/static | head -30
+          echo "==> .vercel/output/static size:"
+          du -sh .vercel/output/static
 
       - name: Deploy to Vercel
         working-directory: my_finance_app
