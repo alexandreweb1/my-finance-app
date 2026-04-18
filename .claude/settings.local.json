@@ -23,7 +23,12 @@
       "Read(//c/Users/alexa/AppData/Local/Android/**)",
       "Read(//c/Program Files/Android/**)",
       "Read(//c/Program Files \\(x86\\)/**)",
-      "Read(//c//**)"
+      "Read(//c//**)",
+      "Bash(mkdir -p build/web)",
+      "Bash(touch build/web/test-ignore.html)",
+      "Bash(mkdir -p build/web build/cache)",
+      "Bash(touch build/web/index.html build/cache/foo.tmp)",
+      "Bash(git add *)"
     ]
   }
 }
