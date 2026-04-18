@@ -28,7 +28,10 @@
       "Bash(touch build/web/test-ignore.html)",
       "Bash(mkdir -p build/web build/cache)",
       "Bash(touch build/web/index.html build/cache/foo.tmp)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git check-ignore *)",
+      "Bash(cat .gitignore)",
+      "Bash(ls my_finance_app/web/)"
     ]
   }
 }
