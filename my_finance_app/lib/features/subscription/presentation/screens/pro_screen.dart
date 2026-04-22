@@ -371,6 +371,18 @@ class _FeaturesCard extends StatelessWidget {
               title: 'Tags / Etiquetas',
               description:
                   'Classifique transações com tags livres além da categoria — filtre e organize como quiser.',
+            ),
+            const _FeatureRow(
+              icon: Icons.file_download_rounded,
+              title: 'Importação de extratos',
+              description:
+                  'Importe arquivos OFX ou CSV direto do seu banco e traga todas as transações em poucos cliques.',
+            ),
+            const _FeatureRow(
+              icon: Icons.ios_share_rounded,
+              title: 'Exportação de relatórios',
+              description:
+                  'Gere extratos em PDF ou Excel por período para compartilhar com contador, parceiro ou arquivar.',
               isLast: true,
             ),
           ],

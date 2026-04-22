@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/l10n/app_localizations.dart';
 import 'core/providers/app_settings_provider.dart';
 import 'core/utils/firebase_options.dart';
+import 'features/app_lock/presentation/widgets/app_lock_gate.dart';
 import 'features/auth/domain/entities/user_entity.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
@@ -139,8 +140,9 @@ class AppRouter extends ConsumerWidget {
     });
 
     return authAsync.when(
-      data: (UserEntity? user) =>
-          user != null ? const MainScreen() : const LoginScreen(),
+      data: (UserEntity? user) => user != null
+          ? const AppLockGate(child: MainScreen())
+          : const LoginScreen(),
       loading: () => const _SplashScreen(),
       error: (error, _) => _FirebaseErrorScreen(error: error.toString()),
     );

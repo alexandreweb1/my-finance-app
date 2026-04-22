@@ -18,3 +18,5 @@ vantagens** em `lib/features/subscription/presentation/screens/pro_screen.dart`
 | Compartilhamento | `settings_screen.dart` |
 | Transações recorrentes | `planning_screen.dart` (ProGateWidget no tab) |
 | Tags / Etiquetas | `add_transaction_dialog.dart` (input só aparece se Pro) |
+| Importação de extratos (OFX/CSV) | `settings_screen.dart` (`_DataIoCard._openImport`) |
+| Exportação de relatórios (PDF/Excel) | `settings_screen.dart` (`_DataIoCard._openExport`) |

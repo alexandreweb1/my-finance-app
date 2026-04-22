@@ -11,6 +11,10 @@ import '../../../../core/services/notification_listener_service.dart';
 import '../../../../core/services/notification_providers.dart';
 import '../../../../core/providers/effective_user_provider.dart';
 import '../../../../core/utils/category_icons.dart';
+import '../../../app_lock/presentation/providers/app_lock_provider.dart';
+import '../../../app_lock/presentation/screens/setup_pin_screen.dart';
+import '../../../data_io/presentation/screens/export_screen.dart';
+import '../../../data_io/presentation/screens/import_screen.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/widgets/user_avatar.dart';
@@ -390,6 +394,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
         ]),
       ),
+      const SizedBox(height: 20),
+
+      // ── SEGURANÇA ──────────────────────────────────────────────────────
+      _MobileSectionLabel(l10n.security),
+      const SizedBox(height: 6),
+      const _AppLockCard(),
+      const SizedBox(height: 20),
+
+      // ── DADOS ──────────────────────────────────────────────────────────
+      _MobileSectionLabel(l10n.dataSection),
+      const SizedBox(height: 6),
+      const _DataIoCard(),
       const SizedBox(height: 20),
 
       // ── GERAL ──────────────────────────────────────────────────────────
@@ -2838,5 +2854,182 @@ class _SidebarItem extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App lock card (PIN + biometrics)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AppLockCard extends ConsumerWidget {
+  const _AppLockCard();
+
+  Future<void> _toggle(
+    BuildContext context,
+    WidgetRef ref,
+    bool enable,
+  ) async {
+    final notifier = ref.read(appLockProvider.notifier);
+    if (enable) {
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const SetupPinScreen()),
+      );
+    } else {
+      final l10n = AppLocalizations.of(context);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.disableAppLockTitle),
+          content: Text(l10n.disableAppLockMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.confirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) await notifier.disable();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final state = ref.watch(appLockProvider);
+    final service = ref.read(appLockServiceProvider);
+
+    if (!service.isPlatformSupported) {
+      return _SettingsCard(children: [
+        ListTile(
+          leading: const _IconBadge(Icons.lock_outline,
+              color: Color(0xFF7E57C2)),
+          title: Text(l10n.appLockTitle),
+          subtitle: Text(l10n.appLockUnavailableWeb,
+              style: const TextStyle(fontSize: 12)),
+          enabled: false,
+        ),
+      ]);
+    }
+
+    return _SettingsCard(children: [
+      SwitchListTile(
+        secondary: const _IconBadge(Icons.lock_outline,
+            color: Color(0xFF7E57C2)),
+        title: Text(l10n.appLockTitle),
+        subtitle: Text(l10n.appLockSubtitle,
+            style: const TextStyle(fontSize: 12)),
+        value: state.enabled,
+        onChanged: (v) => _toggle(context, ref, v),
+      ),
+      if (state.enabled) ...[
+        const Divider(height: 1, indent: 56),
+        if (state.biometricAvailable)
+          SwitchListTile(
+            secondary: const _IconBadge(Icons.fingerprint,
+                color: Color(0xFF26A69A)),
+            title: Text(l10n.useBiometrics),
+            subtitle: Text(l10n.useBiometricsDesc,
+                style: const TextStyle(fontSize: 12)),
+            value: state.biometricEnabled,
+            onChanged: (v) =>
+                ref.read(appLockProvider.notifier).setBiometricEnabled(v),
+          ),
+        if (state.biometricAvailable)
+          const Divider(height: 1, indent: 56),
+        ListTile(
+          leading: const _IconBadge(Icons.pin_outlined,
+              color: Color(0xFF42A5F5)),
+          title: Text(l10n.changePin),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SetupPinScreen()),
+          ),
+        ),
+      ],
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Import / Export card (OFX, CSV → Excel, PDF) — Pro feature
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DataIoCard extends ConsumerWidget {
+  const _DataIoCard();
+
+  void _openImport(BuildContext context, WidgetRef ref) {
+    if (!ref.read(isProProvider)) {
+      showProGateBottomSheet(
+        context,
+        featureName: 'Importação de extratos',
+        featureDescription:
+            'Importe arquivos OFX ou CSV do seu banco e traga suas transações em segundos.',
+        featureIcon: Icons.file_download_rounded,
+      );
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const ImportScreen(),
+    ));
+  }
+
+  void _openExport(BuildContext context, WidgetRef ref) {
+    if (!ref.read(isProProvider)) {
+      showProGateBottomSheet(
+        context,
+        featureName: 'Exportação de relatórios',
+        featureDescription:
+            'Gere PDF ou Excel das suas transações para compartilhar ou arquivar.',
+        featureIcon: Icons.ios_share_rounded,
+      );
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const ExportScreen(),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final isPro = ref.watch(isProProvider);
+    return _SettingsCard(children: [
+      ListTile(
+        leading: const _IconBadge(Icons.file_download_outlined,
+            color: Color(0xFF26A69A)),
+        title: Row(
+          children: [
+            Text(l10n.importTitle),
+            const SizedBox(width: 8),
+            if (!isPro) const ProBadgeWidget(),
+          ],
+        ),
+        subtitle: Text(l10n.importSubtitle,
+            style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+        onTap: () => _openImport(context, ref),
+      ),
+      const Divider(height: 1, indent: 56),
+      ListTile(
+        leading: const _IconBadge(Icons.ios_share_outlined,
+            color: Color(0xFFAB47BC)),
+        title: Row(
+          children: [
+            Text(l10n.exportTitle),
+            const SizedBox(width: 8),
+            if (!isPro) const ProBadgeWidget(),
+          ],
+        ),
+        subtitle: Text(l10n.exportSubtitle,
+            style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+        onTap: () => _openExport(context, ref),
+      ),
+    ]);
   }
 }

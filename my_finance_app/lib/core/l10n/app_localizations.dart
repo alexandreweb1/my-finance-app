@@ -241,6 +241,151 @@ class AppLocalizations {
   // ── Common ───────────────────────────────────────────────────────────────
   String get errorGeneric => _t('Erro desconhecido.', 'Unknown error.', 'Error desconocido.');
   String get confirm => _t('Confirmar', 'Confirm', 'Confirmar');
+
+  // ── App lock (PIN + biometrics) ──────────────────────────────────────────
+  String get security => _t('Segurança', 'Security', 'Seguridad');
+  String get appLockTitle =>
+      _t('Bloqueio do app', 'App lock', 'Bloqueo de la app');
+  String get appLockSubtitle => _t(
+      'Exige PIN ou biometria para abrir o app',
+      'Require PIN or biometrics to open the app',
+      'Exige PIN o biometría para abrir la app');
+  String get appLockUnavailableWeb => _t(
+      'Disponível apenas no aplicativo móvel',
+      'Available only on the mobile app',
+      'Disponible solo en la app móvil');
+  String get useBiometrics => _t(
+      'Usar biometria', 'Use biometrics', 'Usar biometría');
+  String get useBiometricsDesc => _t(
+      'Digital ou reconhecimento facial',
+      'Fingerprint or face recognition',
+      'Huella o reconocimiento facial');
+  String get changePin => _t('Alterar PIN', 'Change PIN', 'Cambiar PIN');
+  String get createPinTitle =>
+      _t('Criar PIN', 'Create PIN', 'Crear PIN');
+  String get createPinSubtitle => _t(
+      'Escolha um PIN de 4 dígitos para proteger o app',
+      'Choose a 4-digit PIN to protect the app',
+      'Elige un PIN de 4 dígitos para proteger la app');
+  String get confirmPinTitle =>
+      _t('Confirmar PIN', 'Confirm PIN', 'Confirmar PIN');
+  String get confirmPinSubtitle => _t(
+      'Digite o PIN novamente para confirmar',
+      'Enter the PIN again to confirm',
+      'Ingresa el PIN nuevamente para confirmar');
+  String get pinsDoNotMatch => _t(
+      'Os PINs não coincidem. Tente novamente.',
+      'PINs don\'t match. Try again.',
+      'Los PIN no coinciden. Inténtalo de nuevo.');
+  String get pinEnabled => _t(
+      'Bloqueio do app ativado!',
+      'App lock enabled!',
+      '¡Bloqueo de la app activado!');
+  String get pinIncorrect =>
+      _t('PIN incorreto', 'Incorrect PIN', 'PIN incorrecto');
+  String get enterPinTitle =>
+      _t('Digite seu PIN', 'Enter your PIN', 'Ingresa tu PIN');
+  String get enterPinSubtitle => _t(
+      'Desbloqueie para acessar o app',
+      'Unlock to access the app',
+      'Desbloquea para acceder a la app');
+  String get unlockWithBiometricsReason => _t(
+      'Desbloqueie o Fintab',
+      'Unlock Fintab',
+      'Desbloquea Fintab');
+  String get forgotPin =>
+      _t('Esqueci o PIN', 'Forgot PIN', 'Olvidé el PIN');
+  String get forgotPinTitle =>
+      _t('Esqueci o PIN', 'Forgot PIN', 'Olvidé el PIN');
+  String get forgotPinMessage => _t(
+      'Para redefinir o PIN você precisa sair e entrar novamente com sua senha. Seus dados permanecem salvos.',
+      'To reset the PIN you need to sign out and sign in again with your password. Your data will be preserved.',
+      'Para restablecer el PIN debes cerrar sesión y volver a iniciarla con tu contraseña. Tus datos se conservan.');
+  String get disableAppLockTitle => _t(
+      'Desativar bloqueio?',
+      'Disable app lock?',
+      '¿Desactivar bloqueo de la app?');
+  String get disableAppLockMessage => _t(
+      'O app deixará de pedir PIN ou biometria ao abrir.',
+      'The app will no longer ask for PIN or biometrics on open.',
+      'La app dejará de pedir PIN o biometría al abrir.');
+
+  // ── Data (Import / Export) ───────────────────────────────────────────────
+  String get dataSection => _t('Dados', 'Data', 'Datos');
+  String get importTitle =>
+      _t('Importar extrato', 'Import statement', 'Importar extracto');
+  String get importSubtitle => _t(
+      'Traga transações de arquivos OFX ou CSV do banco',
+      'Bring transactions from OFX or CSV bank files',
+      'Trae transacciones desde archivos OFX o CSV del banco');
+  String get importPickFileTitle =>
+      _t('Arquivo', 'File', 'Archivo');
+  String get importPickFileDesc => _t(
+      'Selecione um arquivo .ofx ou .csv exportado do seu banco',
+      'Choose an .ofx or .csv file exported from your bank',
+      'Selecciona un archivo .ofx o .csv exportado desde tu banco');
+  String get importSelectFile =>
+      _t('Selecionar arquivo', 'Select file', 'Seleccionar archivo');
+  String get importDefaults =>
+      _t('Padrões da importação', 'Import defaults', 'Predeterminados');
+  String get importTargetWallet =>
+      _t('Carteira de destino', 'Target wallet', 'Cartera destino');
+  String get importIncomeCategory => _t('Categoria padrão (receitas)',
+      'Default category (income)', 'Categoría por defecto (ingresos)');
+  String get importExpenseCategory => _t('Categoria padrão (despesas)',
+      'Default category (expenses)', 'Categoría por defecto (gastos)');
+  String get importSelectAll =>
+      _t('Selecionar todas', 'Select all', 'Seleccionar todas');
+  String get importDeselectAll => _t(
+      'Desmarcar todas', 'Deselect all', 'Deseleccionar todas');
+  String importPreviewTitle(int n) => _t(
+      'Transações detectadas ($n)',
+      'Detected transactions ($n)',
+      'Transacciones detectadas ($n)');
+  String importConfirm(int n) => _t(
+      'Importar $n transações',
+      'Import $n transactions',
+      'Importar $n transacciones');
+
+  String get exportTitle =>
+      _t('Exportar extrato', 'Export statement', 'Exportar extracto');
+  String get exportSubtitle => _t(
+      'Gere PDF ou Excel das suas transações',
+      'Generate PDF or Excel of your transactions',
+      'Genera PDF o Excel de tus transacciones');
+  String get exportPeriod => _t('Período', 'Period', 'Período');
+  String get exportCurrentMonth =>
+      _t('Mês atual', 'Current month', 'Mes actual');
+  String get exportPreviousMonth =>
+      _t('Mês anterior', 'Previous month', 'Mes anterior');
+  String get exportCurrentYear =>
+      _t('Ano atual', 'Current year', 'Año actual');
+  String get exportAllTime =>
+      _t('Todos os lançamentos', 'All transactions', 'Todas las transacciones');
+  String get exportCustomRange => _t(
+      'Período personalizado', 'Custom range', 'Período personalizado');
+  String get exportPickRange =>
+      _t('Escolher', 'Pick', 'Elegir');
+  String get exportFormat => _t('Formato', 'Format', 'Formato');
+  String get exportPdfDesc => _t(
+      'Relatório pronto para impressão ou envio',
+      'Printable / shareable report',
+      'Informe listo para imprimir o enviar');
+  String get exportExcelDesc => _t(
+      'Planilha editável com totais',
+      'Editable spreadsheet with totals',
+      'Hoja editable con totales');
+  String get exportSummary => _t('Resumo', 'Summary', 'Resumen');
+  String exportTransactionsCount(int n) => _t(
+      '$n transações no período',
+      '$n transactions in period',
+      '$n transacciones en el período');
+  String get exportGenerate =>
+      _t('Gerar e compartilhar', 'Generate and share', 'Generar y compartir');
+  String get exportNoTransactions => _t(
+      'Nenhuma transação no período selecionado.',
+      'No transactions in the selected period.',
+      'No hay transacciones en el período seleccionado.');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
