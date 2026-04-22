@@ -91,6 +91,10 @@ class DashboardScreen extends ConsumerWidget {
               _IncomeExpenseRow(income: income, expense: expense),
               const SizedBox(height: 24),
             ],
+            if (section == DashboardSection.financialHealth) ...[
+              const DashboardFinancialHealthCard(),
+              const SizedBox(height: 24),
+            ],
             if (section == DashboardSection.budgets &&
                 budgetSummaries.isNotEmpty) ...[
               _SectionHeader(title: l10n.budgets, subtitle: monthLabel),
@@ -1451,6 +1455,8 @@ class _SectionTile extends StatelessWidget {
     switch (s) {
       case DashboardSection.incomeExpense:
         return Icons.swap_vert_rounded;
+      case DashboardSection.financialHealth:
+        return Icons.monitor_heart_outlined;
       case DashboardSection.budgets:
         return Icons.pie_chart_outline_rounded;
       case DashboardSection.wallets:

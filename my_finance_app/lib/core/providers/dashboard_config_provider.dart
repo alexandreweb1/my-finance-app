@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum DashboardSection {
   incomeExpense,
+  financialHealth,
   budgets,
   wallets,
   recentTransactions,
@@ -18,6 +19,8 @@ enum DashboardSection {
     switch (this) {
       case DashboardSection.incomeExpense:
         return 'Receitas & Despesas';
+      case DashboardSection.financialHealth:
+        return 'Saúde Financeira';
       case DashboardSection.budgets:
         return 'Resumo de Orçamentos';
       case DashboardSection.wallets:
@@ -33,6 +36,8 @@ enum DashboardSection {
     switch (this) {
       case DashboardSection.incomeExpense:
         return 'Cards de receita e despesa do mês';
+      case DashboardSection.financialHealth:
+        return 'Score de 0 a 100 com seu nível atual';
       case DashboardSection.budgets:
         return 'Barra de progresso dos orçamentos';
       case DashboardSection.wallets:

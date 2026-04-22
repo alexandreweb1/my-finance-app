@@ -1,10 +1,18 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../financial_health/domain/financial_score.dart';
+import '../../../financial_health/presentation/providers/financial_health_provider.dart';
+import '../../../financial_health/presentation/screens/financial_health_screen.dart';
 import '../../../recurring/domain/entities/recurring_transaction_entity.dart';
 import '../../../recurring/presentation/providers/recurring_provider.dart';
+import '../../../subscription/presentation/providers/subscription_provider.dart';
+import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 
 // ─── Recent Transactions Card ─────────────────────────────────────────────────
@@ -308,5 +316,239 @@ class _RecurringTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ─── Financial Health Card (compact) ──────────────────────────────────────────
+
+class DashboardFinancialHealthCard extends ConsumerWidget {
+  const DashboardFinancialHealthCard({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPro = ref.watch(isProProvider);
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+
+    if (!isPro) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: InkWell(
+          onTap: () => showProGateBottomSheet(
+            context,
+            featureName: l10n.financialHealthTitle,
+            featureDescription: l10n.financialHealthSubtitle,
+            featureIcon: Icons.monitor_heart_outlined,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFFA726).withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFA726).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.lock_outline_rounded,
+                      color: Color(0xFFFFA726), size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.financialHealthTitle,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(l10n.financialHealthSubtitle,
+                          style: TextStyle(
+                              fontSize: 11, color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final score = ref.watch(financialScoreProvider);
+    final color = _healthColor(score.level);
+    final label = _healthLabel(score.level, l10n);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FinancialHealthScreen()),
+        ),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: CustomPaint(
+                  painter: _MiniGaugePainter(
+                    progress: (score.score / 100).clamp(0.0, 1.0),
+                    color: color,
+                    trackColor: cs.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${score.scoreRounded}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '· ${score.scoreRounded}/100',
+                          style: TextStyle(
+                              fontSize: 12, color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      score.recommendations.isNotEmpty
+                          ? score.recommendations.first
+                          : l10n.financialHealthSubtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniGaugePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color trackColor;
+
+  _MiniGaugePainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 6.0;
+    final center = (Offset.zero & size).center;
+    final radius = (math.min(size.width, size.height) / 2) - stroke / 2;
+
+    final track = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+
+    const startAngle = 0.75 * math.pi * 2 - math.pi; // 135°
+    const sweepAll = 1.5 * math.pi; // 270°
+    canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle, sweepAll, false, track);
+    canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle, sweepAll * progress, false, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniGaugePainter old) =>
+      old.progress != progress || old.color != color;
+}
+
+Color _healthColor(HealthLevel level) {
+  switch (level) {
+    case HealthLevel.excellent:
+      return const Color(0xFF2E7D32);
+    case HealthLevel.good:
+      return const Color(0xFF66BB6A);
+    case HealthLevel.fair:
+      return const Color(0xFFFFA726);
+    case HealthLevel.attention:
+      return const Color(0xFFEF6C00);
+    case HealthLevel.critical:
+      return const Color(0xFFC62828);
+  }
+}
+
+String _healthLabel(HealthLevel level, AppLocalizations l10n) {
+  switch (level) {
+    case HealthLevel.excellent:
+      return l10n.financialHealthLevelExcellent;
+    case HealthLevel.good:
+      return l10n.financialHealthLevelGood;
+    case HealthLevel.fair:
+      return l10n.financialHealthLevelFair;
+    case HealthLevel.attention:
+      return l10n.financialHealthLevelAttention;
+    case HealthLevel.critical:
+      return l10n.financialHealthLevelCritical;
   }
 }
