@@ -642,9 +642,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final daysInMonth =
         DateUtils.getDaysInMonth(selectedMonth.year, selectedMonth.month);
 
-    // Saldo acumulado até o início do mês (histórico real)
+    // Saldo acumulado até o início do mês (histórico real). Ignora
+    // transferências (movimentos entre carteiras do usuário não alteram saldo).
     final balanceBeforeMonth = allTxs
         .where((t) =>
+            !t.isTransfer &&
             t.date.isBefore(DateTime(selectedMonth.year, selectedMonth.month, 1)))
         .fold<double>(0, (s, t) => t.isIncome ? s + t.amount : s - t.amount);
 
@@ -654,6 +656,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     double runningBalance = balanceBeforeMonth;
     for (int d = 1; d <= lastRealDay; d++) {
       for (final t in allTxs.where((t) =>
+          !t.isTransfer &&
           t.date.year == selectedMonth.year &&
           t.date.month == selectedMonth.month &&
           t.date.day == d)) {

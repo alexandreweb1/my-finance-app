@@ -77,11 +77,22 @@ final visibleTransactionsProvider = Provider<List<TransactionEntity>>((ref) {
 
 // --- All-time summary (used by dashboard balance) ---
 
+/// Total balance across all wallets. Transfers between user wallets
+/// (sourceWalletId set) are net-zero. External aportes (sourceWalletId == null)
+/// add to the total.
 final balanceProvider = Provider<double>((ref) {
   final transactions = ref.watch(visibleTransactionsProvider);
-  return transactions.fold(0.0, (sum, t) {
-    return t.isIncome ? sum + t.amount : sum - t.amount;
-  });
+  double total = 0;
+  for (final t in transactions) {
+    if (t.isIncome) {
+      total += t.amount;
+    } else if (t.isExpense) {
+      total -= t.amount;
+    } else if (t.isTransfer && t.sourceWalletId == null) {
+      total += t.amount;
+    }
+  }
+  return total;
 });
 
 final totalIncomeProvider = Provider<double>((ref) {
@@ -342,12 +353,23 @@ final previousCalendarMonthExpenseProvider = Provider<double>((ref) {
 });
 
 /// All-time balance per wallet ID (key '' = transactions without wallet / "Geral").
+/// Transfers add to the destination [walletId] and subtract from [sourceWalletId]
+/// when present.
 final walletBalancesProvider = Provider<Map<String, double>>((ref) {
   final transactions = ref.watch(visibleTransactionsProvider);
   final Map<String, double> balances = {};
   for (final t in transactions) {
-    balances[t.walletId] = (balances[t.walletId] ?? 0) +
-        (t.isIncome ? t.amount : -t.amount);
+    if (t.isIncome) {
+      balances[t.walletId] = (balances[t.walletId] ?? 0) + t.amount;
+    } else if (t.isExpense) {
+      balances[t.walletId] = (balances[t.walletId] ?? 0) - t.amount;
+    } else if (t.isTransfer) {
+      balances[t.walletId] = (balances[t.walletId] ?? 0) + t.amount;
+      final src = t.sourceWalletId;
+      if (src != null) {
+        balances[src] = (balances[src] ?? 0) - t.amount;
+      }
+    }
   }
   return balances;
 });
@@ -375,6 +397,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
     required DateTime date,
     String? description,
     String walletId = '',
+    String? sourceWalletId,
     String? goalId,
     bool isPending = false,
     List<String> tags = const [],
@@ -390,6 +413,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
       date: date,
       description: description,
       walletId: walletId,
+      sourceWalletId: sourceWalletId,
       goalId: goalId,
       isPending: isPending,
       tags: tags,

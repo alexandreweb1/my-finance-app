@@ -7,7 +7,9 @@ import '../../../../core/utils/category_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
+import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../wallets/presentation/widgets/wallet_buckets_widgets.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/transaction_list_tile.dart';
@@ -34,7 +36,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       setState(() => _selectedTab = _tabController.index);
@@ -179,8 +181,12 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             : null,
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(text: 'Extrato'),
+            Tab(text: 'Reservas'),
+            Tab(text: 'Investimentos'),
             Tab(text: 'Patrimônio'),
           ],
         ),
@@ -293,7 +299,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             ],
           ),
 
-          // ── Tab 1: Patrimônio ──────────────────────────────────────────
+          // ── Tab 1: Reservas ────────────────────────────────────────────
+          const TypedWalletsTab(type: WalletType.reserve),
+
+          // ── Tab 2: Investimentos ───────────────────────────────────────
+          const TypedWalletsTab(type: WalletType.investment),
+
+          // ── Tab 3: Patrimônio ──────────────────────────────────────────
           const _PatrimonioTab(),
         ],
       ),

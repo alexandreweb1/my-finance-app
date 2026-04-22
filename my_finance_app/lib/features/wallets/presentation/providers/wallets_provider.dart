@@ -40,6 +40,23 @@ final deleteWalletUseCaseProvider = Provider(
   (ref) => DeleteWalletUseCase(ref.watch(walletRepositoryProvider)),
 );
 
+// --- Filtered providers by wallet type ---
+
+final regularWalletsProvider = Provider<List<WalletEntity>>((ref) {
+  final all = ref.watch(walletsStreamProvider).value ?? [];
+  return all.where((w) => w.type == WalletType.regular).toList();
+});
+
+final reserveWalletsProvider = Provider<List<WalletEntity>>((ref) {
+  final all = ref.watch(walletsStreamProvider).value ?? [];
+  return all.where((w) => w.type == WalletType.reserve).toList();
+});
+
+final investmentWalletsProvider = Provider<List<WalletEntity>>((ref) {
+  final all = ref.watch(walletsStreamProvider).value ?? [];
+  return all.where((w) => w.type == WalletType.investment).toList();
+});
+
 // --- Stream Provider ---
 
 final walletsStreamProvider = StreamProvider<List<WalletEntity>>((ref) {
@@ -93,6 +110,8 @@ class WalletsNotifier extends StateNotifier<AsyncValue<void>> {
     required int iconCodePoint,
     required int colorValue,
     String currencyCode = '',
+    WalletType type = WalletType.regular,
+    double targetAmount = 0,
   }) async {
     state = const AsyncValue.loading();
     final wallet = WalletEntity(
@@ -102,6 +121,8 @@ class WalletsNotifier extends StateNotifier<AsyncValue<void>> {
       iconCodePoint: iconCodePoint,
       colorValue: colorValue,
       currencyCode: currencyCode,
+      type: type,
+      targetAmount: targetAmount,
     );
     final result = await _addWallet(AddWalletParams(wallet: wallet));
     return result.fold(

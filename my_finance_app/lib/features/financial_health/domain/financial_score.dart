@@ -1,13 +1,14 @@
 /// Severity buckets the score is classified into.
 enum HealthLevel { critical, attention, fair, good, excellent }
 
-/// One of the five inputs that compose the overall score.
+/// Inputs that compose the overall score.
 enum ScoreFactorKind {
   savingsRate,
   emergencyReserve,
   budgetAdherence,
   goalMomentum,
   spendingConcentration,
+  investments,
 }
 
 /// Result of evaluating one factor. `value` is in the 0–20 range when

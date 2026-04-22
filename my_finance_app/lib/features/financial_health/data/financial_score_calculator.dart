@@ -14,7 +14,10 @@ class FinancialScoreCalculator {
     required List<BudgetSummary> currentMonthBudgets,
     required List<GoalEntity> goals,
     required Map<String, double> goalContributedAmounts,
-    required double totalBalance,
+    required double reserveBalance,
+    required double investmentBalance,
+    required Set<String> reserveWalletIds,
+    required Set<String> investmentWalletIds,
     DateTime? now,
   }) {
     final reference = now ?? DateTime.now();
@@ -26,10 +29,11 @@ class FinancialScoreCalculator {
 
     final factors = <ScoreFactor>[
       _savingsRate(windowed),
-      _emergencyReserve(windowed, totalBalance),
+      _emergencyReserve(windowed, reserveBalance, reserveWalletIds),
       _budgetAdherence(currentMonthBudgets),
       _goalMomentum(goals, goalContributedAmounts, transactions, reference),
       _spendingConcentration(windowed),
+      _investments(windowed, investmentBalance, investmentWalletIds, reference),
     ];
 
     final measured = factors.where((f) => f.measured).toList();
@@ -85,12 +89,25 @@ class FinancialScoreCalculator {
   }
 
   // ── Factor 2: Emergency reserve (months of expense covered) ───────────────
+  // Now uses the SUM of reserve wallets balance, not total balance.
   ScoreFactor _emergencyReserve(
-      List<TransactionEntity> txs, double totalBalance) {
+    List<TransactionEntity> txs,
+    double reserveBalance,
+    Set<String> reserveWalletIds,
+  ) {
     final expense = txs
         .where((t) => t.isExpense)
         .fold<double>(0, (s, t) => s + t.amount);
     final monthlyExpense = expense / 3.0;
+    if (reserveWalletIds.isEmpty) {
+      return const ScoreFactor(
+        kind: ScoreFactorKind.emergencyReserve,
+        value: 0,
+        measured: false,
+        headline: 'Cadastre uma carteira de Reserva para medir sua cobertura.',
+        hint: 'Crie uma carteira do tipo Reserva no Extrato.',
+      );
+    }
     if (monthlyExpense <= 0) {
       return const ScoreFactor(
         kind: ScoreFactorKind.emergencyReserve,
@@ -99,7 +116,7 @@ class FinancialScoreCalculator {
         headline: 'Sem despesas suficientes para estimar a reserva.',
       );
     }
-    final months = totalBalance / monthlyExpense;
+    final months = reserveBalance / monthlyExpense;
     final value = months >= 6
         ? 20.0
         : months >= 3
@@ -236,6 +253,69 @@ class FinancialScoreCalculator {
           '"${topEntry.key}" concentra $pct% das suas despesas.',
       hint: share >= 0.45
           ? 'Diversifique seus gastos ou avalie cortes nesta categoria.'
+          : null,
+    );
+  }
+
+  // ── Factor 6: Investments (taxa de aporte vs renda) ──────────────────────
+  // Mede quanto da renda dos últimos 90 dias virou aporte em carteiras
+  // de investimento.
+  ScoreFactor _investments(
+    List<TransactionEntity> txs,
+    double investmentBalance,
+    Set<String> investmentWalletIds,
+    DateTime reference,
+  ) {
+    if (investmentWalletIds.isEmpty) {
+      return const ScoreFactor(
+        kind: ScoreFactorKind.investments,
+        value: 0,
+        measured: false,
+        headline: 'Cadastre uma carteira de Investimento para começar.',
+        hint: 'Crie uma carteira do tipo Investimento no Extrato.',
+      );
+    }
+    final income = txs
+        .where((t) => t.isIncome)
+        .fold<double>(0, (s, t) => s + t.amount);
+    if (income <= 0) {
+      return const ScoreFactor(
+        kind: ScoreFactorKind.investments,
+        value: 0,
+        measured: false,
+        headline: 'Sem receitas registradas para comparar com aportes.',
+      );
+    }
+    // Net flow into investment wallets in the window: aportes − resgates.
+    double netInvested = 0;
+    for (final t in txs.where((t) => t.isTransfer)) {
+      final intoInvestment = investmentWalletIds.contains(t.walletId);
+      final outOfInvestment =
+          t.sourceWalletId != null && investmentWalletIds.contains(t.sourceWalletId);
+      if (intoInvestment) netInvested += t.amount;
+      if (outOfInvestment) netInvested -= t.amount;
+    }
+    final rate = netInvested / income;
+    final value = rate >= 0.20
+        ? 20.0
+        : rate >= 0.10
+            ? 16.0
+            : rate >= 0.05
+                ? 12.0
+                : rate > 0
+                    ? 6.0
+                    : 0.0;
+    final pct = (rate * 100).toStringAsFixed(0);
+    final headline = netInvested > 0
+        ? 'Você investiu $pct% da renda nos últimos 90 dias.'
+        : 'Nenhum aporte líquido em investimentos nos últimos 90 dias.';
+    return ScoreFactor(
+      kind: ScoreFactorKind.investments,
+      value: value,
+      measured: true,
+      headline: headline,
+      hint: rate < 0.05
+          ? 'Aporte regularmente para fazer seu patrimônio crescer.'
           : null,
     );
   }

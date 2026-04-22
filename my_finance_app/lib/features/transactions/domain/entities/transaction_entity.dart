@@ -1,6 +1,28 @@
 import 'package:equatable/equatable.dart';
 
-enum TransactionType { income, expense }
+enum TransactionType {
+  income,
+  expense,
+  /// Aporte/resgate em uma carteira de reserva ou investimento.
+  /// O sinal é determinado pela combinação `walletId` (destino) e
+  /// `sourceWalletId` (origem). Não conta como receita nem despesa do mês.
+  transfer;
+
+  String get id => name;
+
+  static TransactionType fromId(String? id) {
+    switch (id) {
+      case 'income':
+        return TransactionType.income;
+      case 'expense':
+        return TransactionType.expense;
+      case 'transfer':
+        return TransactionType.transfer;
+      default:
+        return TransactionType.expense;
+    }
+  }
+}
 
 class TransactionEntity extends Equatable {
   final String id;
@@ -11,8 +33,12 @@ class TransactionEntity extends Equatable {
   final String category;
   final DateTime date;
   final String? description;
-  /// ID of the wallet this transaction belongs to. Empty string = "Geral".
+  /// ID of the wallet this transaction belongs to (destination for transfers).
+  /// Empty string = "Geral".
   final String walletId;
+  /// For transfers: source wallet that loses [amount]. Null means the aporte
+  /// came from outside (external money) — only [walletId] is impacted.
+  final String? sourceWalletId;
   /// Optional ID of a savings goal this transaction contributes to.
   final String? goalId;
   /// True when the transaction was auto-created from a notification and
@@ -31,6 +57,7 @@ class TransactionEntity extends Equatable {
     required this.date,
     this.description,
     this.walletId = '',
+    this.sourceWalletId,
     this.goalId,
     this.isPending = false,
     this.tags = const [],
@@ -38,8 +65,22 @@ class TransactionEntity extends Equatable {
 
   bool get isIncome => type == TransactionType.income;
   bool get isExpense => type == TransactionType.expense;
+  bool get isTransfer => type == TransactionType.transfer;
 
   @override
-  List<Object?> get props =>
-      [id, userId, title, amount, type, category, date, description, walletId, goalId, isPending, tags];
+  List<Object?> get props => [
+        id,
+        userId,
+        title,
+        amount,
+        type,
+        category,
+        date,
+        description,
+        walletId,
+        sourceWalletId,
+        goalId,
+        isPending,
+        tags,
+      ];
 }

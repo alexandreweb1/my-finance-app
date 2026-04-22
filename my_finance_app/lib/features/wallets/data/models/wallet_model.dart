@@ -11,6 +11,8 @@ class WalletModel extends WalletEntity {
     required super.colorValue,
     super.isDefault,
     super.currencyCode,
+    super.type,
+    super.targetAmount,
   });
 
   factory WalletModel.fromFirestore(DocumentSnapshot doc) {
@@ -23,6 +25,8 @@ class WalletModel extends WalletEntity {
       colorValue: (data['colorValue'] as num).toInt(),
       isDefault: data['isDefault'] as bool? ?? false,
       currencyCode: data['currencyCode'] as String? ?? '',
+      type: WalletType.fromId(data['type'] as String?),
+      targetAmount: (data['targetAmount'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -33,6 +37,8 @@ class WalletModel extends WalletEntity {
         'colorValue': colorValue,
         'isDefault': isDefault,
         'currencyCode': currencyCode,
+        'type': type.id,
+        'targetAmount': targetAmount,
       };
 
   factory WalletModel.fromEntity(WalletEntity entity) => WalletModel(
@@ -43,5 +49,7 @@ class WalletModel extends WalletEntity {
         colorValue: entity.colorValue,
         isDefault: entity.isDefault,
         currencyCode: entity.currencyCode,
+        type: entity.type,
+        targetAmount: entity.targetAmount,
       );
 }

@@ -330,6 +330,8 @@ IconData _iconFor(ScoreFactorKind kind) {
       return Icons.flag_outlined;
     case ScoreFactorKind.spendingConcentration:
       return Icons.donut_large_outlined;
+    case ScoreFactorKind.investments:
+      return Icons.trending_up_rounded;
   }
 }
 
@@ -345,5 +347,7 @@ String _titleFor(ScoreFactorKind kind, AppLocalizations l10n) {
       return l10n.financialFactorGoalMomentum;
     case ScoreFactorKind.spendingConcentration:
       return l10n.financialFactorSpendingConcentration;
+    case ScoreFactorKind.investments:
+      return 'Investimentos';
   }
 }
