@@ -20,3 +20,4 @@ vantagens** em `lib/features/subscription/presentation/screens/pro_screen.dart`
 | Tags / Etiquetas | `add_transaction_dialog.dart` (input só aparece se Pro) |
 | Importação de extratos (OFX/CSV) | `settings_screen.dart` (`_DataIoCard._openImport`) |
 | Exportação de relatórios (PDF/Excel) | `settings_screen.dart` (`_DataIoCard._openExport`) |
+| Saúde financeira (score 0–100) | `settings_screen.dart` (`_FinancialHealthCard._open`) |

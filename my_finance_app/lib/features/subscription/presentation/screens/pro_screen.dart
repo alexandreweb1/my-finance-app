@@ -383,6 +383,12 @@ class _FeaturesCard extends StatelessWidget {
               title: 'Exportação de relatórios',
               description:
                   'Gere extratos em PDF ou Excel por período para compartilhar com contador, parceiro ou arquivar.',
+            ),
+            const _FeatureRow(
+              icon: Icons.monitor_heart_rounded,
+              title: 'Saúde financeira',
+              description:
+                  'Score de 0 a 100 com análise de poupança, reserva, orçamentos, metas e diversificação de gastos.',
               isLast: true,
             ),
           ],

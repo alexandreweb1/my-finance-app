@@ -15,6 +15,8 @@ import '../../../app_lock/presentation/providers/app_lock_provider.dart';
 import '../../../app_lock/presentation/screens/setup_pin_screen.dart';
 import '../../../data_io/presentation/screens/export_screen.dart';
 import '../../../data_io/presentation/screens/import_screen.dart';
+import '../../../financial_health/presentation/providers/financial_health_provider.dart';
+import '../../../financial_health/presentation/screens/financial_health_screen.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/widgets/user_avatar.dart';
@@ -406,6 +408,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _MobileSectionLabel(l10n.dataSection),
       const SizedBox(height: 6),
       const _DataIoCard(),
+      const SizedBox(height: 12),
+      const _FinancialHealthCard(),
       const SizedBox(height: 20),
 
       // ── GERAL ──────────────────────────────────────────────────────────
@@ -3029,6 +3033,66 @@ class _DataIoCard extends ConsumerWidget {
             style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.chevron_right, size: 20),
         onTap: () => _openExport(context, ref),
+      ),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Financial Health card (score + insights) — Pro feature
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FinancialHealthCard extends ConsumerWidget {
+  const _FinancialHealthCard();
+
+  void _open(BuildContext context, WidgetRef ref) {
+    if (!ref.read(isProProvider)) {
+      showProGateBottomSheet(
+        context,
+        featureName: 'Saúde financeira',
+        featureDescription:
+            'Veja seu score de 0 a 100 e descubra como melhorar suas finanças.',
+        featureIcon: Icons.monitor_heart_rounded,
+      );
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const FinancialHealthScreen(),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final isPro = ref.watch(isProProvider);
+    final score = isPro
+        ? ref.watch(financialScoreProvider).scoreRounded
+        : null;
+    return _SettingsCard(children: [
+      ListTile(
+        leading: const _IconBadge(Icons.monitor_heart_outlined,
+            color: Color(0xFFEC407A)),
+        title: Row(
+          children: [
+            Text(l10n.financialHealthTitle),
+            const SizedBox(width: 8),
+            if (!isPro) const ProBadgeWidget(),
+          ],
+        ),
+        subtitle: Text(l10n.financialHealthSubtitle,
+            style: const TextStyle(fontSize: 12)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (score != null)
+              Text('$score / 100',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
+        ),
+        onTap: () => _open(context, ref),
       ),
     ]);
   }

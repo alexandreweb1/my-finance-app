@@ -386,6 +386,45 @@ class AppLocalizations {
       'Nenhuma transação no período selecionado.',
       'No transactions in the selected period.',
       'No hay transacciones en el período seleccionado.');
+
+  // ── Financial Health ─────────────────────────────────────────────────────
+  String get financialHealthTitle =>
+      _t('Saúde financeira', 'Financial health', 'Salud financiera');
+  String get financialHealthSubtitle => _t(
+      'Score de 0 a 100 baseado nos seus hábitos',
+      'Score from 0 to 100 based on your habits',
+      'Puntuación de 0 a 100 según tus hábitos');
+  String get financialHealthFactors =>
+      _t('Fatores avaliados', 'Evaluated factors', 'Factores evaluados');
+  String get financialHealthRecommendations =>
+      _t('Recomendações', 'Recommendations', 'Recomendaciones');
+
+  String get financialHealthLevelExcellent =>
+      _t('Excelente', 'Excellent', 'Excelente');
+  String get financialHealthLevelGood => _t('Bom', 'Good', 'Bueno');
+  String get financialHealthLevelFair =>
+      _t('Razoável', 'Fair', 'Aceptable');
+  String get financialHealthLevelAttention =>
+      _t('Atenção', 'Needs attention', 'Atención');
+  String get financialHealthLevelCritical =>
+      _t('Crítico', 'Critical', 'Crítico');
+
+  String get financialFactorSavingsRate =>
+      _t('Taxa de poupança', 'Savings rate', 'Tasa de ahorro');
+  String get financialFactorEmergencyReserve => _t(
+      'Reserva de emergência',
+      'Emergency reserve',
+      'Reserva de emergencia');
+  String get financialFactorBudgetAdherence => _t(
+      'Aderência aos orçamentos',
+      'Budget adherence',
+      'Cumplimiento de presupuestos');
+  String get financialFactorGoalMomentum =>
+      _t('Progresso de metas', 'Goal momentum', 'Progreso de metas');
+  String get financialFactorSpendingConcentration => _t(
+      'Diversificação de gastos',
+      'Spending diversification',
+      'Diversificación de gastos');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
