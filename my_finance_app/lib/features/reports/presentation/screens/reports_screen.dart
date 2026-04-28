@@ -532,33 +532,22 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         fmt: fmt,
       );
     } else if (_barSubTab == 1) {
-      // Annual cashflow: 12 months
-      final groups = List.generate(12, (i) {
-        final month = i + 1;
-        final m = DateTime(selectedMonth.year, month, 1);
-        final label = DateFormat('MMM', dateLoc)
-            .format(m)
-            .toUpperCase()
-            .substring(0, 3);
-        final income = allTxs
-            .where((t) =>
-                t.isIncome &&
-                t.date.year == selectedMonth.year &&
-                t.date.month == month)
-            .fold<double>(0, (s, t) => s + t.amount);
-        final expense = allTxs
-            .where((t) =>
-                t.isExpense &&
-                t.date.year == selectedMonth.year &&
-                t.date.month == month)
-            .fold<double>(0, (s, t) => s + t.amount);
-        return _BarGroup(label: label, values: [income, expense]);
-      });
+      // Annual cashflow: aggregated totals for the year
+      final yearIncome = allTxs
+          .where((t) => t.isIncome && t.date.year == selectedMonth.year)
+          .fold<double>(0, (s, t) => s + t.amount);
+      final yearExpense = allTxs
+          .where((t) => t.isExpense && t.date.year == selectedMonth.year)
+          .fold<double>(0, (s, t) => s + t.amount);
 
-      return _BarChartWidget(
-        groups: groups,
-        colors: const [_kIncomeColor, _kExpenseColor],
-        legendLabels: const ['Receitas', 'Despesas'],
+      if (yearIncome == 0 && yearExpense == 0) {
+        return _emptyState(context, Icons.bar_chart_rounded);
+      }
+
+      return _AnnualSummaryView(
+        year: selectedMonth.year,
+        income: yearIncome,
+        expense: yearExpense,
         fmt: fmt,
       );
     } else {
@@ -1343,7 +1332,7 @@ class _BarGroup {
   const _BarGroup({required this.label, required this.values});
 }
 
-class _BarChartWidget extends StatelessWidget {
+class _BarChartWidget extends StatefulWidget {
   final List<_BarGroup> groups;
   final List<Color> colors;
   final List<String> legendLabels;
@@ -1357,21 +1346,59 @@ class _BarChartWidget extends StatelessWidget {
   });
 
   @override
+  State<_BarChartWidget> createState() => _BarChartWidgetState();
+}
+
+class _BarChartWidgetState extends State<_BarChartWidget> {
+  ({int group, int series})? _selected;
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           height: 240,
-          child: CustomPaint(
-            painter: _BarPainter(groups: groups, colors: colors, fmt: fmt),
-            child: const SizedBox.expand(),
+          child: LayoutBuilder(
+            builder: (ctx, c) {
+              final size = Size(c.maxWidth, 240);
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) {
+                  final layout = _BarLayout.compute(
+                    size,
+                    widget.groups,
+                    widget.colors.length,
+                  );
+                  final hit = layout.hitTest(details.localPosition);
+                  setState(() {
+                    if (hit == null) {
+                      _selected = null;
+                    } else if (_selected != null &&
+                        _selected!.group == hit.group &&
+                        _selected!.series == hit.series) {
+                      _selected = null;
+                    } else {
+                      _selected = hit;
+                    }
+                  });
+                },
+                child: CustomPaint(
+                  painter: _BarPainter(
+                    groups: widget.groups,
+                    colors: widget.colors,
+                    fmt: widget.fmt,
+                    selected: _selected,
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 12),
-        // Legend
         Row(
-          children: List.generate(colors.length, (i) {
+          children: List.generate(widget.colors.length, (i) {
             return Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Row(
@@ -1381,13 +1408,13 @@ class _BarChartWidget extends StatelessWidget {
                     width: 10,
                     height: 10,
                     decoration: BoxDecoration(
-                      color: colors[i],
+                      color: widget.colors[i],
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    legendLabels[i],
+                    widget.legendLabels[i],
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1403,29 +1430,40 @@ class _BarChartWidget extends StatelessWidget {
   }
 }
 
-class _BarPainter extends CustomPainter {
-  final List<_BarGroup> groups;
-  final List<Color> colors;
-  final String Function(double) fmt;
+/// Computes the layout (rects + scaling) of the grouped bar chart so that
+/// painter and tap hit-test stay perfectly in sync.
+class _BarLayout {
+  static const double leftPad = 68;
+  static const double rightPad = 8;
+  static const double topPad = 8;
+  static const double bottomPad = 32;
+  static const double groupGap = 8;
+  static const double barGap = 2;
 
-  const _BarPainter({
-    required this.groups,
-    required this.colors,
-    required this.fmt,
+  final Size size;
+  final double effectiveMax;
+  final double chartW;
+  final double chartH;
+
+  /// barRects[group][series] — full-height hit area for tap detection.
+  /// Tapping anywhere in the column counts as a hit for that bar.
+  final List<List<Rect>> barRects;
+
+  const _BarLayout._({
+    required this.size,
+    required this.effectiveMax,
+    required this.chartW,
+    required this.chartH,
+    required this.barRects,
   });
 
-  static const double _leftPad = 68;
-  static const double _rightPad = 8;
-  static const double _topPad = 8;
-  static const double _bottomPad = 32;
-  static const int _yDivisions = 4;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (groups.isEmpty) return;
-
-    final chartW = size.width - _leftPad - _rightPad;
-    final chartH = size.height - _topPad - _bottomPad;
+  factory _BarLayout.compute(
+    Size size,
+    List<_BarGroup> groups,
+    int seriesCount,
+  ) {
+    final chartW = size.width - leftPad - rightPad;
+    final chartH = size.height - topPad - bottomPad;
 
     double maxVal = 0;
     for (final g in groups) {
@@ -1434,6 +1472,74 @@ class _BarPainter extends CustomPainter {
       }
     }
     final effectiveMax = maxVal == 0 ? 1.0 : maxVal * 1.1;
+
+    final n = groups.length;
+    final groupW = n > 0 ? (chartW - groupGap * (n - 1)) / n : chartW;
+    final barW = seriesCount > 1
+        ? (groupW - barGap * (seriesCount - 1)) / seriesCount
+        : groupW * 0.7;
+
+    final rects = <List<Rect>>[];
+    for (int gi = 0; gi < n; gi++) {
+      final gx = leftPad + gi * (groupW + groupGap);
+      final groupRects = <Rect>[];
+      for (int si = 0;
+          si < seriesCount && si < groups[gi].values.length;
+          si++) {
+        final bx = seriesCount > 1
+            ? gx + si * (barW + barGap)
+            : gx + (groupW - barW) / 2;
+        groupRects.add(Rect.fromLTWH(bx, topPad, barW, chartH));
+      }
+      rects.add(groupRects);
+    }
+
+    return _BarLayout._(
+      size: size,
+      effectiveMax: effectiveMax,
+      chartW: chartW,
+      chartH: chartH,
+      barRects: rects,
+    );
+  }
+
+  ({int group, int series})? hitTest(Offset offset) {
+    for (int g = 0; g < barRects.length; g++) {
+      for (int s = 0; s < barRects[g].length; s++) {
+        if (barRects[g][s].contains(offset)) {
+          return (group: g, series: s);
+        }
+      }
+    }
+    return null;
+  }
+}
+
+class _BarPainter extends CustomPainter {
+  final List<_BarGroup> groups;
+  final List<Color> colors;
+  final String Function(double) fmt;
+  final ({int group, int series})? selected;
+
+  const _BarPainter({
+    required this.groups,
+    required this.colors,
+    required this.fmt,
+    this.selected,
+  });
+
+  static const int _yDivisions = 4;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (groups.isEmpty) return;
+
+    final layout = _BarLayout.compute(size, groups, colors.length);
+    final chartH = layout.chartH;
+    final effectiveMax = layout.effectiveMax;
+    const leftPad = _BarLayout.leftPad;
+    const topPad = _BarLayout.topPad;
+    const rightPad = _BarLayout.rightPad;
 
     final gridPaint = Paint()
       ..color = Colors.grey.withValues(alpha: 0.15)
@@ -1447,10 +1553,10 @@ class _BarPainter extends CustomPainter {
     // ── Y grid + labels ──────────────────────────────────────────────────
     for (int i = 0; i <= _yDivisions; i++) {
       final frac = i / _yDivisions;
-      final y = _topPad + chartH * (1 - frac);
+      final y = topPad + chartH * (1 - frac);
       canvas.drawLine(
-        Offset(_leftPad, y),
-        Offset(size.width - _rightPad, y),
+        Offset(leftPad, y),
+        Offset(size.width - rightPad, y),
         gridPaint,
       );
       final val = effectiveMax * frac;
@@ -1458,37 +1564,35 @@ class _BarPainter extends CustomPainter {
         canvas,
         _compact(val),
         Offset(0, y - 6),
-        _leftPad - 4,
+        leftPad - 4,
         labelStyle,
         TextAlign.right,
       );
     }
 
     // ── Bars ─────────────────────────────────────────────────────────────
-    final n = groups.length;
-    final seriesCount = colors.length;
-    const groupGap = 8.0;
-    const barGap = 2.0;
-    final groupW = (chartW - groupGap * (n - 1)) / n;
-    final barW = seriesCount > 1
-        ? (groupW - barGap * (seriesCount - 1)) / seriesCount
-        : groupW * 0.7;
+    for (int gi = 0; gi < layout.barRects.length; gi++) {
+      final groupRects = layout.barRects[gi];
+      final hitRect =
+          groupRects.isNotEmpty ? groupRects.first : Rect.zero;
+      final groupLeft = hitRect.left;
+      final groupRight = groupRects.isNotEmpty
+          ? groupRects.last.right
+          : groupLeft;
 
-    for (int gi = 0; gi < n; gi++) {
-      final gx = _leftPad + gi * (groupW + groupGap);
-
-      for (int si = 0; si < seriesCount && si < groups[gi].values.length; si++) {
+      for (int si = 0; si < groupRects.length; si++) {
         final val = groups[gi].values[si];
         if (val <= 0) continue;
 
         final barH = (val / effectiveMax) * chartH;
-        final bx = seriesCount > 1
-            ? gx + si * (barW + barGap)
-            : gx + (groupW - barW) / 2;
-        final by = _topPad + chartH - barH;
+        final col = groupRects[si];
+        final by = topPad + chartH - barH;
+
+        final isSelected =
+            selected != null && selected!.group == gi && selected!.series == si;
 
         final rrect = RRect.fromRectAndCorners(
-          Rect.fromLTWH(bx, by, barW, barH),
+          Rect.fromLTWH(col.left, by, col.width, barH),
           topLeft: const Radius.circular(3),
           topRight: const Radius.circular(3),
         );
@@ -1496,19 +1600,92 @@ class _BarPainter extends CustomPainter {
           rrect,
           Paint()..color = colors[si],
         );
+
+        // Highlight stroke for selected bar
+        if (isSelected) {
+          canvas.drawRRect(
+            rrect,
+            Paint()
+              ..color = Colors.black.withValues(alpha: 0.55)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.5,
+          );
+        }
       }
 
       // X label
-      final labelX = gx + groupW / 2;
+      final labelX = (groupLeft + groupRight) / 2;
       _drawText(
         canvas,
         groups[gi].label,
-        Offset(labelX - 28, _topPad + chartH + 6),
+        Offset(labelX - 28, topPad + chartH + 6),
         56,
         labelStyle,
         TextAlign.center,
       );
     }
+
+    // ── Tooltip on selected bar ─────────────────────────────────────────
+    if (selected != null) {
+      final g = selected!.group;
+      final s = selected!.series;
+      if (g < groups.length && s < groups[g].values.length) {
+        final val = groups[g].values[s];
+        final col = layout.barRects[g][s];
+        final barH = (val / effectiveMax) * chartH;
+        final barTop = topPad + chartH - barH;
+
+        _drawTooltip(
+          canvas,
+          size,
+          fmt(val),
+          Offset(col.left + col.width / 2, barTop),
+          colors[s],
+        );
+      }
+    }
+  }
+
+  void _drawTooltip(
+    Canvas canvas,
+    Size size,
+    String text,
+    Offset anchor,
+    Color color,
+  ) {
+    const textStyle = TextStyle(
+      fontSize: 11,
+      color: Colors.white,
+      fontWeight: FontWeight.w600,
+    );
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    const padH = 8.0;
+    const padV = 5.0;
+    const gap = 6.0;
+    final w = tp.width + padH * 2;
+    final h = tp.height + padV * 2;
+
+    double left = anchor.dx - w / 2;
+    if (left < _BarLayout.leftPad) left = _BarLayout.leftPad;
+    if (left + w > size.width - _BarLayout.rightPad) {
+      left = size.width - _BarLayout.rightPad - w;
+    }
+
+    double top = anchor.dy - h - gap;
+    if (top < 0) top = anchor.dy + gap;
+
+    final rect = Rect.fromLTWH(left, top, w, h);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+
+    canvas.drawRRect(
+      rrect,
+      Paint()..color = color,
+    );
+    tp.paint(canvas, Offset(left + padH, top + padV));
   }
 
   String _compact(double val) {
@@ -1535,7 +1712,206 @@ class _BarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BarPainter old) =>
-      old.groups != groups || old.colors != colors;
+      old.groups != groups ||
+      old.colors != colors ||
+      old.selected != selected;
+}
+
+// ─── Annual Summary (totals for the year) ─────────────────────────────────────
+
+class _AnnualSummaryView extends StatelessWidget {
+  final int year;
+  final double income;
+  final double expense;
+  final String Function(double) fmt;
+
+  const _AnnualSummaryView({
+    required this.year,
+    required this.income,
+    required this.expense,
+    required this.fmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final balance = income - expense;
+    final isPositive = balance >= 0;
+    final maxVal = math.max(income, expense);
+    final incomeFraction = maxVal > 0 ? income / maxVal : 0.0;
+    final expenseFraction = maxVal > 0 ? expense / maxVal : 0.0;
+    final savingsRate = income > 0 ? (balance / income) * 100 : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Total acumulado de $year',
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _AnnualBarRow(
+            icon: Icons.arrow_downward_rounded,
+            label: 'Receitas',
+            value: fmt(income),
+            color: _kIncomeColor,
+            fraction: incomeFraction,
+          ),
+          const SizedBox(height: 16),
+          _AnnualBarRow(
+            icon: Icons.arrow_upward_rounded,
+            label: 'Despesas',
+            value: fmt(expense),
+            color: _kExpenseColor,
+            fraction: expenseFraction,
+          ),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: (isPositive ? _kIncomeColor : _kExpenseColor)
+                  .withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (isPositive ? _kIncomeColor : _kExpenseColor)
+                    .withValues(alpha: 0.30),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isPositive
+                      ? Icons.savings_rounded
+                      : Icons.warning_amber_rounded,
+                  size: 20,
+                  color: isPositive ? _kIncomeColor : _kExpenseColor,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isPositive ? 'Saldo do ano' : 'Déficit do ano',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${isPositive ? '+' : '-'}${fmt(balance.abs())}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isPositive ? _kIncomeColor : _kExpenseColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (income > 0)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        isPositive ? 'Taxa de poupança' : 'Sobre receita',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${savingsRate.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isPositive ? _kIncomeColor : _kExpenseColor,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnualBarRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final double fraction;
+
+  const _AnnualBarRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.fraction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: fraction.clamp(0.0, 1.0)),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeOutCubic,
+            builder: (context, v, _) => LinearProgressIndicator(
+              value: v,
+              minHeight: 10,
+              backgroundColor: color.withValues(alpha: 0.12),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // ─── Data classes ─────────────────────────────────────────────────────────────
