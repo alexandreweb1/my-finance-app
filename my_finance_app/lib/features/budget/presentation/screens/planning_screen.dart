@@ -405,7 +405,7 @@ class _BudgetCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${fmt(summary.spentAmount)} / ${fmt(budget.limitAmount)}',
+                            '${fmt(budget.limitAmount)} / ${fmt(summary.spentAmount)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

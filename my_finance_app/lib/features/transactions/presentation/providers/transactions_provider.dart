@@ -352,6 +352,28 @@ final previousCalendarMonthExpenseProvider = Provider<double>((ref) {
       .fold(0.0, (sum, t) => sum + t.amount);
 });
 
+/// All-time balance per wallet ID, ignoring the hidden-wallets filter.
+/// Used in the Reservas/Investimentos tabs so each bucket keeps showing its
+/// real balance even when the user has hidden the wallet from totals/charts.
+final walletAllBalancesProvider = Provider<Map<String, double>>((ref) {
+  final transactions = ref.watch(transactionsStreamProvider).value ?? const [];
+  final Map<String, double> balances = {};
+  for (final t in transactions) {
+    if (t.isIncome) {
+      balances[t.walletId] = (balances[t.walletId] ?? 0) + t.amount;
+    } else if (t.isExpense) {
+      balances[t.walletId] = (balances[t.walletId] ?? 0) - t.amount;
+    } else if (t.isTransfer) {
+      balances[t.walletId] = (balances[t.walletId] ?? 0) + t.amount;
+      final src = t.sourceWalletId;
+      if (src != null) {
+        balances[src] = (balances[src] ?? 0) - t.amount;
+      }
+    }
+  }
+  return balances;
+});
+
 /// All-time balance per wallet ID (key '' = transactions without wallet / "Geral").
 /// Transfers add to the destination [walletId] and subtract from [sourceWalletId]
 /// when present.
