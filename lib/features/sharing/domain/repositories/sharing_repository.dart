@@ -20,6 +20,10 @@ abstract class SharingRepository {
   Stream<Either<Failure, List<InvitationEntity>>> watchCollaborators(
       String masterUserId);
 
+  /// Convites enviados pelo master que ainda aguardam resposta.
+  Stream<Either<Failure, List<InvitationEntity>>> watchSentPendingInvitations(
+      String masterUserId);
+
   Future<Either<Failure, void>> acceptInvitation({
     required String invitationId,
     required String inviteeUserId,
@@ -28,6 +32,9 @@ abstract class SharingRepository {
   });
 
   Future<Either<Failure, void>> declineInvitation(String invitationId);
+
+  /// Master cancela um convite pendente que ele mesmo enviou.
+  Future<Either<Failure, void>> cancelInvitation(String invitationId);
 
   Future<Either<Failure, void>> removeCollaborator({
     required String invitationId,

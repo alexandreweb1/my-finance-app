@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../categories/presentation/providers/categories_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../domain/entities/category_rule_entity.dart';
 import '../providers/category_rules_provider.dart';
 
@@ -37,7 +38,15 @@ class CategoryRulesScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Regras de categorização')),
+      appBar: AppBar(
+        title: const Text('Regras de categorização'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(child: CarteiraHeaderSelector(onDark: false)),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEditor(context, ref),
         backgroundColor: _kGreen,

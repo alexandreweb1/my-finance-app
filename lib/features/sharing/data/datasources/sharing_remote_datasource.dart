@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:uuid/uuid.dart';
@@ -19,6 +21,9 @@ abstract class SharingRemoteDataSource {
 
   Stream<List<InvitationEntity>> watchCollaborators(String masterUserId);
 
+  /// Convites que o master ENVIOU e ainda aguardam resposta.
+  Stream<List<InvitationEntity>> watchSentPendingInvitations(String masterUserId);
+
   Future<void> acceptInvitation({
     required String invitationId,
     required String inviteeUserId,
@@ -27,6 +32,9 @@ abstract class SharingRemoteDataSource {
   });
 
   Future<void> declineInvitation(String invitationId);
+
+  /// Master cancela um convite que ele mesmo enviou e ainda está pendente.
+  Future<void> cancelInvitation(String invitationId);
 
   Future<void> removeCollaborator({
     required String invitationId,
@@ -83,20 +91,28 @@ class SharingRemoteDataSourceImpl implements SharingRemoteDataSource {
       throw Exception('Você não pode se convidar.');
     }
 
-    // Guard: no duplicate pending invite
+    // Guard: no duplicate invite FOR THE SAME Carteira. Sharing is per
+    // workspace, so an invite pending (or already accepted) for a DIFFERENT
+    // Carteira must not block this one — the same person can legitimately be
+    // a member of several Carteiras with different roles.
     final existing = await _invitations
         .where('masterUserId', isEqualTo: masterUserId)
         .where('inviteeEmail', isEqualTo: normalizedEmail)
-        .where('status', isEqualTo: 'pending')
-        .limit(1)
+        .where('status', whereIn: ['pending', 'accepted'])
         .get();
 
-    if (existing.docs.isNotEmpty) {
-      throw Exception('Já existe um convite pendente para este email.');
+    for (final doc in existing.docs) {
+      final d = doc.data();
+      // Legacy account-wide invites carry no workspaceId; they collide only
+      // with another account-wide invite (workspaceId == null on both sides).
+      if ((d['workspaceId'] as String?) != workspaceId) continue;
+      throw Exception(d['status'] == 'pending'
+          ? 'Já existe um convite pendente para este email nesta Carteira.'
+          : 'Este email já tem acesso a esta Carteira.');
     }
 
     final id = const Uuid().v4();
-    await _invitations.doc(id).set({
+    final data = {
       'id': id,
       'masterUserId': masterUserId,
       'masterEmail': masterEmail,
@@ -109,7 +125,28 @@ class SharingRemoteDataSourceImpl implements SharingRemoteDataSource {
       if (workspaceId != null) 'workspaceId': workspaceId,
       if (workspaceId != null) 'workspaceName': workspaceName ?? '',
       if (workspaceId != null) 'role': role,
-    });
+    };
+
+    // Transação, não `doc().set()` — mesma razão de acceptInvitation: com a
+    // persistência offline (padrão no iOS/Android) um `set()` fica na FILA
+    // quando não há rede e o Future nunca completa, então o botão "Convidar"
+    // gira para sempre e o usuário não recebe erro nenhum; e uma recusa das
+    // rules chegaria tarde demais, silenciosa. A transação sempre vai ao
+    // servidor e o Future reflete o resultado real.
+    try {
+      await _firestore
+          .runTransaction((tx) async => tx.set(_invitations.doc(id), data))
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw Exception(
+          'Sem resposta do servidor. Confira sua conexão e tente de novo.');
+    } on FirebaseException catch (e) {
+      if (e.code == 'unavailable' || e.code == 'deadline-exceeded') {
+        throw Exception(
+            'Você parece estar sem conexão. Tente de novo quando a internet voltar.');
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -128,6 +165,16 @@ class SharingRemoteDataSourceImpl implements SharingRemoteDataSource {
     return _invitations
         .where('masterUserId', isEqualTo: masterUserId)
         .where('status', isEqualTo: 'accepted')
+        .snapshots()
+        .map((snap) => snap.docs.map(_fromDoc).toList());
+  }
+
+  @override
+  Stream<List<InvitationEntity>> watchSentPendingInvitations(
+      String masterUserId) {
+    return _invitations
+        .where('masterUserId', isEqualTo: masterUserId)
+        .where('status', isEqualTo: 'pending')
         .snapshots()
         .map((snap) => snap.docs.map(_fromDoc).toList());
   }
@@ -181,6 +228,14 @@ class SharingRemoteDataSourceImpl implements SharingRemoteDataSource {
   @override
   Future<void> declineInvitation(String invitationId) async {
     await _invitations.doc(invitationId).update({'status': 'declined'});
+  }
+
+  @override
+  Future<void> cancelInvitation(String invitationId) async {
+    // Rules let the master change only `status`; 'removed' takes the invite
+    // out of both the invitee's pending list and the master's, and frees the
+    // e-mail to be invited to this Carteira again.
+    await _invitations.doc(invitationId).update({'status': 'removed'});
   }
 
   @override

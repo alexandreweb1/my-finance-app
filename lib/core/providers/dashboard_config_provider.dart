@@ -101,6 +101,25 @@ class DashboardConfig {
     required this.hidden,
   });
 
+  /// Seções ligadas de fábrica. TODAS as 12 continuam disponíveis (a ordem
+  /// abaixo lista o conjunto inteiro) — o que muda é quantas aparecem sem o
+  /// usuário pedir: a Home abria com tudo ligado e virava uma rolagem longa
+  /// logo no primeiro acesso. Ficam ligadas as que respondem "como estou este
+  /// mês?"; o resto entra por um toque em Personalizar.
+  ///
+  /// Três das visíveis já se escondem sozinhas quando não têm o que mostrar
+  /// (plano do onboarding, insights e orçamentos), então na prática a Home
+  /// nova abre com 2 a 5 blocos em vez de 9 a 12.
+  static const Set<DashboardSection> defaultHidden = {
+    DashboardSection.investments,
+    DashboardSection.safeToSpend,
+    DashboardSection.netWorth,
+    DashboardSection.financialHealth,
+    DashboardSection.bills,
+    DashboardSection.wallets,
+    DashboardSection.upcomingRecurring,
+  };
+
   /// Default section order (padrão para todos os usuários). Mirrors the layout
   /// approved in the Personalizar Dashboard screen.
   static const DashboardConfig defaultConfig = DashboardConfig(
@@ -118,13 +137,18 @@ class DashboardConfig {
       DashboardSection.recentTransactions, // Últimas Transações
       DashboardSection.upcomingRecurring, // Próximas Recorrências
     ],
-    hidden: {},
+    hidden: defaultHidden,
   );
 
   bool isVisible(DashboardSection s) => !hidden.contains(s);
 
   List<DashboardSection> get visibleSections =>
       order.where(isVisible).toList();
+
+  /// Seções desligadas, na ordem em que apareceriam — o que o botão
+  /// "Mostrar mais seções" da Home oferece.
+  List<DashboardSection> get hiddenSections =>
+      order.where((s) => !isVisible(s)).toList();
 
   DashboardConfig copyWith({
     List<DashboardSection>? order,
@@ -168,6 +192,11 @@ class DashboardConfig {
 
 // v2: rolled out the new default section order to every user (a saved v1 config
 // is ignored, so everyone starts from the new default and can re-customize).
+//
+// A chave segue em v2 de propósito depois da simplificação do padrão: `_save()`
+// só roda quando o usuário mexe em algo, então quem nunca personalizou não tem
+// nada gravado e cai no novo padrão sozinho — e quem personalizou mantém o
+// layout que escolheu em vez de ser resetado pelas nossas costas.
 const _kPrefKey = 'dashboard_config_v2';
 
 class DashboardConfigNotifier extends Notifier<DashboardConfig> {

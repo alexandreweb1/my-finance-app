@@ -5,11 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/providers/workspace_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../recurring/presentation/providers/recurring_provider.dart';
+import '../../../subscription/presentation/providers/subscription_provider.dart';
+import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
+import '../report_export.dart';
 
 // ─── Colour palette ────────────────────────────────────────────────────────────
 const _kChartColors = [
@@ -37,6 +42,23 @@ class ReportsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
+  static const _kPieSubLabels = [
+    'Despesas por categoria',
+    'Despesas por conta',
+    'Receitas por categoria',
+  ];
+  static const _kLineSubLabels = [
+    'Despesas da semana',
+    'Despesas do mês',
+    'Despesas por ano',
+  ];
+  static const _kBarSubLabels = [
+    'Balanço mensal',
+    'Fluxo de caixa anual',
+    'Despesas x dia semana',
+  ];
+  static const _kCashFlowLabel = 'Fluxo de caixa';
+
   int _mainTab = 0; // 0=pie  1=line  2=bar  3=cashflow
   int _pieSubTab = 0; // 0=expense/cat  1=expense/wallet  2=income/cat
   int _lineSubTab = 1; // 0=semana  1=mês  2=ano
@@ -46,6 +68,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   late DateTime _barPeriodEnd;
   // Line "week" view window start
   late DateTime _weekStart;
+
+  /// Exportação pedida pelo usuário, aguardando o próximo build. Os gráficos só
+  /// podem ser montados DENTRO do build (usam `ref.watch`), então o pedido fica
+  /// aqui, o build monta as seções e o pós-frame abre a pré-visualização.
+  ReportExportChoice? _pendingExport;
 
   @override
   void initState() {
@@ -66,6 +93,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final allTxs = ref.watch(visibleTransactionsProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
+    if (_pendingExport != null) {
+      final sections =
+          _buildExportSections(_pendingExport!, context, allTxs, fmt, dateLoc);
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _openExportPreview(sections));
+    }
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -75,6 +109,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             pinned: true,
             backgroundColor: colorScheme.surface,
             surfaceTintColor: colorScheme.surfaceTint,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.ios_share_rounded, size: 20),
+                tooltip: 'Exportar relatório',
+                onPressed: _startExport,
+              ),
+              const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Center(child: CarteiraHeaderSelector(onDark: false)),
+              ),
+            ],
           ),
 
           // ── Top icon tab bar ─────────────────────────────────────────────
@@ -175,7 +220,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSubTabsRow(
-          ['Despesas por categoria', 'Despesas por conta', 'Receitas por categoria'],
+          _kPieSubLabels,
           _pieSubTab,
           (i) => setState(() => _pieSubTab = i),
         ),
@@ -275,7 +320,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSubTabsRow(
-          ['Despesas da semana', 'Despesas do mês', 'Despesas por ano'],
+          _kLineSubLabels,
           _lineSubTab,
           (i) => setState(() => _lineSubTab = i),
         ),
@@ -446,7 +491,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSubTabsRow(
-          ['Balanço mensal', 'Fluxo de caixa anual', 'Despesas x dia semana'],
+          _kBarSubLabels,
           _barSubTab,
           (i) => setState(() => _barSubTab = i),
         ),
@@ -789,6 +834,109 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ),
       ],
     );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EXPORTAR (imagem / PDF)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Título do relatório = o sub-filtro escolhido, que é o que descreve de fato
+  /// o que o gráfico mostra.
+  String _reportTitle(int mainTab) => switch (mainTab) {
+        0 => _kPieSubLabels[_pieSubTab],
+        1 => _kLineSubLabels[_lineSubTab],
+        2 => _kBarSubLabels[_barSubTab],
+        _ => _kCashFlowLabel,
+      };
+
+  String _reportPeriod(int mainTab, String dateLoc, DateTime selectedMonth) {
+    final month =
+        DateFormat('MMMM yyyy', dateLoc).format(selectedMonth).toUpperCase();
+    return switch (mainTab) {
+      1 when _lineSubTab == 0 => _weekRangeLabel(_weekStart, dateLoc),
+      1 when _lineSubTab == 2 => selectedMonth.year.toString(),
+      2 when _barSubTab == 0 => _monthRangeLabel(_barPeriodEnd, dateLoc),
+      2 when _barSubTab == 1 => selectedMonth.year.toString(),
+      _ => month,
+    };
+  }
+
+  Future<void> _startExport() async {
+    if (!ref.read(isProProvider)) {
+      showProGateBottomSheet(
+        context,
+        featureName: 'Exportar relatórios',
+        featureDescription:
+            'Gere imagem ou PDF dos seus gráficos para compartilhar.',
+        featureIcon: Icons.ios_share_rounded,
+      );
+      return;
+    }
+    final choice = await showReportExportOptions(
+      context,
+      currentReportLabel: _reportTitle(_mainTab),
+    );
+    if (choice == null || !mounted) return;
+    setState(() => _pendingExport = choice);
+  }
+
+  /// Monta os gráficos pedidos. Roda DENTRO do build (usa `ref.watch` via os
+  /// mesmos construtores das abas), e o resultado é um snapshot: os widgets já
+  /// carregam os dados, então funcionam montados em outra rota.
+  List<ReportExportSection> _buildExportSections(
+    ReportExportChoice choice,
+    BuildContext context,
+    List<TransactionEntity> allTxs,
+    String Function(double) fmt,
+    String dateLoc,
+  ) {
+    // Cores do tema CLARO da exportação — o gráfico vai para um PNG de fundo
+    // branco mesmo que o app esteja no escuro.
+    final cs = reportExportTheme.colorScheme;
+    final selectedMonth = ref.watch(transactionsSelectedMonthProvider);
+    final tabs = choice.scope == ReportExportScope.all
+        ? const [0, 1, 2, 3]
+        : [_mainTab];
+
+    return [
+      for (final tab in tabs)
+        ReportExportSection(
+          title: _reportTitle(tab),
+          period: _reportPeriod(tab, dateLoc, selectedMonth),
+          content: switch (tab) {
+            0 => _buildPieChartContent(
+                context,
+                allTxs
+                    .where((t) =>
+                        t.date.year == selectedMonth.year &&
+                        t.date.month == selectedMonth.month)
+                    .toList(),
+                fmt,
+              ),
+            1 => _buildLineChartContent(
+                context, allTxs, fmt, dateLoc, selectedMonth, cs),
+            2 => _buildBarChartContent(
+                context, allTxs, fmt, dateLoc, selectedMonth, cs),
+            _ => _buildCashFlowContent(
+                context, allTxs, fmt, dateLoc, selectedMonth, cs),
+          },
+        ),
+    ];
+  }
+
+  void _openExportPreview(List<ReportExportSection> sections) {
+    final choice = _pendingExport;
+    // O build pode rodar mais de uma vez antes do pós-frame (um tick do stream
+    // de transações, por exemplo); só a primeira chamada abre a tela.
+    if (!mounted || choice == null) return;
+    setState(() => _pendingExport = null);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ReportExportPreviewScreen(
+        sections: sections,
+        initialFormat: choice.format,
+        walletLabel: ref.read(activeWorkspaceProvider)?.name,
+      ),
+    ));
   }
 
   // ══════════════════════════════════════════════════════════════════════════

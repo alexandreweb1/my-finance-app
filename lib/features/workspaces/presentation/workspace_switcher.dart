@@ -4,17 +4,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/providers/effective_user_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
+import '../../settings/presentation/screens/settings_screen.dart';
 import '../../subscription/presentation/providers/subscription_provider.dart';
 import '../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../domain/workspace_entity.dart';
 import 'move_transactions_screen.dart';
 import 'providers/workspaces_notifier.dart';
 
-IconData workspaceIcon(WorkspaceType type) => type == WorkspaceType.business
-    ? Icons.business_center_rounded
-    : Icons.person_rounded;
+/// Written as an exhaustive switch, not a ternary: a new [WorkspaceType] must
+/// break the build here instead of silently rendering as "Pessoal".
+IconData workspaceIcon(WorkspaceType type) => switch (type) {
+      WorkspaceType.business => Icons.business_center_rounded,
+      WorkspaceType.holding => Icons.account_balance_rounded,
+      WorkspaceType.personal => Icons.person_rounded,
+    };
 
-/// Short PF/PJ badge for a Carteira type. [onDark] tunes it for the navy
+/// Accent color of a Carteira type on light surfaces.
+///
+/// One function instead of the `isBusiness ? purple : primary` ternary that
+/// used to be copy-pasted around: with three types a ternary paints Holdings
+/// with the PF color, and the badge and the icon next to it disagree.
+Color workspaceColor(WorkspaceType type, ColorScheme cs) => switch (type) {
+      WorkspaceType.business => const Color(0xFF7B1FA2), // roxo PJ
+      WorkspaceType.holding => const Color(0xFF00796B), // teal Holding
+      WorkspaceType.personal => cs.primary,
+    };
+
+/// Short PF/PJ/HOLD badge for a Carteira type. [onDark] tunes it for the navy
 /// dashboard header; otherwise it uses theme colors for light surfaces.
 class CarteiraTypeBadge extends StatelessWidget {
   final WorkspaceType type;
@@ -23,15 +39,22 @@ class CarteiraTypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isBiz = type == WorkspaceType.business;
-    final text = isBiz ? 'PJ' : 'PF';
+    final text = switch (type) {
+      WorkspaceType.business => 'PJ',
+      WorkspaceType.holding => 'HOLD',
+      WorkspaceType.personal => 'PF',
+    };
     final Color bg;
     final Color fg;
     if (onDark) {
       bg = Colors.white.withValues(alpha: 0.16);
-      fg = isBiz ? const Color(0xFFE1BEE7) : Colors.white;
+      fg = switch (type) {
+        WorkspaceType.business => const Color(0xFFE1BEE7),
+        WorkspaceType.holding => const Color(0xFF80CBC4),
+        WorkspaceType.personal => Colors.white,
+      };
     } else {
-      final base = isBiz ? const Color(0xFF7B1FA2) : Theme.of(context).colorScheme.primary;
+      final base = workspaceColor(type, Theme.of(context).colorScheme);
       bg = base.withValues(alpha: 0.12);
       fg = base;
     }
@@ -91,9 +114,8 @@ class _CarteiraHeaderSelectorState
     final label = combined
         ? l10n.allWorkspaces
         : (active?.name ?? l10n.workspacePersonal);
-    final icon = combined
-        ? Icons.dashboard_customize_rounded
-        : workspaceIcon(type);
+    final icon =
+        combined ? Icons.dashboard_customize_rounded : workspaceIcon(type);
 
     final pillBg = onDark
         ? Colors.white.withValues(alpha: 0.12)
@@ -104,46 +126,66 @@ class _CarteiraHeaderSelectorState
     final fg = onDark ? Colors.white : cs.onSurface;
     final iconFg = onDark ? Colors.white : cs.primary;
 
-    return Material(
-      key: _pillKey,
-      color: pillBg,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
+    return Semantics(
+      button: true,
+      // Screen readers otherwise walk the pill's parts one by one — the name,
+      // then the "PJ" badge, then an unlabelled button — and never say what
+      // tapping does. Collapse it into one labelled, activatable node.
+      label: '${l10n.workspaceSwitchTo}: $label',
+      onTap: _open,
+      excludeSemantics: true,
+      child: Material(
+        key: _pillKey,
+        color: pillBg,
         borderRadius: BorderRadius.circular(30),
-        onTap: _open,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 7, 10, 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  shape: BoxShape.circle,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(30),
+          onTap: _open,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 7, 10, 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 14, color: iconFg),
                 ),
-                child: Icon(icon, size: 14, color: iconFg),
-              ),
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: onDark ? 170 : 130),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                // Flexible (not a bare ConstrainedBox): the pill now also
+                // lives in crowded AppBars — next to a back button, a screen
+                // title and other actions — so the name must ELLIPSIZE under
+                // pressure instead of painting overflow stripes. The
+                // ConstrainedBox still caps it so a short name never stretches
+                // the pill. Every call site lays the pill out under bounded
+                // width (AppBar title/actions slots, the dashboard Column),
+                // which is what a flex child in a mainAxisSize.min Row needs.
+                Flexible(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: onDark ? 170 : 130),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              if (!combined) ...[
-                const SizedBox(width: 7),
-                CarteiraTypeBadge(type: type, onDark: onDark),
+                if (!combined) ...[
+                  const SizedBox(width: 7),
+                  CarteiraTypeBadge(type: type, onDark: onDark),
+                ],
+                Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: fg),
               ],
-              Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: fg),
-            ],
+            ),
           ),
         ),
       ),
@@ -327,7 +369,7 @@ class _CarteiraMenuCard extends ConsumerWidget {
             ...own.map((w) => tile(
                   leading: _MenuLeadingIcon(
                     icon: workspaceIcon(w.type),
-                    color: w.isBusiness ? const Color(0xFF7B1FA2) : cs.primary,
+                    color: workspaceColor(w.type, cs),
                   ),
                   title: w.name,
                   badge: CarteiraTypeBadge(type: w.type),
@@ -356,8 +398,8 @@ class _CarteiraMenuCard extends ConsumerWidget {
                         color: cs.onSurfaceVariant)),
               ),
               ...shared.map((w) => tile(
-                    leading:
-                        _MenuLeadingIcon(icon: Icons.group_rounded, color: cs.tertiary),
+                    leading: _MenuLeadingIcon(
+                        icon: Icons.group_rounded, color: cs.tertiary),
                     title: w.name,
                     badge: CarteiraTypeBadge(type: w.type),
                     selected: active?.id == w.id,
@@ -367,8 +409,8 @@ class _CarteiraMenuCard extends ConsumerWidget {
             if (isMaster) ...[
               const Divider(height: 8),
               tile(
-                leading:
-                    _MenuLeadingIcon(icon: Icons.add_rounded, color: cs.primary),
+                leading: _MenuLeadingIcon(
+                    icon: Icons.add_rounded, color: cs.primary),
                 title: l10n.newWorkspace,
                 selected: false,
                 onTap: () async {
@@ -478,37 +520,85 @@ class _CreateWorkspaceDialogState
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(l10n.newWorkspace),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SegmentedButton<WorkspaceType>(
-            segments: [
-              ButtonSegment(
-                  value: WorkspaceType.personal,
-                  icon: const Icon(Icons.person_rounded, size: 16),
-                  label: Text(l10n.workspacePersonal)),
-              ButtonSegment(
-                  value: WorkspaceType.business,
-                  icon: const Icon(Icons.business_center_rounded, size: 16),
-                  label: Text(l10n.workspaceBusiness)),
-            ],
-            selected: {_type},
-            onSelectionChanged: (s) => setState(() => _type = s.first),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _name,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(
-              labelText: l10n.workspaceName,
-              hintText: _type == WorkspaceType.business
-                  ? 'Minha Empresa, Holding…'
-                  : 'Família, Viagem…',
-              border: const OutlineInputBorder(),
+      // Scrollable + start-aligned: the type caption grew the content, and a
+      // dialog must still fit a short landscape viewport.
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon-only segments with tooltips, not icon + label: three
+            // labelled segments ("Pessoal (PF)", "Empresarial (PJ)",
+            // "Holding") do not fit the ~190dp of content width an
+            // AlertDialog has on a 320dp phone, and SegmentedButton clips
+            // instead of wrapping. The caption below names the selected type
+            // in full, so nothing is lost.
+            SegmentedButton<WorkspaceType>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                    value: WorkspaceType.personal,
+                    icon: Icon(workspaceIcon(WorkspaceType.personal), size: 18),
+                    tooltip: l10n.workspacePersonal),
+                ButtonSegment(
+                    value: WorkspaceType.business,
+                    icon: Icon(workspaceIcon(WorkspaceType.business), size: 18),
+                    tooltip: l10n.workspaceBusiness),
+                ButtonSegment(
+                    value: WorkspaceType.holding,
+                    icon: Icon(workspaceIcon(WorkspaceType.holding), size: 18),
+                    tooltip: l10n.workspaceHolding),
+              ],
+              selected: {_type},
+              onSelectionChanged: (s) => setState(() => _type = s.first),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CarteiraTypeBadge(type: _type),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    switch (_type) {
+                      WorkspaceType.business => l10n.workspaceBusiness,
+                      WorkspaceType.holding => l10n.workspaceHolding,
+                      WorkspaceType.personal => l10n.workspacePersonal,
+                    },
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              switch (_type) {
+                WorkspaceType.business => l10n.workspacesDesc,
+                WorkspaceType.holding => l10n.holdingTypeHint,
+                WorkspaceType.personal => l10n.carteiraScopeHint,
+              },
+              style: TextStyle(
+                  fontSize: 11.5,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _name,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: l10n.workspaceName,
+                hintText: switch (_type) {
+                  WorkspaceType.business => 'Minha Empresa, Loja…',
+                  WorkspaceType.holding => 'Holding da Família, Sociedade…',
+                  WorkspaceType.personal => 'Família, Viagem…',
+                },
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -552,79 +642,83 @@ class ManageWorkspacesScreen extends ConsumerWidget {
             elevation: 0,
             margin: const EdgeInsets.symmetric(vertical: 4),
             color: cs.primaryContainer.withValues(alpha: 0.35),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
-              leading:
-                  Icon(Icons.drive_file_move_outline, color: cs.primary),
+              leading: Icon(Icons.drive_file_move_outline, color: cs.primary),
               title: const Text('Mover lançamentos entre Carteiras'),
-              subtitle:
-                  const Text('Reorganize receitas e gastos entre PF/PJ'),
+              subtitle: const Text('Reorganize receitas e gastos entre PF/PJ'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => const MoveTransactionsScreen())),
             ),
           ),
-          ...own
-            .map((w) => Card(
-                  elevation: 0,
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.5)),
+          ...own.map((w) => Card(
+                elevation: 0,
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                      color: cs.outlineVariant.withValues(alpha: 0.5)),
+                ),
+                child: ListTile(
+                  leading: Icon(workspaceIcon(w.type),
+                      color: workspaceColor(w.type, cs)),
+                  title: Row(children: [
+                    Flexible(child: Text(w.name)),
+                    if (w.isDefault)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Icon(Icons.star_rounded,
+                            size: 15, color: cs.tertiary),
+                      ),
+                    if (w.archived)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Icon(Icons.archive_outlined,
+                            size: 15, color: cs.onSurfaceVariant),
+                      ),
+                  ]),
+                  subtitle: Text(switch (w.type) {
+                    WorkspaceType.business => l10n.workspaceBusiness,
+                    WorkspaceType.holding => l10n.workspaceHolding,
+                    WorkspaceType.personal => l10n.workspacePersonal,
+                  }),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (v) => _onAction(context, ref, w, v),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(value: 'rename', child: Text(l10n.edit)),
+                      const PopupMenuItem(
+                          value: 'share', child: Text('Compartilhar')),
+                      if (!w.isDefault)
+                        PopupMenuItem(
+                            value: 'archive',
+                            child: Text(w.archived
+                                ? l10n.unarchiveWorkspace
+                                : l10n.archiveWorkspace)),
+                      if (!w.isDefault)
+                        PopupMenuItem(
+                            value: 'delete',
+                            child: Text(l10n.deleteWorkspace,
+                                style: TextStyle(color: cs.error))),
+                    ],
                   ),
-                  child: ListTile(
-                    leading: Icon(workspaceIcon(w.type),
-                        color:
-                            w.isBusiness ? const Color(0xFF7B1FA2) : cs.primary),
-                    title: Row(children: [
-                      Flexible(child: Text(w.name)),
-                      if (w.isDefault)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Icon(Icons.star_rounded,
-                              size: 15, color: cs.tertiary),
-                        ),
-                      if (w.archived)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Icon(Icons.archive_outlined,
-                              size: 15, color: cs.onSurfaceVariant),
-                        ),
-                    ]),
-                    subtitle: Text(w.isBusiness
-                        ? l10n.workspaceBusiness
-                        : l10n.workspacePersonal),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (v) => _onAction(context, ref, w, v),
-                      itemBuilder: (_) => [
-                        PopupMenuItem(value: 'rename', child: Text(l10n.edit)),
-                        if (!w.isDefault)
-                          PopupMenuItem(
-                              value: 'archive',
-                              child: Text(w.archived
-                                  ? l10n.unarchiveWorkspace
-                                  : l10n.archiveWorkspace)),
-                        if (!w.isDefault)
-                          PopupMenuItem(
-                              value: 'delete',
-                              child: Text(l10n.deleteWorkspace,
-                                  style: TextStyle(color: cs.error))),
-                      ],
-                    ),
-                  ),
-                )),
+                ),
+              )),
         ],
       ),
     );
   }
 
-  Future<void> _onAction(BuildContext context, WidgetRef ref,
-      WorkspaceEntity w, String action) async {
+  Future<void> _onAction(BuildContext context, WidgetRef ref, WorkspaceEntity w,
+      String action) async {
     final l10n = AppLocalizations.of(context);
     final notifier = ref.read(workspacesNotifierProvider.notifier);
     switch (action) {
+      case 'share':
+        // Abre o Compartilhamento já apontado para ESTA Carteira.
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => SharingSettingsScreen(initialWorkspaceId: w.id)));
       case 'rename':
         final ctrl = TextEditingController(text: w.name);
         final name = await showDialog<String>(
@@ -638,8 +732,7 @@ class ManageWorkspacesScreen extends ConsumerWidget {
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(c),
-                  child: Text(l10n.cancel)),
+                  onPressed: () => Navigator.pop(c), child: Text(l10n.cancel)),
               FilledButton(
                   onPressed: () => Navigator.pop(c, ctrl.text.trim()),
                   child: Text(l10n.save)),
@@ -651,8 +744,8 @@ class ManageWorkspacesScreen extends ConsumerWidget {
         await notifier.setArchived(w.id, !w.archived);
       case 'delete':
         if (w.isDefault) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(l10n.cannotDeleteDefaultWorkspace)));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.cannotDeleteDefaultWorkspace)));
           return;
         }
         final ctrl = TextEditingController();

@@ -32,7 +32,11 @@ class SharingRepositoryImpl implements SharingRepository {
       );
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      // As guardas de sendInvitation (auto-convite, duplicado na Carteira) são
+      // mensagens escritas para o usuário — o prefixo "Exception: " do
+      // toString() vazaria direto no SnackBar.
+      return Left(ServerFailure(
+          e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '')));
     }
   }
 
@@ -54,6 +58,18 @@ class SharingRepositoryImpl implements SharingRepository {
     try {
       return _dataSource
           .watchCollaborators(masterUserId)
+          .map((list) => Right<Failure, List<InvitationEntity>>(list));
+    } catch (e) {
+      return Stream.value(Left(ServerFailure(e.toString())));
+    }
+  }
+
+  @override
+  Stream<Either<Failure, List<InvitationEntity>>> watchSentPendingInvitations(
+      String masterUserId) {
+    try {
+      return _dataSource
+          .watchSentPendingInvitations(masterUserId)
           .map((list) => Right<Failure, List<InvitationEntity>>(list));
     } catch (e) {
       return Stream.value(Left(ServerFailure(e.toString())));
@@ -85,6 +101,16 @@ class SharingRepositoryImpl implements SharingRepository {
       String invitationId) async {
     try {
       await _dataSource.declineInvitation(invitationId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> cancelInvitation(String invitationId) async {
+    try {
+      await _dataSource.cancelInvitation(invitationId);
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));

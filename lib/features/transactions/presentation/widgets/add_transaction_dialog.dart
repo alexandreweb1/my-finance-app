@@ -29,6 +29,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/money_input_formatter.dart';
 import '../../../../core/utils/icon_data_utils.dart';
 import '../../../goals/presentation/providers/goals_provider.dart';
+import '../../../holding/domain/holding_stamp.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../../domain/transaction_suggestions.dart';
 import '../providers/transactions_provider.dart';
@@ -918,9 +919,34 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     bool wasFirstTransaction = false;
 
     if (_isEditing) {
+      final original = widget.transaction!;
+      // Re-freeze the rateio only when the amount actually moved, and only
+      // across the sócios the stored split already names — never today's
+      // roster, which would let an edit quietly add or drop someone from a
+      // past expense. Null when there is nothing to redo, so PF/PJ Carteiras
+      // and untouched amounts keep exactly the bytes they had.
+      final resplit = resplitStored(
+        storedSplit: original.holdingSplit,
+        amount: amount,
+        seed: original.id,
+      );
       final updated = TransactionEntity(
-        id: widget.transaction!.id,
-        userId: widget.transaction!.userId,
+        id: original.id,
+        userId: original.userId,
+        // This rebuilds the entity from scratch, so every field the form does
+        // not edit has to be carried by hand. workspaceId and sourceWalletId
+        // were being dropped here and survived only because toFirestore()
+        // omits a null workspaceId and the write is an .update() merge — one
+        // .set() away from silently moving the doc out of its Carteira and
+        // breaking the other half of a transfer.
+        workspaceId: original.workspaceId,
+        sourceWalletId: original.sourceWalletId,
+        // isPending is deliberately NOT carried: 'isPending' is always written
+        // (no null-omission), so saving this dialog is exactly what clears the
+        // "Categorizar" badge on an auto-captured entry. Carrying it through
+        // would leave captures pending forever.
+        holdingSplit: resplit ?? original.holdingSplit,
+        holdingPaidBy: original.holdingPaidBy,
         title: _titleController.text.trim(),
         amount: amount,
         type: _type,

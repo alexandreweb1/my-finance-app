@@ -26,6 +26,7 @@ import {
   serverTimestamp,
   Timestamp,
   deleteField,
+  arrayRemove,
 } from 'firebase/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,9 +35,20 @@ const RULES = readFileSync(join(__dirname, '..', 'firestore.rules'), 'utf8');
 const A = 'master_A';
 const C = 'collab_C';
 const D = 'stranger_D';
+const V = 'viewer_V';
 const A_EMAIL = 'master@example.com';
 const C_EMAIL = 'collab@example.com';
+const V_EMAIL = 'viewer@example.com';
 const INV = 'inv_AC';
+
+// Holding fixtures: one Holding Carteira (A owns, C edits, V only reads) and
+// one PF Carteira of the same owner, used as the "other Carteira" in the
+// cross-workspace and holdingSplit-injection tests.
+const WS_H = 'ws_holding';
+const WS_PF = 'ws_pf';
+const M1 = 'hm_socio1';
+const M_OTHER = 'hm_socio_pf';
+const HC1 = 'hc_aporte1';
 
 const days = (n) => Timestamp.fromMillis(Date.now() + n * 86400 * 1000);
 
@@ -62,6 +74,7 @@ const asA = () => env.authenticatedContext(A, { email: A_EMAIL }).firestore();
 const asC = () => env.authenticatedContext(C, { email: C_EMAIL }).firestore();
 // Stranger D shares C's email-less identity; give D a distinct email.
 const asD = () => env.authenticatedContext(D, { email: 'd@example.com' }).firestore();
+const asV = () => env.authenticatedContext(V, { email: V_EMAIL }).firestore();
 // Mixed-case email to prove callerEmail().lower() normalisation.
 const asCUpper = () =>
   env.authenticatedContext(C, { email: 'Collab@Example.com' }).firestore();
@@ -106,6 +119,72 @@ async function makeCcollaborator() {
       { merge: true },
     );
   });
+}
+
+// Seeds the Holding scenario on top of seed() (rules DISABLED). Roles mirror
+// production: the owner is always an editor of their own Carteira.
+async function seedHolding() {
+  await seed();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', V), { userId: V, email: V_EMAIL });
+    await setDoc(doc(db, 'workspaces', WS_H), {
+      ownerId: A,
+      name: 'Holding da Família',
+      type: 'holding',
+      holdingQuotaMode: 'proportional',
+      memberUids: [A, C, V],
+      roles: { [A]: 'editor', [C]: 'editor', [V]: 'viewer' },
+      isDefault: false,
+      archived: false,
+      order: 1,
+      createdAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'workspaces', WS_PF), {
+      ownerId: A,
+      name: 'Pessoal',
+      type: 'personal',
+      memberUids: [A, C],
+      roles: { [A]: 'editor', [C]: 'editor' },
+      isDefault: true,
+      archived: false,
+      order: 0,
+      createdAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'holding_members', M1), socio({ name: 'Alex' }));
+    await setDoc(
+      doc(db, 'holding_members', M_OTHER),
+      socio({ name: 'Sócio da PF', workspaceId: WS_PF }),
+    );
+    await setDoc(doc(db, 'holding_contributions', HC1), aporte(A));
+  });
+}
+
+// Valid payloads; `by` is the uid recording the aporte (createdBy must be the
+// caller). Overrides make each attack differ from a legit write by one field.
+function socio(over = {}) {
+  return {
+    userId: A,
+    workspaceId: WS_H,
+    name: 'Sócio',
+    quotaBps: 5000,
+    joinedAt: days(-365),
+    createdAt: serverTimestamp(),
+    ...over,
+  };
+}
+
+function aporte(by, over = {}) {
+  return {
+    userId: A,
+    workspaceId: WS_H,
+    memberId: M1,
+    amountCents: 500000, // R$ 5.000,00
+    date: days(-10),
+    createdBy: by,
+    createdAt: serverTimestamp(),
+    ...over,
+  };
 }
 
 async function main() {
@@ -399,6 +478,345 @@ async function main() {
     });
     await assertSucceeds(deleteDoc(doc(asA(), 'subscriptions', A)));
     await assertSucceeds(deleteDoc(doc(asA(), 'users', A)));
+  });
+
+  console.log('\n── Holding: sócios (quem é dono de quanto) ──');
+
+  await seedHolding();
+  await test('HAPPY: viewer V reads a sócio of the Holding → allowed', async () => {
+    await assertSucceeds(getDoc(doc(asV(), 'holding_members', M1)));
+  });
+
+  await seedHolding();
+  await test('ATTACK: non-member D reads a sócio → denied', async () => {
+    await assertFails(getDoc(doc(asD(), 'holding_members', M1)));
+  });
+
+  await seedHolding();
+  await test('ATTACK: non-member D reads an aporte → denied', async () => {
+    await assertFails(getDoc(doc(asD(), 'holding_contributions', HC1)));
+  });
+
+  await seedHolding();
+  await test('HAPPY: owner A creates a sócio → allowed', async () => {
+    await assertSucceeds(
+      setDoc(doc(asA(), 'holding_members', 'hm_novo'), socio({ name: 'Bia' })),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: editor C creates a sócio → denied (cap table is owner-only)', async () => {
+    await assertFails(
+      setDoc(doc(asC(), 'holding_members', 'hm_c'), socio({ name: 'C' })),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: editor C enlarges a sócio’s quota → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asC(), 'holding_members', M1), { quotaBps: 9000 }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: quotaBps above 100% (12000 bps) → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'holding_members', M1), { quotaBps: 12000 }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: quotaBps as a float (50.5) → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'holding_members', M1), { quotaBps: 50.5 }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: sócio with an empty name → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'holding_members', M1), { name: '' }),
+    );
+  });
+
+  await seedHolding();
+  await test('HAPPY: owner A renames a sócio → allowed', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'holding_members', M1), { name: 'Alexandre' }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: owner moves a sócio to another Carteira → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'holding_members', M1), { workspaceId: WS_PF }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: editor C deletes a sócio → denied', async () => {
+    await assertFails(deleteDoc(doc(asC(), 'holding_members', M1)));
+  });
+
+  await seedHolding();
+  await test('HAPPY: owner A deletes a sócio → allowed', async () => {
+    await assertSucceeds(deleteDoc(doc(asA(), 'holding_members', M1)));
+  });
+
+  console.log('\n── Holding: aportes (trilha do dinheiro, append-only) ──');
+
+  await seedHolding();
+  await test('HAPPY: editor C records their own aporte → allowed', async () => {
+    await assertSucceeds(
+      setDoc(doc(asC(), 'holding_contributions', 'hc_c'), aporte(C)),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: viewer V records an aporte → denied', async () => {
+    await assertFails(
+      setDoc(doc(asV(), 'holding_contributions', 'hc_v'), aporte(V)),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: non-member D records an aporte in the Holding → denied', async () => {
+    await assertFails(
+      setDoc(doc(asD(), 'holding_contributions', 'hc_d'), aporte(D)),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte with a forged createdBy (C claims A recorded it) → denied', async () => {
+    await assertFails(
+      setDoc(doc(asC(), 'holding_contributions', 'hc_forged'), aporte(A)),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte of zero → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asC(), 'holding_contributions', 'hc_zero'),
+        aporte(C, { amountCents: 0 }),
+      ),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte above kMaxCents (1e11) → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asC(), 'holding_contributions', 'hc_huge'),
+        aporte(C, { amountCents: 100000000000 }),
+      ),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte with fractional centavos (float) → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asC(), 'holding_contributions', 'hc_float'),
+        aporte(C, { amountCents: 1000.5 }),
+      ),
+    );
+  });
+
+  await seedHolding();
+  await test('HAPPY: retirada (negative amount) → allowed', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(asC(), 'holding_contributions', 'hc_neg'),
+        aporte(C, { amountCents: -250000 }),
+      ),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte pointing at a sócio of ANOTHER Carteira → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asC(), 'holding_contributions', 'hc_cross'),
+        aporte(C, { memberId: M_OTHER }),
+      ),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte pointing at a sócio that does not exist → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asC(), 'holding_contributions', 'hc_ghost'),
+        aporte(C, { memberId: 'hm_inexistente' }),
+      ),
+    );
+  });
+
+  await seedHolding();
+  await test('HAPPY: new sócio + first aporte in the SAME batch (getAfter) → allowed', async () => {
+    const db = asA();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'holding_members', 'hm_batch'), socio({ name: 'Novo' }));
+    batch.set(
+      doc(db, 'holding_contributions', 'hc_batch'),
+      aporte(A, { memberId: 'hm_batch' }),
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  await seedHolding();
+  await test('ATTACK: owner A rewrites amountCents after creation → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'holding_contributions', HC1), { amountCents: 1 }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: editor C rewrites amountCents after creation → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asC(), 'holding_contributions', HC1), { amountCents: 1 }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: aporte re-pointed at another sócio after creation → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asC(), 'holding_contributions', HC1), { memberId: M_OTHER }),
+    );
+  });
+
+  await seedHolding();
+  await test('HAPPY: editor C fixes only the note → allowed', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asC(), 'holding_contributions', HC1), {
+        note: 'entrada do apartamento',
+      }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: editor C deletes an aporte → denied', async () => {
+    await assertFails(deleteDoc(doc(asC(), 'holding_contributions', HC1)));
+  });
+
+  await seedHolding();
+  await test('HAPPY: owner A deletes an aporte (cascade / LGPD) → allowed', async () => {
+    await assertSucceeds(deleteDoc(doc(asA(), 'holding_contributions', HC1)));
+  });
+
+  console.log('\n── Carteira: tipo válido, tipo imutável, regressões ──');
+
+  await seedHolding();
+  await test('ATTACK: Carteira created with an unknown type → denied', async () => {
+    await assertFails(
+      setDoc(doc(asA(), 'workspaces', 'ws_novo'), {
+        ownerId: A,
+        name: 'Pirata',
+        type: 'pirate',
+        memberUids: [A],
+        roles: { [A]: 'editor' },
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: Holding flipped to personal (would strand its sócios) → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'workspaces', WS_H), { type: 'personal' }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: unknown holdingQuotaMode → denied', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'workspaces', WS_H), { holdingQuotaMode: 'whatever' }),
+    );
+  });
+
+  await seedHolding();
+  await test('HAPPY: owner switches the Holding to fixed quotas → allowed', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'workspaces', WS_H), { holdingQuotaMode: 'fixed' }),
+    );
+  });
+
+  await seedHolding();
+  await test('REGRESSION: rename a Carteira still works', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'workspaces', WS_H), { name: 'Holding Silva' }),
+    );
+  });
+
+  await seedHolding();
+  await test('REGRESSION: archive a Carteira still works', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'workspaces', WS_H), { archived: true }),
+    );
+  });
+
+  await seedHolding();
+  await test('REGRESSION: removeCollaborator (memberUids + roles key) still works', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'workspaces', WS_H), {
+        memberUids: arrayRemove(C),
+        [`roles.${C}`]: deleteField(),
+      }),
+    );
+  });
+
+  console.log('\n── transactions: rateio congelado só dentro de Holding ──');
+
+  await seedHolding();
+  await test('HAPPY: transaction with holdingSplit inside the Holding → allowed', async () => {
+    await assertSucceeds(
+      setDoc(doc(asA(), 'transactions', 'tx_h'), {
+        userId: A,
+        workspaceId: WS_H,
+        title: 'Condomínio',
+        amount: 1200,
+        holdingSplit: { [M1]: 60000, hm_outro: 60000 },
+        holdingPaidBy: M1,
+      }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: holdingSplit injected into a PF Carteira → denied', async () => {
+    await assertFails(
+      setDoc(doc(asA(), 'transactions', 'tx_pf_split'), {
+        userId: A,
+        workspaceId: WS_PF,
+        title: 'Mercado',
+        amount: 200,
+        holdingSplit: { [M1]: 20000 },
+      }),
+    );
+  });
+
+  await seedHolding();
+  await test('ATTACK: holdingSplit on a legacy (Carteira-less) transaction → denied', async () => {
+    await assertFails(
+      setDoc(doc(asA(), 'transactions', 'tx_legacy_split'), {
+        userId: A,
+        title: 'Antiga',
+        amount: 50,
+        holdingSplit: { [M1]: 5000 },
+      }),
+    );
+  });
+
+  await seedHolding();
+  await test('REGRESSION: ordinary transaction in a PF Carteira still allowed', async () => {
+    await assertSucceeds(
+      setDoc(doc(asA(), 'transactions', 'tx_pf'), {
+        userId: A,
+        workspaceId: WS_PF,
+        title: 'Mercado',
+        amount: 200,
+      }),
+    );
   });
 
   await env.cleanup();

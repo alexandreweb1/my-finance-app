@@ -5,6 +5,8 @@ import '../../../../core/providers/app_settings_provider.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/providers/selected_month_provider.dart';
 import '../../../../core/providers/workspace_provider.dart';
+import '../../../holding/domain/holding_stamp.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
 import '../../data/datasources/transaction_remote_datasource.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/repositories/transaction_repository_impl.dart';
@@ -468,13 +470,22 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
   final String _userId;
   final String? _workspaceId;
 
+  /// Non-null only while a Holding Carteira is active. Every rateio in the app
+  /// is frozen HERE, because this notifier is the one place all the manual and
+  /// automatic creation paths (dialog, bank-notification capture, share sheet,
+  /// quick actions) already funnel through — so a Holding expense cannot be
+  /// created without a split by adding one more caller somewhere else.
+  final HoldingStamp? _holdingStamp;
+
   TransactionsNotifier(
     this._addTransaction,
     this._deleteTransaction,
     this._updateTransaction,
     this._userId,
-    this._workspaceId,
-  ) : super(const AsyncValue.data(null));
+    this._workspaceId, {
+    HoldingStamp? holdingStamp,
+  })  : _holdingStamp = holdingStamp,
+        super(const AsyncValue.data(null));
 
   Future<bool> add({
     required String title,
@@ -489,10 +500,24 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
     bool isPending = false,
     List<String> tags = const [],
     List<String> attachmentUrls = const [],
+    /// Which sócio fronted the money, in a Holding. Ignored outside one.
+    String? holdingPaidBy,
   }) async {
     state = const AsyncValue.loading();
+    final id = const Uuid().v4();
+    // The doc id is the split seed: it is stable for the life of the expense,
+    // so a recalculation lands the odd centavo on the same sócio as the
+    // original freeze.
+    final holdingSplit = _holdingStamp?.splitFor(
+      targetWorkspaceId: _workspaceId,
+      type: type,
+      amount: amount,
+      date: date,
+      seed: id,
+      paidByParticipantId: holdingPaidBy,
+    );
     final transaction = TransactionEntity(
-      id: const Uuid().v4(),
+      id: id,
       userId: _userId,
       workspaceId: _workspaceId,
       title: title,
@@ -507,6 +532,10 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
       isPending: isPending,
       tags: tags,
       attachmentUrls: attachmentUrls,
+      holdingSplit: holdingSplit,
+      // Never stamped without a split: a payer on a doc nothing splits would
+      // be counted as `paidOnBehalf` by rateioBalances with no matching owed.
+      holdingPaidBy: holdingSplit == null ? null : holdingPaidBy,
     );
     final result = await _addTransaction(
         AddTransactionParams(transaction: transaction));
@@ -545,10 +574,21 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     final id = const Uuid().v4();
+    // Stamp against the workspace the doc ACTUALLY lands in, not the active
+    // one. A bank notification captured while a Holding is on screen is homed
+    // to the DEFAULT Carteira, and HoldingStamp.splitFor refuses to split it.
+    final targetWorkspaceId = workspaceIdOverride ?? _workspaceId;
+    final holdingSplit = _holdingStamp?.splitFor(
+      targetWorkspaceId: targetWorkspaceId,
+      type: type,
+      amount: amount,
+      date: date,
+      seed: id,
+    );
     final transaction = TransactionEntity(
       id: id,
       userId: userIdOverride ?? _userId,
-      workspaceId: workspaceIdOverride ?? _workspaceId,
+      workspaceId: targetWorkspaceId,
       title: title,
       amount: amount,
       type: type,
@@ -560,6 +600,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
       goalId: goalId,
       isPending: isPending,
       tags: tags,
+      holdingSplit: holdingSplit,
     );
     final result = await _addTransaction(
         AddTransactionParams(transaction: transaction));
@@ -617,5 +658,7 @@ final transactionsNotifierProvider =
     ref.watch(updateTransactionUseCaseProvider),
     ledgerOwnerId,
     ref.watch(workspaceStampProvider),
+    // Null outside a Holding, so nothing about a PF/PJ write changes.
+    holdingStamp: ref.watch(activeHoldingStampProvider),
   );
 });

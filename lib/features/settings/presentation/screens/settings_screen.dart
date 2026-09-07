@@ -35,6 +35,7 @@ import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../../workspaces/domain/workspace_entity.dart';
 import 'tools_hub_screen.dart';
 import '../../../../core/utils/money_input_formatter.dart';
+import '../../../sharing/domain/entities/invitation_entity.dart';
 import '../../../sharing/presentation/providers/sharing_provider.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../subscription/presentation/screens/pro_screen.dart';
@@ -1382,7 +1383,10 @@ class _EditCategoryDialogState extends ConsumerState<_EditCategoryDialog> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SharingSection extends ConsumerStatefulWidget {
-  const _SharingSection();
+  /// Carteira pré-selecionada ao abrir a tela (vem da tela "Carteiras").
+  final String? initialWorkspaceId;
+
+  const _SharingSection({this.initialWorkspaceId});
 
   @override
   ConsumerState<_SharingSection> createState() => _SharingSectionState();
@@ -1391,8 +1395,38 @@ class _SharingSection extends ConsumerStatefulWidget {
 class _SharingSectionState extends ConsumerState<_SharingSection> {
   final _emailCtrl = TextEditingController();
   bool _sending = false;
-  String? _inviteWorkspaceId; // null = default Carteira
+  String? _inviteWorkspaceId; // null = Carteira padrão
   String _inviteRole = 'editor';
+
+  @override
+  void initState() {
+    super.initState();
+    _inviteWorkspaceId = widget.initialWorkspaceId;
+  }
+
+  /// Carteiras ativas primeiro, arquivadas no fim — arquivadas continuam na
+  /// lista porque quem já tem acesso a elas precisa poder ser removido.
+  List<WorkspaceEntity> _ownOrdered(List<WorkspaceEntity> own) => [
+        ...own.where((w) => !w.archived),
+        ...own.where((w) => w.archived),
+      ];
+
+  /// Carteira alvo do convite e da lista de acessos: a seleção explícita,
+  /// senão a Carteira padrão, senão a primeira. Uma seleção órfã (Carteira
+  /// apagada em outro aparelho) cai de volta na padrão em vez de travar a tela.
+  String? _resolveWorkspaceId(List<WorkspaceEntity> own, String? defaultWs) {
+    if (own.isEmpty) return null;
+    final ids = {for (final w in own) w.id};
+    if (ids.contains(_inviteWorkspaceId)) return _inviteWorkspaceId;
+    if (defaultWs != null && ids.contains(defaultWs)) return defaultWs;
+    return own.first.id;
+  }
+
+  void _shareInvite(String email) => Share.share(
+        'Te convidei pra organizar nossas finanças juntos no Fintab! '
+        'Baixe o app, cadastre-se com este e-mail ($email) e aceite o '
+        'convite: $storeUrl',
+      );
 
   @override
   void dispose() {
@@ -1405,9 +1439,9 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
     if (email.isEmpty) return;
     setState(() => _sending = true);
     // Resolve the target Carteira: explicit selection or the default one.
-    final own = ref.read(ownWorkspacesStreamProvider).value ?? const [];
-    final defaultWs = ref.read(defaultWorkspaceIdProvider);
-    final wsId = _inviteWorkspaceId ?? defaultWs;
+    final own = _ownOrdered(
+        ref.read(ownWorkspacesStreamProvider).value ?? const []);
+    final wsId = _resolveWorkspaceId(own, ref.read(defaultWorkspaceIdProvider));
     String? wsName;
     for (final w in own) {
       if (w.id == wsId) wsName = w.name;
@@ -1428,11 +1462,7 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
           content: const Text('Convite enviado com sucesso!'),
           action: SnackBarAction(
             label: 'Compartilhar',
-            onPressed: () => Share.share(
-              'Te convidei pra organizar nossas finanças juntos no Fintab! '
-              'Baixe o app, cadastre-se com este e-mail ($email) e aceite o '
-              'convite: $storeUrl',
-            ),
+            onPressed: () => _shareInvite(email),
           ),
         ),
       );
@@ -1453,6 +1483,134 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
 
   Future<void> _redeemReferral() =>
       showRedeemReferralDialog(context, ref, origin: 'settings');
+
+  Future<void> _confirmRemoveAccess(InvitationEntity inv) async {
+    final uid = inv.collaboratorUserId;
+    if (uid == null) return;
+    final scope = inv.isWorkspaceInvite
+        ? 'à Carteira "${_invScopeName(inv)}"'
+        : 'à sua conta';
+    final confirmed = await showAnimatedDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Remover acesso'),
+        content: Text('${inv.inviteeEmail} perde o acesso $scope. '
+            'Você pode convidar de novo quando quiser.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(AppLocalizations.of(context).cancel)),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remover'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await ref.read(sharingNotifierProvider.notifier).removeCollaborator(
+          invitationId: inv.id,
+          collaboratorUserId: uid,
+          workspaceId: inv.workspaceId,
+        );
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(error ?? 'Acesso removido.'),
+      backgroundColor: error != null ? Colors.red.shade700 : null,
+    ));
+  }
+
+  Future<void> _confirmCancelInvite(InvitationEntity inv) async {
+    final confirmed = await showAnimatedDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancelar convite'),
+        content: Text('O convite enviado para ${inv.inviteeEmail} deixa de '
+            'valer e o e-mail fica livre para ser convidado de novo.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Voltar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancelar convite'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await ref
+        .read(sharingNotifierProvider.notifier)
+        .cancelInvitation(inv.id);
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(error ?? 'Convite cancelado.'),
+      backgroundColor: error != null ? Colors.red.shade700 : null,
+    ));
+  }
+
+  static String _invScopeName(InvitationEntity inv) =>
+      (inv.workspaceName?.isNotEmpty ?? false)
+          ? inv.workspaceName!
+          : (inv.isWorkspaceInvite ? 'Pessoal' : 'Conta inteira');
+
+  /// Linha de uma pessoa com acesso (ou convidada) a uma Carteira.
+  Widget _accessTile(InvitationEntity inv,
+      {required bool pending, String? scopeLabel}) {
+    final accent = pending ? Colors.amber.shade800 : const Color(0xFF7E57C2);
+    final role = inv.isWorkspaceInvite
+        ? (inv.isViewer ? 'Só ver' : 'Pode editar')
+        : 'Acesso à conta inteira';
+    final subtitle = [
+      if (scopeLabel != null) scopeLabel,
+      if (pending) 'Aguardando aceite',
+      role,
+    ].join(' · ');
+
+    return ListTile(
+      dense: true,
+      leading: CircleAvatar(
+        radius: 16,
+        backgroundColor: accent.withValues(alpha: 0.15),
+        child: Text(
+          inv.inviteeEmail[0].toUpperCase(),
+          style: TextStyle(
+              color: accent, fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+      ),
+      title: Text(inv.inviteeEmail, style: const TextStyle(fontSize: 13)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
+      trailing: pending
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.ios_share, size: 18),
+                  tooltip: 'Reenviar convite',
+                  onPressed: () => _shareInvite(inv.inviteeEmail),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close_rounded,
+                      color: Colors.red.shade400, size: 20),
+                  tooltip: 'Cancelar convite',
+                  onPressed: () => _confirmCancelInvite(inv),
+                ),
+              ],
+            )
+          : IconButton(
+              icon: Icon(Icons.person_remove_outlined,
+                  color: Colors.red.shade400, size: 20),
+              tooltip: 'Remover acesso',
+              onPressed: inv.collaboratorUserId == null
+                  ? null
+                  : () => _confirmRemoveAccess(inv),
+            ),
+    );
+  }
 
   Future<void> _confirmLeave() async {
     final confirmed = await showAnimatedDialog<bool>(
@@ -1694,68 +1852,105 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
           );
         }),
 
-        // ── Master view: invite + collaborator list ───────────────────────
-        if (isMaster) ...[
-          _SettingsCard(children: [
-            ExpansionTile(
-              leading: const _IconBadge(Icons.people_outline,
-                  color: Color(0xFF7E57C2)),
-              title: Row(
+        // ── Master view: convidar + quem tem acesso, por Carteira ────────
+        if (isMaster)
+          Builder(builder: (context) {
+            final own = _ownOrdered(
+                ref.watch(ownWorkspacesStreamProvider).value ??
+                    const <WorkspaceEntity>[]);
+            final selectedWs = _resolveWorkspaceId(
+                own, ref.watch(defaultWorkspaceIdProvider));
+            final sentPending =
+                ref.watch(sentPendingInvitationsProvider).value ??
+                    const <InvitationEntity>[];
+
+            // Quem tem (ou foi convidado para) acesso à Carteira selecionada.
+            final wsMembers = collaborators
+                .where((i) => i.workspaceId != null && i.workspaceId == selectedWs)
+                .toList();
+            final wsInvites = sentPending
+                .where((i) => i.workspaceId != null && i.workspaceId == selectedWs)
+                .toList();
+
+            // Convites sem Carteira (modelo antigo, acesso à conta inteira) ou
+            // apontando para uma Carteira que não existe mais: não aparecem em
+            // nenhum item do seletor, mas continuam dando acesso — ficam num
+            // grupo à parte para poderem ser revogados.
+            final ownIds = {for (final w in own) w.id};
+            final otherMembers = collaborators
+                .where((i) => !ownIds.contains(i.workspaceId))
+                .toList();
+            final otherInvites = sentPending
+                .where((i) => !ownIds.contains(i.workspaceId))
+                .toList();
+
+            String accessLabel(String wsId) {
+              final members =
+                  collaborators.where((i) => i.workspaceId == wsId).length;
+              if (members > 0) {
+                return members == 1 ? '1 pessoa' : '$members pessoas';
+              }
+              final invites =
+                  sentPending.where((i) => i.workspaceId == wsId).length;
+              if (invites > 0) return 'convite enviado';
+              return 'só você';
+            }
+
+            String? selectedName;
+            for (final w in own) {
+              if (w.id == selectedWs) selectedName = w.name;
+            }
+
+            return _SettingsCard(children: [
+              ExpansionTile(
+                initiallyExpanded: true,
+                leading: const _IconBadge(Icons.people_outline,
+                    color: Color(0xFF7E57C2)),
+                title: Row(
+                  children: [
+                    const Text('Compartilhamento',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    if (!ref.watch(isProProvider)) const ProBadgeWidget(),
+                  ],
+                ),
                 children: [
-                  const Text('Compartilhamento',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 8),
-                  if (!ref.watch(isProProvider)) const ProBadgeWidget(),
-                ],
-              ),
-              children: [
-                // Invite field (bloqueado para usuários free)
-                if (!ref.watch(isProProvider))
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => showProGateBottomSheet(
-                          context,
-                          featureName: 'Compartilhamento',
-                          featureDescription:
-                              'Convide colaboradores para gerenciar suas finanças juntos.',
-                          featureIcon: Icons.people_rounded,
+                  // Invite field (bloqueado para usuários free)
+                  if (!ref.watch(isProProvider))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => showProGateBottomSheet(
+                            context,
+                            featureName: 'Compartilhamento',
+                            featureDescription:
+                                'Convide colaboradores para gerenciar suas finanças juntos.',
+                            featureIcon: Icons.people_rounded,
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF00D887),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.lock_outline, size: 18),
+                          label: const Text('Disponível no plano Pro',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF00D887),
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        icon: const Icon(Icons.lock_outline, size: 18),
-                        label: const Text('Disponível no plano Pro',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                    ),
-                  )
-                else ...[
-                  // ── Which Carteira + which role ──
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Builder(builder: (context) {
-                      final own = (ref
-                                  .watch(ownWorkspacesStreamProvider)
-                                  .value ??
-                              const <WorkspaceEntity>[])
-                          .where((w) => !w.archived)
-                          .toList();
-                      final defaultWs = ref.watch(defaultWorkspaceIdProvider);
-                      final selected = _inviteWorkspaceId ?? defaultWs;
-                      return Column(
+                    )
+                  else ...[
+                    // ── Qual Carteira + qual papel ──
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (own.length > 1)
+                          if (selectedWs != null)
                             DropdownButtonFormField<String>(
-                              initialValue: own.any((w) => w.id == selected)
-                                  ? selected
-                                  : defaultWs,
+                              initialValue: selectedWs,
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Carteira a compartilhar',
@@ -1765,14 +1960,42 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                               items: own
                                   .map((w) => DropdownMenuItem(
                                         value: w.id,
-                                        child: Text(w.name,
-                                            overflow: TextOverflow.ellipsis),
+                                        child: Row(children: [
+                                          Icon(workspaceIcon(w.type),
+                                              size: 16,
+                                              color: workspaceColor(
+                                                  w.type, colorScheme)),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                                w.archived
+                                                    ? '${w.name} (arquivada)'
+                                                    : w.name,
+                                                overflow:
+                                                    TextOverflow.ellipsis),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(accessLabel(w.id),
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant)),
+                                        ]),
                                       ))
                                   .toList(),
                               onChanged: (v) =>
                                   setState(() => _inviteWorkspaceId = v),
                             ),
-                          if (own.length > 1) const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, bottom: 10),
+                            child: Text(
+                              'O convite dá acesso só à Carteira escolhida. '
+                              'Trocar aqui também troca a lista de quem tem acesso.',
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
+                          ),
                           SegmentedButton<String>(
                             style: const ButtonStyle(
                                 visualDensity: VisualDensity.compact),
@@ -1792,95 +2015,89 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                                 setState(() => _inviteRole = v.first),
                           ),
                         ],
-                      );
-                    }),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              labelText: 'Email do colaborador',
-                              isDense: true,
-                              border: OutlineInputBorder(),
-                            ),
-                            onSubmitted: (_) => _sendInvite(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _sending ? null : _sendInvite,
-                          child: _sending
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))
-                              : const Text('Convidar'),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: const InputDecoration(
+                                labelText: 'Email do colaborador',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                              onSubmitted: (_) => _sendInvite(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: _sending ? null : _sendInvite,
+                            child: _sending
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Text('Convidar'),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                // Active collaborators
-                if (collaborators.isNotEmpty) ...[
-                  const Divider(height: 1, indent: 16),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                    child: Text('Colaboradores ativos',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurfaceVariant)),
-                  ),
-                  ...collaborators.map((inv) => ListTile(
-                        dense: true,
-                        leading: CircleAvatar(
-                          radius: 16,
-                          backgroundColor:
-                              const Color(0xFF7E57C2).withValues(alpha: 0.15),
+                    // ── Quem tem acesso à Carteira selecionada ──
+                    // Sem Carteira nenhuma (conta ainda não migrada) não há
+                    // recorte possível: tudo cai em "Outros acessos" abaixo.
+                    if (selectedWs != null) ...[
+                      const Divider(height: 1, indent: 16),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                        child: Text('Quem tem acesso a "${selectedName ?? ''}"',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurfaceVariant)),
+                      ),
+                      if (wsMembers.isEmpty && wsInvites.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                           child: Text(
-                            inv.inviteeEmail[0].toUpperCase(),
-                            style: const TextStyle(
-                                color: Color(0xFF7E57C2),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13),
+                            'Ninguém além de você. Convide alguém pelo campo acima.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant),
                           ),
                         ),
-                        title: Text(inv.inviteeEmail,
-                            style: const TextStyle(fontSize: 13)),
-                        subtitle: inv.isWorkspaceInvite
-                            ? Text(
-                                '${(inv.workspaceName?.isNotEmpty ?? false) ? inv.workspaceName : 'Pessoal'} · ${inv.isViewer ? 'só ver' : 'pode editar'}',
-                                style: const TextStyle(fontSize: 11))
-                            : null,
-                        trailing: IconButton(
-                          icon: Icon(Icons.person_remove_outlined,
-                              color: Colors.red.shade400, size: 20),
-                          tooltip: 'Remover colaborador',
-                          onPressed: inv.collaboratorUserId == null
-                              ? null
-                              : () => ref
-                                  .read(sharingNotifierProvider.notifier)
-                                  .removeCollaborator(
-                                    invitationId: inv.id,
-                                    collaboratorUserId: inv.collaboratorUserId!,
-                                    workspaceId: inv.workspaceId,
-                                  ),
-                        ),
-                      )),
-                ],
+                      ...wsMembers.map((inv) => _accessTile(inv, pending: false)),
+                      ...wsInvites.map((inv) => _accessTile(inv, pending: true)),
+                    ],
+                  ],
 
-                const SizedBox(height: 8),
-              ],
-            ),
-          ]),
-        ],
+                  // ── Acessos fora do seletor (conta inteira / Carteira apagada) ──
+                  if (otherMembers.isNotEmpty || otherInvites.isNotEmpty) ...[
+                    const Divider(height: 1, indent: 16),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                      child: Text('Outros acessos',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurfaceVariant)),
+                    ),
+                    ...otherMembers.map((inv) => _accessTile(inv,
+                        pending: false, scopeLabel: _invScopeName(inv))),
+                    ...otherInvites.map((inv) => _accessTile(inv,
+                        pending: true, scopeLabel: _invScopeName(inv))),
+                  ],
+
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ]);
+          }),
       ],
     );
   }
@@ -3680,11 +3897,16 @@ class DataSettingsScreen extends ConsumerWidget {
 }
 
 class SharingSettingsScreen extends StatelessWidget {
-  const SharingSettingsScreen({super.key});
+  /// Carteira já selecionada ao abrir (usado pelo atalho "Compartilhar" da
+  /// tela de Carteiras).
+  final String? initialWorkspaceId;
+
+  const SharingSettingsScreen({super.key, this.initialWorkspaceId});
+
   @override
-  Widget build(BuildContext context) => const _SubScreen(
+  Widget build(BuildContext context) => _SubScreen(
         title: 'Compartilhamento',
-        children: [_SharingSection()],
+        children: [_SharingSection(initialWorkspaceId: initialWorkspaceId)],
       );
 }
 

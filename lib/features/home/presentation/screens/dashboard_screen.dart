@@ -210,6 +210,25 @@ class DashboardScreen extends ConsumerWidget {
             ],
           ],
 
+          // ── As seções desligadas continuam a um toque ────────────────────
+          // A Home abre enxuta de propósito; sem esta porta o usuário acha que
+          // o app perdeu Patrimônio, Saúde Financeira e companhia.
+          if (config.hiddenSections.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: OutlinedButton.icon(
+                onPressed: () => _showCustomizeSheet(context),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                    'Mostrar mais seções (${config.hiddenSections.length})'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 46),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+
           const SizedBox(height: 80),
         ],
       ),

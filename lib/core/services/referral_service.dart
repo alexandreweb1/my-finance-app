@@ -30,21 +30,34 @@ class ReferralService {
 
   /// Ensures the user's referral code is persisted (on the user doc + the
   /// public code→uid map) and returns it. Idempotent and cheap.
+  ///
+  /// NUNCA fica pendurado: quem chama isto está com o dedo no botão
+  /// "Convidar" esperando o share sheet abrir. Com a persistência offline do
+  /// Firestore (padrão no iOS/Android), o Future de um `set()` só completa
+  /// quando o SERVIDOR confirma — sem rede ele nunca completa, a escrita fica
+  /// na fila, e o botão de convidar não abre nada e não dá erro. Por isso a
+  /// gravação é best-effort com prazo: o código é determinístico
+  /// ([codeForUid]), então compartilhar sem ter gravado ainda é correto — a
+  /// escrita enfileirada sobe sozinha quando a conexão voltar.
   Future<String> ensureReferralCode(String uid) async {
     final code = codeForUid(uid);
     try {
-      await _db.collection('users').doc(uid).set(
-        {'referralCode': code},
-        SetOptions(merge: true),
-      );
-      final ref = _db.collection('referralCodes').doc(code);
-      if (!(await ref.get()).exists) {
-        await ref.set({'uid': uid});
-      }
+      await _persistCode(uid, code).timeout(const Duration(seconds: 3));
     } catch (_) {
-      // Non-fatal — the code is deterministic, sharing still works.
+      // Offline, lento ou negado — seguir e compartilhar assim mesmo.
     }
     return code;
+  }
+
+  Future<void> _persistCode(String uid, String code) async {
+    await _db.collection('users').doc(uid).set(
+      {'referralCode': code},
+      SetOptions(merge: true),
+    );
+    final ref = _db.collection('referralCodes').doc(code);
+    if (!(await ref.get()).exists) {
+      await ref.set({'uid': uid});
+    }
   }
 
   /// Records that [uid] was referred by the owner of [rawCode].

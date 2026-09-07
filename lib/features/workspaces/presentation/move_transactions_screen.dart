@@ -282,9 +282,8 @@ class _CarteiraDropdown extends StatelessWidget {
                       children: [
                         Icon(workspaceIcon(w.type),
                             size: 16,
-                            color: w.isBusiness
-                                ? const Color(0xFF7B1FA2)
-                                : Theme.of(context).colorScheme.primary),
+                            color: workspaceColor(
+                                w.type, Theme.of(context).colorScheme)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(w.name,

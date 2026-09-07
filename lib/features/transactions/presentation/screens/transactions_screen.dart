@@ -9,6 +9,7 @@ import '../../../wallets/presentation/screens/cards_view.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
 import '../../../subscription/presentation/widgets/pro_gate_widget.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import '../widgets/transaction_list_tile.dart';
@@ -146,8 +147,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.navStatement),
-        centerTitle: true,
+        titleSpacing: 12,
+        title: const Align(
+          alignment: Alignment.centerLeft,
+          child: CarteiraHeaderSelector(onDark: false),
+        ),
         actions: _selectedTab == 0
             ? [
                 IconButton(

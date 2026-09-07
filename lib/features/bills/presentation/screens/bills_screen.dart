@@ -5,6 +5,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/money_input_formatter.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../domain/bill_entity.dart';
 import '../providers/bills_provider.dart';
 
@@ -21,7 +22,15 @@ class BillsScreen extends ConsumerWidget {
       ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.bills)),
+      appBar: AppBar(
+        title: Text(l10n.bills),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(child: CarteiraHeaderSelector(onDark: false)),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEditor(context, ref, null),
         icon: const Icon(Icons.add),

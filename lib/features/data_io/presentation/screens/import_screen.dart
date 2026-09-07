@@ -12,6 +12,7 @@ import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../wallets/domain/entities/wallet_entity.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../data/csv_parser.dart';
 import '../../data/ofx_parser.dart';
 import '../../domain/parsed_transaction.dart';
@@ -151,6 +152,12 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.importTitle),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(child: CarteiraHeaderSelector(onDark: false)),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

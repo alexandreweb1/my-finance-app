@@ -29,7 +29,7 @@ firebase emulators:exec --project demo-fintab --only firestore \
   "node firestore-rules-test/rules.test.js"
 ```
 
-Saída esperada: `RESULT: 26 passed, 0 failed`. Exit code ≠ 0 se algo falhar
+Saída esperada: `RESULT: 67 passed, 0 failed`. Exit code ≠ 0 se algo falhar
 (útil para CI). Não precisa de login no Firebase — usa o projeto fake
 `demo-fintab`.
 
@@ -46,5 +46,15 @@ Saída esperada: `RESULT: 26 passed, 0 failed`. Exit code ≠ 0 se algo falhar
   passa (só fecha com validação de recibo server-side — Cloud Function).
 - **Exclusão de conta**: dono apaga as próprias coleções; colaborador recusa o
   convite ao se deletar (fix B2).
+- **Holding (sócios e aportes)**: leitura só para membros da Carteira; a tabela
+  de cotas (`holding_members`) só o DONO escreve — um editor não consegue
+  aumentar a própria fatia; um editor pode registrar aporte
+  (`holding_contributions`) mas ninguém reescreve `amountCents` depois (trilha
+  append-only, só `note` muda); aporte apontando para sócio de OUTRA Carteira é
+  negado; sócio + primeiro aporte no mesmo batch passa (via `getAfter`).
+- **Carteira**: `type` só aceita os três ids conhecidos e é imutável depois de
+  gravado (virar Holding/PF depois de ter dados abandonaria ou inventaria
+  patrimônio); `holdingSplit` congelado só entra em transação de Holding.
+  Inclui regressões de renomear, arquivar e remover colaborador.
 
 > Ao mudar `firestore.rules`, rode esta suíte **antes** de `firebase deploy`.

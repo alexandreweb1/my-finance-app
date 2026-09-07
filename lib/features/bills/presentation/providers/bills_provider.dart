@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/providers/workspace_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/services/local_notification_service.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/domain/usecases/add_transaction_usecase.dart';
@@ -172,20 +173,35 @@ class BillsNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       final txId = const Uuid().v4();
+      final paidAt = DateTime.now();
+      // The settlement transaction lives in the bill's workspace; legacy
+      // bills (null) fall back to the current write stamp.
+      final txWorkspaceId = bill.workspaceId ?? _workspaceId;
+      final txType =
+          bill.isPayable ? TransactionType.expense : TransactionType.income;
+      // Paying a bill of a Holding is a Holding expense like any other, so it
+      // is rateado by the same code the add dialog uses. The stamp's own guard
+      // makes this a no-op for a bill that belongs to a different Carteira
+      // than the active one (legacy bills stamped with the write scope
+      // included), and for a receivable, which is income.
+      final holdingSplit = _ref.read(activeHoldingStampProvider)?.splitFor(
+            targetWorkspaceId: txWorkspaceId,
+            type: txType,
+            amount: bill.amount,
+            date: paidAt,
+            seed: txId,
+          );
       final tx = TransactionEntity(
         id: txId,
         userId: _uid,
-        // The settlement transaction lives in the bill's workspace; legacy
-        // bills (null) fall back to the current write stamp.
-        workspaceId: bill.workspaceId ?? _workspaceId,
+        workspaceId: txWorkspaceId,
         title: bill.title,
         amount: bill.amount,
-        type: bill.isPayable
-            ? TransactionType.expense
-            : TransactionType.income,
+        type: txType,
         category: bill.category,
-        date: DateTime.now(),
+        date: paidAt,
         walletId: bill.walletId,
+        holdingSplit: holdingSplit,
       );
       final txResult = await _ref
           .read(addTransactionUseCaseProvider)
@@ -193,7 +209,7 @@ class BillsNotifier extends StateNotifier<AsyncValue<void>> {
       final linkedTxId = txResult.fold<String?>((_) => null, (_) => txId);
       final paid = bill.copyWith(
         isPaid: true,
-        paidDate: DateTime.now(),
+        paidDate: paidAt,
         transactionId: linkedTxId,
       );
       await _col.doc(paid.id).set(BillModel.fromEntity(paid).toFirestore());

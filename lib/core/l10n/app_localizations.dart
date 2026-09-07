@@ -554,6 +554,182 @@ class AppLocalizations {
       'Separate Personal and Business ledgers and manage each independently',
       'Separa Personal y Empresarial y gestiona cada uno de forma independiente');
 
+  // ── Holding (sócios e patrimônio) ──────────────────────────────────────────
+  String get workspaceHolding => _t('Holding', 'Holding', 'Holding');
+  String get holdingTitle =>
+      _t('Sócios e patrimônio', 'Partners & equity', 'Socios y patrimonio');
+  String get holdingToolsDesc => _t(
+      'Quem aportou quanto e o patrimônio de cada sócio',
+      'Who contributed what, and each partner\'s equity',
+      'Quién aportó cuánto y el patrimonio de cada socio');
+  String get holdingNetWorth => _t('Patrimônio', 'Net worth', 'Patrimonio');
+  String get holdingTotalContributed =>
+      _t('Total aportado', 'Total contributed', 'Total aportado');
+  String get holdingApproxFx => _t('aproximado (câmbio do dia)',
+      "approximate (today's rate)", 'aproximado (cambio del día)');
+  String get holdingApproxFxHint => _t(
+      'Esta Carteira tem contas em mais de uma moeda. O patrimônio é convertido pela cotação do dia e muda quando as cotações mudam.',
+      "This space holds accounts in more than one currency. Net worth is converted at today's rate and moves as rates refresh.",
+      'Este espacio tiene cuentas en más de una moneda. El patrimonio se convierte con la cotización del día y cambia cuando cambian las cotizaciones.');
+  String get holdingPartners => _t('Sócios', 'Partners', 'Socios');
+  String get holdingContributedVerb => _t('aportou', 'contributed', 'aportó');
+  String get holdingQuotaLabel => _t('Cota', 'Share', 'Cuota');
+  String get holdingUnavailable =>
+      _t('indisponível', 'unavailable', 'no disponible');
+  String get holdingNoContributionsYet => _t(
+      'Ninguém aportou ainda — as cotas aparecem depois do primeiro aporte.',
+      'Nobody has contributed yet — shares show up after the first contribution.',
+      'Nadie ha aportado todavía: las cuotas aparecen tras el primer aporte.');
+  String get holdingInvalidFixedQuotas => _t(
+      'As porcentagens fixas não somam 100%. Ajuste as cotas dos sócios.',
+      "The fixed percentages do not add up to 100%. Adjust the partners' shares.",
+      'Los porcentajes fijos no suman 100%. Ajusta las cuotas de los socios.');
+  String get holdingNegativeContributions => _t(
+      'Há retiradas maiores que os aportes. Revise os lançamentos dos sócios.',
+      'Withdrawals exceed contributions. Review the entries of each partner.',
+      'Hay retiros mayores que los aportes. Revisa los registros de los socios.');
+  String get holdingBalances =>
+      _t('Saldos do rateio', 'Split balances', 'Saldos del reparto');
+  String get holdingBalancesHint => _t(
+      'Aportes e gastos divididos entre os sócios.',
+      'Contributions and expenses split between partners.',
+      'Aportes y gastos repartidos entre los socios.');
+  String get holdingToReceive => _t('a receber', 'to receive', 'a cobrar');
+  String get holdingToPay => _t('a pagar', 'to pay', 'a pagar');
+  String get holdingAllSettled => _t(
+      'Tudo acertado — ninguém deve nada a ninguém.',
+      'All settled — nobody owes anybody.',
+      'Todo saldado: nadie le debe nada a nadie.');
+  String get holdingHowToSettle =>
+      _t('Como acertar', 'How to settle', 'Cómo saldar');
+  String holdingSettlementLine(String from, String amount, String to) => _t(
+      '$from paga $amount para $to',
+      '$from pays $amount to $to',
+      '$from paga $amount a $to');
+  String get holdingQuotaMode =>
+      _t('Divisão das cotas', 'Share mode', 'Modo de cuotas');
+  String get holdingQuotaProportional =>
+      _t('Proporcional', 'Proportional', 'Proporcional');
+  String get holdingQuotaFixed => _t('Fixa', 'Fixed', 'Fija');
+  String get holdingQuotaProportionalHint => _t(
+      'A cota de cada sócio acompanha o quanto ele aportou.',
+      "Each partner's share follows how much they put in.",
+      'La cuota de cada socio sigue cuánto aportó.');
+  String get holdingQuotaFixedHint => _t(
+      'Você define a porcentagem de cada sócio; o app mostra quem está em dia.',
+      "You set each partner's percentage; the app shows who is behind.",
+      'Tú defines el porcentaje de cada socio; la app muestra quién está al día.');
+  String get holdingExpectedContribution =>
+      _t('Deveria ter aportado', 'Should have put in', 'Debería haber aportado');
+  String holdingShortBy(String amount) =>
+      _t('faltam $amount', '$amount short', 'faltan $amount');
+  String holdingAheadBy(String amount) =>
+      _t('$amount a mais', '$amount ahead', '$amount de más');
+  String get holdingOnTrack => _t('em dia', 'on track', 'al día');
+  String holdingStaleSplits(int n) => _t(
+      n == 1
+          ? '1 gasto foi editado depois que o rateio foi congelado — a divisão guardada pode não bater com o valor atual.'
+          : '$n gastos foram editados depois que o rateio foi congelado — as divisões guardadas podem não bater com os valores atuais.',
+      n == 1
+          ? '1 expense was edited after its split was frozen — the stored split may no longer match the amount.'
+          : '$n expenses were edited after their splits were frozen — the stored splits may no longer match the amounts.',
+      n == 1
+          ? '1 gasto se editó después de congelar el reparto: la división guardada puede no coincidir con el importe.'
+          : '$n gastos se editaron después de congelar el reparto: las divisiones guardadas pueden no coincidir con los importes.');
+  String get holdingAddContribution =>
+      _t('Registrar aporte', 'Record contribution', 'Registrar aporte');
+  String get holdingAddPartner =>
+      _t('Adicionar sócio', 'Add partner', 'Añadir socio');
+  String get holdingEmptyTitle =>
+      _t('Nenhum sócio ainda', 'No partners yet', 'Aún no hay socios');
+  String get holdingEmptyBody => _t(
+      'Sócio é quem divide o patrimônio desta Carteira. Cadastre cada pessoa, registre os aportes e o Fintab calcula quanto do patrimônio pertence a cada um — mesmo quem não usa o app.',
+      'A partner is someone who shares this space’s equity. Add each person, record what they put in, and Fintab works out how much of the net worth belongs to each one — even those who do not use the app.',
+      'Un socio es quien comparte el patrimonio de este espacio. Registra a cada persona y sus aportes, y Fintab calcula cuánto del patrimonio le corresponde a cada uno, incluso a quien no usa la app.');
+  String get holdingReadOnly => _t(
+      'Somente leitura — apenas o dono da Carteira edita sócios e aportes.',
+      'Read-only — only the space owner can edit partners and contributions.',
+      'Solo lectura: únicamente el dueño del espacio edita socios y aportes.');
+  String get holdingNotAHolding => _t(
+      'Esta Carteira não é uma Holding. Troque para uma Carteira do tipo Holding para ver sócios e patrimônio.',
+      'This space is not a Holding. Switch to a Holding space to see partners and equity.',
+      'Este espacio no es una Holding. Cambia a un espacio de tipo Holding para ver socios y patrimonio.');
+
+  // ── Holding — diálogos de sócio e aporte ───────────────────────────────────
+  String get holdingEditPartner =>
+      _t('Editar sócio', 'Edit partner', 'Editar socio');
+  String get holdingPartner => _t('Sócio', 'Partner', 'Socio');
+  String get holdingPartnerName =>
+      _t('Nome do sócio', 'Partner name', 'Nombre del socio');
+  String get holdingSourceApp =>
+      _t('Membro do app', 'App member', 'Miembro de la app');
+  String get holdingSourceOffline => _t('Pessoa sem conta',
+      'Person without an account', 'Persona sin cuenta');
+  String get holdingSourceHint => _t(
+      'Um membro do app acompanha a própria posição no celular dele. Uma pessoa sem conta entra só como nome — e conta igual em todos os cálculos.',
+      'An app member follows their own position on their phone. A person without an account is only a name here — and counts the same in every calculation.',
+      'Un miembro de la app sigue su propia posición en su teléfono. Una persona sin cuenta entra solo como nombre, y cuenta igual en todos los cálculos.');
+  String get holdingPickAppMember => _t('Quem tem acesso a esta Carteira',
+      'Who has access to this space', 'Quién tiene acceso a este espacio');
+  String get holdingNoAppMembersLeft => _t(
+      'Todos os membros desta Carteira já são sócios. Cadastre como pessoa sem conta ou compartilhe a Carteira primeiro.',
+      'Everyone with access to this space is already a partner. Add them as a person without an account, or share the space first.',
+      'Todos los miembros de este espacio ya son socios. Regístralo como persona sin cuenta o comparte el espacio primero.');
+  String get holdingJoinedAt =>
+      _t('Participa desde', 'Taking part since', 'Participa desde');
+  String get holdingJoinedAtHint => _t(
+      'Gastos anteriores a esta data não entram no rateio deste sócio. O padrão é a data de criação da Carteira — mude só se ele entrou depois.',
+      "Expenses dated before this are not split with this partner. It defaults to the space's creation date — change it only if they joined later.",
+      'Los gastos anteriores a esta fecha no se reparten con este socio. Por defecto es la fecha de creación del espacio: cámbiala solo si entró después.');
+  String get holdingQuotaPercent => _t('Cota (%)', 'Share (%)', 'Cuota (%)');
+  String holdingQuotaSumOk(String total) => _t('As cotas somam $total ✓',
+      'Shares add up to $total ✓', 'Las cuotas suman $total ✓');
+  String holdingQuotaSumShort(String total, String delta) => _t(
+      'As cotas somam $total — faltam $delta para 100%',
+      'Shares add up to $total — $delta short of 100%',
+      'Las cuotas suman $total: faltan $delta para 100%');
+  String holdingQuotaSumOver(String total, String delta) => _t(
+      'As cotas somam $total — $delta acima de 100%',
+      'Shares add up to $total — $delta over 100%',
+      'Las cuotas suman $total: $delta por encima de 100%');
+  String get holdingQuotaSumWarning => _t(
+      'Enquanto não somar 100%, o patrimônio por sócio fica indisponível. Você pode salvar agora e ajustar os outros sócios em seguida.',
+      'Until they add up to 100%, per-partner equity stays unavailable. You can save now and adjust the other partners next.',
+      'Mientras no sumen 100%, el patrimonio por socio queda no disponible. Puedes guardar ahora y ajustar a los demás socios después.');
+  String get holdingWithdrawal =>
+      _t('É uma retirada', 'This is a withdrawal', 'Es un retiro');
+  String get holdingWithdrawalHint => _t(
+      'A retirada devolve dinheiro ao sócio e reduz a cota dele.',
+      'A withdrawal returns money to the partner and lowers their share.',
+      'El retiro devuelve dinero al socio y reduce su cuota.');
+  String get holdingNeedPartnerFirst => _t(
+      'Cadastre um sócio antes de registrar um aporte.',
+      'Add a partner before recording a contribution.',
+      'Registra un socio antes de anotar un aporte.');
+  String holdingContributionPreview(String amount, String name, String date) =>
+      _t('Aporte de $amount por $name em $date',
+          'Contribution of $amount by $name on $date',
+          'Aporte de $amount por $name el $date');
+  String holdingWithdrawalPreview(String amount, String name, String date) =>
+      _t('Retirada de $amount por $name em $date',
+          'Withdrawal of $amount by $name on $date',
+          'Retiro de $amount por $name el $date');
+  String get holdingSaveError => _t(
+      'Não foi possível salvar. Verifique a conexão e tente de novo.',
+      'Could not save. Check your connection and try again.',
+      'No se pudo guardar. Revisa la conexión e inténtalo de nuevo.');
+  String get holdingProTitle =>
+      _t('Holding: sócios e patrimônio', 'Holding: partners and equity',
+          'Holding: socios y patrimonio');
+  String get holdingTypeHint => _t(
+      'Patrimônio dividido entre sócios, com aportes e rateio dos gastos.',
+      'Equity divided between partners, with contributions and expense splitting.',
+      'Patrimonio dividido entre socios, con aportes y reparto de gastos.');
+  String get holdingProDesc => _t(
+      'Crie uma Carteira Holding, cadastre os sócios e veja quanto do patrimônio é de cada um, com rateio dos gastos e quem paga quem.',
+      'Create a Holding space, register the partners and see how much of the equity belongs to each one, with expense splitting and who pays whom.',
+      'Crea un espacio Holding, registra a los socios y mira cuánto del patrimonio es de cada uno, con reparto de gastos y quién paga a quién.');
+
   // ── Tools hub ──────────────────────────────────────────────────────────────
   String get toolsHub =>
       _t('Ferramentas & Recursos', 'Tools & Features', 'Herramientas y recursos');

@@ -19,6 +19,8 @@ class TransactionModel extends TransactionEntity {
     super.tags,
     super.attachmentUrls,
     super.workspaceId,
+    super.holdingSplit,
+    super.holdingPaidBy,
   });
 
   factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
@@ -41,7 +43,24 @@ class TransactionModel extends TransactionEntity {
           (data['attachmentUrls'] as List<dynamic>?)?.cast<String>() ??
               const [],
       workspaceId: data['workspaceId'] as String?,
+      holdingSplit: _splitFromFirestore(data['holdingSplit']),
+      holdingPaidBy: data['holdingPaidBy'] as String?,
     );
+  }
+
+  /// Reads the frozen rateio map, tolerating a doc written by any client.
+  ///
+  /// Values are centavos and MUST be integers, but Firestore hands back a
+  /// `num`, and an older/broken writer could have stored a double. Round rather
+  /// than cast so one odd document degrades to the nearest centavo instead of
+  /// throwing and taking the whole Extrato list down.
+  static Map<String, int>? _splitFromFirestore(dynamic raw) {
+    if (raw is! Map) return null;
+    final out = <String, int>{};
+    raw.forEach((k, v) {
+      if (k is String && v is num && v.isFinite) out[k] = v.round();
+    });
+    return out.isEmpty ? null : out;
   }
 
   Map<String, dynamic> toFirestore() {
@@ -60,6 +79,8 @@ class TransactionModel extends TransactionEntity {
       'tags': tags,
       'attachmentUrls': attachmentUrls,
       if (workspaceId != null) 'workspaceId': workspaceId,
+      if (holdingSplit != null) 'holdingSplit': holdingSplit,
+      if (holdingPaidBy != null) 'holdingPaidBy': holdingPaidBy,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -81,6 +102,8 @@ class TransactionModel extends TransactionEntity {
       tags: entity.tags,
       attachmentUrls: entity.attachmentUrls,
       workspaceId: entity.workspaceId,
+      holdingSplit: entity.holdingSplit,
+      holdingPaidBy: entity.holdingPaidBy,
     );
   }
 }

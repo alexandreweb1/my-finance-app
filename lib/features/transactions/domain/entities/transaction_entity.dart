@@ -55,6 +55,21 @@ class TransactionEntity extends Equatable {
   /// pre-migration doc (treated as the default workspace).
   final String? workspaceId;
 
+  /// Frozen rateio for a HOLDING Carteira: participantId → centavos owed.
+  ///
+  /// Written once, when the expense is created, from the sócios who were
+  /// participating at that moment — which is what keeps a sócio added later
+  /// from retroactively changing the past. Null everywhere else, so PF/PJ
+  /// Carteiras carry no extra bytes.
+  ///
+  /// Centavos, not reais: the whole point is that R\$ 100,00 split three ways
+  /// loses nothing.
+  final Map<String, int>? holdingSplit;
+
+  /// Which sócio actually paid this expense, when known. Null means it came
+  /// out of a Conta of the Holding itself.
+  final String? holdingPaidBy;
+
   const TransactionEntity({
     required this.id,
     required this.userId,
@@ -71,6 +86,8 @@ class TransactionEntity extends Equatable {
     this.tags = const [],
     this.attachmentUrls = const [],
     this.workspaceId,
+    this.holdingSplit,
+    this.holdingPaidBy,
   });
 
   bool get isIncome => type == TransactionType.income;
@@ -94,5 +111,7 @@ class TransactionEntity extends Equatable {
         tags,
         attachmentUrls,
         workspaceId,
+        holdingSplit,
+        holdingPaidBy,
       ];
 }

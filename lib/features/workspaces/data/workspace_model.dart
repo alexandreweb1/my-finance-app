@@ -14,6 +14,7 @@ class WorkspaceModel extends WorkspaceEntity {
     super.archived,
     super.order,
     required super.createdAt,
+    super.holdingQuotaMode,
   });
 
   factory WorkspaceModel.fromFirestore(DocumentSnapshot doc) {
@@ -32,6 +33,7 @@ class WorkspaceModel extends WorkspaceEntity {
       archived: (d['archived'] as bool?) ?? false,
       order: (d['order'] as num?)?.toInt() ?? 0,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2020),
+      holdingQuotaMode: d['holdingQuotaMode'] as String?,
     );
   }
 
@@ -45,5 +47,6 @@ class WorkspaceModel extends WorkspaceEntity {
         'archived': archived,
         'order': order,
         'createdAt': Timestamp.fromDate(createdAt),
+        if (holdingQuotaMode != null) 'holdingQuotaMode': holdingQuotaMode,
       };
 }

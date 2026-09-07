@@ -6,6 +6,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../recurring/domain/entities/recurring_transaction_entity.dart';
 import '../../../recurring/presentation/providers/recurring_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../domain/subscription_detector.dart';
 import '../providers/subscriptions_provider.dart';
 
@@ -24,7 +25,15 @@ class SubscriptionsScreen extends ConsumerWidget {
     final dateLoc = ref.watch(dateLocaleProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.subscriptions)),
+      appBar: AppBar(
+        title: Text(l10n.subscriptions),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(child: CarteiraHeaderSelector(onDark: false)),
+          ),
+        ],
+      ),
       body: subs.isEmpty
           ? _EmptyState(l10n: l10n)
           : ListView(

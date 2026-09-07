@@ -3,12 +3,36 @@ import 'package:equatable/equatable.dart';
 /// The kind of ledger space a workspace ("Carteira") represents.
 enum WorkspaceType {
   personal, // Pessoa Física
-  business; // Pessoa Jurídica / empresa
+  business, // Pessoa Jurídica / empresa
+  holding; // Holding — patrimônio dividido entre sócios
 
   String get id => name;
 
-  static WorkspaceType fromId(String? id) =>
-      id == 'business' ? WorkspaceType.business : WorkspaceType.personal;
+  /// Unknown ids fall back to [personal] so a doc written by a NEWER app
+  /// version still opens on an older build. Written as an exhaustive switch
+  /// rather than a ternary: with a ternary, adding a type silently maps it to
+  /// personal and the whole feature becomes dead code no test can catch.
+  static WorkspaceType fromId(String? id) => switch (id) {
+        'business' => WorkspaceType.business,
+        'holding' => WorkspaceType.holding,
+        _ => WorkspaceType.personal,
+      };
+}
+
+/// How a Holding divides its patrimony between sócios.
+enum HoldingQuotaMode {
+  /// Quota = what the sócio contributed / everything contributed. Whoever puts
+  /// in more owns more, automatically.
+  proportional,
+
+  /// The owner sets each sócio's percentage by hand; the app then reports how
+  /// much each one SHOULD have contributed versus what they actually did.
+  fixed;
+
+  String get id => name;
+
+  static HoldingQuotaMode fromId(String? id) =>
+      id == 'fixed' ? HoldingQuotaMode.fixed : HoldingQuotaMode.proportional;
 }
 
 /// Role a member holds inside a workspace.
@@ -47,6 +71,11 @@ class WorkspaceEntity extends Equatable {
   final int order;
   final DateTime createdAt;
 
+  /// Quota mode — meaningful only when [type] is [WorkspaceType.holding].
+  /// Stored raw so an unknown future mode round-trips untouched instead of
+  /// being silently rewritten to the default on the next save.
+  final String? holdingQuotaMode;
+
   const WorkspaceEntity({
     required this.id,
     required this.ownerId,
@@ -58,15 +87,32 @@ class WorkspaceEntity extends Equatable {
     this.archived = false,
     this.order = 0,
     required this.createdAt,
+    this.holdingQuotaMode,
   });
 
   bool get isBusiness => type == WorkspaceType.business;
+
+  bool get isHolding => type == WorkspaceType.holding;
+
+  /// The Holding's quota mode, defaulting to proportional. Meaningless (and
+  /// unused) for non-Holding Carteiras.
+  HoldingQuotaMode get quotaMode => HoldingQuotaMode.fromId(holdingQuotaMode);
 
   WorkspaceRole roleOf(String uid) => roles[uid] ?? WorkspaceRole.viewer;
 
   bool isEditor(String uid) => roleOf(uid) == WorkspaceRole.editor;
 
   @override
-  List<Object?> get props =>
-      [id, ownerId, name, type, memberUids, roles, isDefault, archived, order];
+  List<Object?> get props => [
+        id,
+        ownerId,
+        name,
+        type,
+        memberUids,
+        roles,
+        isDefault,
+        archived,
+        order,
+        holdingQuotaMode,
+      ];
 }

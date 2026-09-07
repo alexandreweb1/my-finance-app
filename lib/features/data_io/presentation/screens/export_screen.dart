@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +12,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/providers/app_settings_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../data/excel_exporter.dart';
 import '../../data/pdf_exporter.dart';
 
@@ -135,13 +137,26 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     }
   }
 
+  static const _kXlsxMime =
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
   Future<void> _shareExcel(Uint8List bytes, String filename) async {
+    // Na web não há diretório temporário (path_provider não é suportado): o
+    // arquivo tem que ir direto em memória, senão o botão "Exportar Excel"
+    // morre com MissingPluginException. O PDF já escapava disso porque usa
+    // Printing.sharePdf.
+    if (kIsWeb) {
+      await Share.shareXFiles(
+        [XFile.fromData(bytes, name: filename, mimeType: _kXlsxMime)],
+        subject: filename,
+      );
+      return;
+    }
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(bytes, flush: true);
     await Share.shareXFiles(
-      [XFile(file.path, mimeType:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      [XFile(file.path, mimeType: _kXlsxMime)],
       subject: filename,
     );
   }
@@ -157,7 +172,15 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
         : l10n.exportAllTime;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.exportTitle)),
+      appBar: AppBar(
+        title: Text(l10n.exportTitle),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(child: CarteiraHeaderSelector(onDark: false)),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

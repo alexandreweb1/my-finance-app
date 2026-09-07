@@ -7,6 +7,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../budget/domain/ideal_budget.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../../domain/financial_score.dart';
 import '../providers/financial_health_provider.dart';
 
@@ -23,6 +24,12 @@ class FinancialHealthScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.financialHealthTitle),
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Center(child: CarteiraHeaderSelector(onDark: false)),
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.health_and_safety_outlined), text: 'Score'),

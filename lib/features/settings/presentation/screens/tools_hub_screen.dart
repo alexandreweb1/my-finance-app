@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../bills/presentation/screens/bills_screen.dart';
 import '../../../category_rules/presentation/screens/category_rules_screen.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
+import '../../../holding/presentation/screens/holding_screen.dart';
 import '../../../investments/presentation/screens/investments_screen.dart';
 import '../../../subscriptions/presentation/screens/subscriptions_screen.dart';
 import '../../../subscription/presentation/providers/subscription_provider.dart';
@@ -19,6 +21,12 @@ class ToolsHubScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final isPro = ref.watch(isProProvider);
+    // The sócios/patrimônio tool exists ONLY inside a Holding Carteira. In a
+    // Pessoal or Empresarial Carteira there is nothing to divide, so the row is
+    // absent entirely rather than shown disabled — a disabled row would invite
+    // the question "why can't I tap this?" on a screen where the answer is
+    // "this simply is not part of a PF Carteira".
+    final showHolding = ref.watch(isHoldingActiveProvider);
 
     void open(Widget screen) => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => screen),
@@ -76,6 +84,14 @@ class ToolsHubScreen extends ConsumerWidget {
             subtitle: l10n.subscriptionsDesc,
             onTap: () => open(const SubscriptionsScreen()),
           ),
+          if (showHolding)
+            _Tile(
+              icon: Icons.account_balance_rounded,
+              color: const Color(0xFF00796B),
+              title: l10n.holdingTitle,
+              subtitle: l10n.holdingToolsDesc,
+              onTap: () => open(const HoldingScreen()),
+            ),
           _Tile(
             icon: Icons.rule_folder_outlined,
             color: const Color(0xFF00B894),

@@ -6,6 +6,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../transactions/domain/entities/transaction_entity.dart';
 import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../transactions/domain/usecases/add_transaction_usecase.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
 import '../../data/datasources/recurring_transaction_remote_datasource.dart';
 import '../../data/models/recurring_transaction_model.dart';
 import '../../data/repositories/recurring_transaction_repository_impl.dart';
@@ -174,6 +175,10 @@ final recurringGeneratorProvider = FutureProvider<int>((ref) async {
 
   final addUseCase = ref.read(addTransactionUseCaseProvider);
   final ds = ref.read(recurringDataSourceProvider);
+  // Materialized occurrences of a Holding recurrence are Holding expenses and
+  // must carry a rateio too. Read (not watch): the generator must not re-run
+  // just because the active Carteira changed.
+  final holdingStamp = ref.read(activeHoldingStampProvider);
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day, 23, 59, 59);
   int generated = 0;
@@ -188,8 +193,9 @@ final recurringGeneratorProvider = FutureProvider<int>((ref) async {
       final dateKey = '${next.year.toString().padLeft(4, '0')}'
           '${next.month.toString().padLeft(2, '0')}'
           '${next.day.toString().padLeft(2, '0')}';
+      final txId = 'rec_${rec.id}_$dateKey';
       final tx = TransactionEntity(
-        id: 'rec_${rec.id}_$dateKey',
+        id: txId,
         userId: rec.userId,
         workspaceId: rec.workspaceId,
         title: rec.title,
@@ -199,6 +205,16 @@ final recurringGeneratorProvider = FutureProvider<int>((ref) async {
         date: next,
         description: rec.description,
         walletId: rec.walletId,
+        // Seeded with the deterministic doc id, so a re-run of the generator
+        // rewrites byte-identical shares instead of shuffling the odd centavo.
+        // The stamp's guard skips recurrences homed to any other Carteira.
+        holdingSplit: holdingStamp?.splitFor(
+          targetWorkspaceId: rec.workspaceId,
+          type: rec.type,
+          amount: rec.amount,
+          date: next,
+          seed: txId,
+        ),
       );
 
       final result = await addUseCase(

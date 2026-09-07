@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../settings/presentation/screens/currency_converter_screen.dart';
+import '../../../workspaces/presentation/workspace_switcher.dart';
 import '../providers/investments_provider.dart';
 import 'add_asset_screen.dart';
 import 'asset_detail_screen.dart';
@@ -23,7 +24,15 @@ class InvestmentsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context).investments)),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).investments),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(child: CarteiraHeaderSelector(onDark: false)),
+          ),
+        ],
+      ),
       body: const InvestmentsView(),
     );
   }

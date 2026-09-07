@@ -40,6 +40,18 @@ final myCollaboratorsProvider =
       .map((either) => either.getOrElse(() => []));
 });
 
+// ─── Pending invitations SENT by the current user (master view) ──────────────
+
+final sentPendingInvitationsProvider =
+    StreamProvider<List<InvitationEntity>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref
+      .watch(sharingRepositoryProvider)
+      .watchSentPendingInvitations(user.id)
+      .map((either) => either.getOrElse(() => []));
+});
+
 // ─── Notifier ─────────────────────────────────────────────────────────────────
 
 class SharingNotifier extends StateNotifier<AsyncValue<void>> {
@@ -102,6 +114,21 @@ class SharingNotifier extends StateNotifier<AsyncValue<void>> {
   Future<String?> declineInvitation(String invitationId) async {
     state = const AsyncValue.loading();
     final result = await _repo.declineInvitation(invitationId);
+    return result.fold(
+      (failure) {
+        state = AsyncValue.error(failure.message, StackTrace.current);
+        return failure.message;
+      },
+      (_) {
+        state = const AsyncValue.data(null);
+        return null;
+      },
+    );
+  }
+
+  Future<String?> cancelInvitation(String invitationId) async {
+    state = const AsyncValue.loading();
+    final result = await _repo.cancelInvitation(invitationId);
     return result.fold(
       (failure) {
         state = AsyncValue.error(failure.message, StackTrace.current);

@@ -19,12 +19,13 @@ vantagens** em `lib/features/subscription/presentation/screens/pro_screen.dart`
 | Transações recorrentes | `planning_screen.dart` (ProGateWidget no tab) |
 | Tags / Etiquetas | `add_transaction_dialog.dart` (input só aparece se Pro) |
 | Importação de extratos (OFX/CSV) | `settings_screen.dart` (`_DataIoCard._openImport`) |
-| Exportação de relatórios (PDF/Excel) | `settings_screen.dart` (`_DataIoCard._openExport`) |
+| Exportação de relatórios (PDF/Excel) | `settings_screen.dart` (`_DataIoCard._openExport`); `reports_screen.dart` (`_startExport` → imagem/PDF dos gráficos) |
 | Saúde financeira (score 0–100) | `settings_screen.dart` (`_FinancialHealthCard._open`) |
 | Cartão de crédito (fatura/parcelas) | `settings_screen.dart` (`_AddWalletDialog`), `add_transaction_dialog.dart` (parcelas), `credit_card_screen.dart`, aba **Cartões** em `transactions_screen.dart` (ProGateWidget → `cards_view.dart`) |
 | Anexar comprovante (foto/PDF) | `add_transaction_dialog.dart` (`_addAttachment`) |
 | Conversor de moedas (cotação real) | `settings_screen.dart` (tools card → gate), `currency_converter_screen.dart` |
 | Alertas de preço (investimentos) | `price_alert_dialog.dart` (`openPriceAlertDialog` → gate imperativo antes do dialog) |
+| Holding: sócios e divisão de patrimônio | herda o gate de Carteiras (`canUseWorkspacesProvider` == `isProProvider`); a tela só aparece em `tools_hub_screen.dart` quando `isHoldingActiveProvider` é true |
 
 > Notas:
 > - Rollover de orçamento é sub-recurso de Orçamentos (já Pro), togglado no `_AddBudgetDialog`.

@@ -82,6 +82,107 @@ service cloud.firestore {
           && request.resource.data.userId == wsOwner(request.resource.data.workspaceId);
     }
 
+    // ── Holding ("Carteira" cujo patrimônio é dividido entre sócios) ─────────
+
+    // The caller owns the Carteira itself.
+    function wsOwnedByCaller(wid) {
+      return wsOwner(wid) == request.auth.uid;
+    }
+
+    // Same owner test for an EXISTING doc. isOwnerOfExistingDoc() comes first
+    // on purpose: it is the same principal (create pins userId == wsOwner and
+    // ownerId is immutable on /workspaces, so a doc homed to the caller can
+    // only belong to a Carteira the caller owns) AND it keeps working when the
+    // workspace doc is already gone. That matters for the deletion paths — a
+    // get() of a deleted Carteira errors out, which would leave an orphaned
+    // doc that nobody, not even its owner, can wipe (LGPD).
+    function isWorkspaceOwnerOfExistingDoc() {
+      return isOwnerOfExistingDoc()
+          || ('workspaceId' in resource.data
+              && wsOwnedByCaller(resource.data.workspaceId));
+    }
+
+    // Shape of a sócio. quotaBps is basis points (10000 = 100,00%): an int,
+    // never a float, because seven sócios at 100/7 each only sum back to
+    // exactly 100% in integer arithmetic — and inside 0..10000 so the
+    // fixed-quota math can never be handed a percentage it cannot represent.
+    function validHoldingMember() {
+      let d = request.resource.data;
+      return 'workspaceId' in d && d.workspaceId is string
+          && 'name' in d && d.name is string
+          && d.name.size() > 0 && d.name.size() <= 80
+          && 'quotaBps' in d && d.quotaBps is int
+          && d.quotaBps >= 0 && d.quotaBps <= 10000;
+    }
+
+    // The sócio being credited must live in the SAME Carteira — otherwise an
+    // editor of Carteira X could push money onto someone's position in
+    // Carteira Y. getAfter() rather than get() because a sócio and their first
+    // aporte may legitimately land in the same batch; get() would see a
+    // not-yet-existing member and deny a perfectly valid write.
+    function contributionMemberIsInSameWorkspace() {
+      let d = request.resource.data;
+      return getAfter(/databases/$(database)/documents/holding_members/$(d.memberId))
+               .data.workspaceId == d.workspaceId;
+    }
+
+    // An aporte/retirada. The amount is the ONLY half of "exato ao centavo"
+    // a rule can actually check: an int (a float would silently lose
+    // centavos), never zero (an empty entry is noise in the money trail), and
+    // bounded by kMaxCents so nothing can overflow the client-side math.
+    function validHoldingContribution() {
+      let d = request.resource.data;
+      return 'amountCents' in d && d.amountCents is int
+          && d.amountCents != 0
+          && d.amountCents > -100000000000
+          && d.amountCents < 100000000000
+          && d.createdBy == request.auth.uid
+          && (!('note' in d) || (d.note is string && d.note.size() <= 500))
+          && 'memberId' in d && d.memberId is string
+          && contributionMemberIsInSameWorkspace();
+    }
+
+    // Only the three known kinds of Carteira. Tolerates a doc with no `type`
+    // at all — pre-Carteira docs read as 'personal' — so this hardens new
+    // writes without denying a rename on an old workspace.
+    function validWorkspaceType() {
+      return !('type' in request.resource.data)
+          || request.resource.data.type in ['personal', 'business', 'holding'];
+    }
+
+    function validHoldingQuotaMode() {
+      return !('holdingQuotaMode' in request.resource.data)
+          || request.resource.data.holdingQuotaMode in ['proportional', 'fixed'];
+    }
+
+    // `type` is STICKY once set. Flipping a Carteira between PF/PJ/Holding
+    // would either strand its sócios and quotas (equity records describing a
+    // ledger that no longer divides anything) or invent equity for a ledger
+    // that never had any — and every rateio already frozen on a transaction
+    // would start describing a Carteira that does not exist. Rename, archive
+    // and membership writes never touch `type`, so they are unaffected.
+    function workspaceTypeSticky() {
+      return !('type' in resource.data)
+          || ('type' in request.resource.data
+              && request.resource.data.type == resource.data.type);
+    }
+
+    // A frozen rateio may only live inside a Holding. This costs no document
+    // read on the transactions everyone else writes: without the fields the
+    // expression short-circuits before any get(). When the fields ARE present,
+    // the workspace doc was already fetched by wsCreatable()/wsEditable() in
+    // the same evaluation, so the lookup is served from the rules cache.
+    // NOT validated here: that the map's VALUES are ints that add up to the
+    // amount — rules cannot iterate a map's values. The client freezes the
+    // split from holding_math; a hostile client can still write a nonsense
+    // split into its OWN Holding, which corrupts nothing but its own reports.
+    function holdingSplitOnlyInHolding() {
+      let d = request.resource.data;
+      return (!('holdingSplit' in d) && !('holdingPaidBy' in d))
+          || ('workspaceId' in d
+              && wsData(d.workspaceId).get('type', '') == 'holding');
+    }
+
     // Pre-workspace access paths (owner or account-wide collaborator).
     function legacyAccess() {
       return isOwnerOfExistingDoc() || isCollaboratorOfOwner();
@@ -187,10 +288,15 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.ownerId == request.auth.uid
                     && request.auth.uid in request.resource.data.memberUids
-                    && request.resource.data.roles[request.auth.uid] == 'editor';
+                    && request.resource.data.roles[request.auth.uid] == 'editor'
+                    && validWorkspaceType()
+                    && validHoldingQuotaMode();
       allow update: if isSignedIn()
                     && resource.data.ownerId == request.auth.uid
-                    && request.resource.data.ownerId == resource.data.ownerId;
+                    && request.resource.data.ownerId == resource.data.ownerId
+                    && workspaceTypeSticky()
+                    && validWorkspaceType()
+                    && validHoldingQuotaMode();
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
@@ -200,11 +306,15 @@ service cloud.firestore {
     // userIdUnchanged() on update is the audit fix (no cross-user re-homing).
 
     // ── /transactions/{transactionId} ─────────────────────────────────────────
+    // holdingSplitOnlyInHolding() keeps a frozen rateio from being injected
+    // into a PF/PJ Carteira (or into a legacy doc with no Carteira at all).
     match /transactions/{transactionId} {
       allow read:   if isSignedIn() && (wsReadable() || legacyAccess());
-      allow create: if isSignedIn() && (wsCreatable()
+      allow create: if isSignedIn() && holdingSplitOnlyInHolding()
+                        && (wsCreatable()
                         || (legacyCreate() && !('workspaceId' in request.resource.data)));
       allow update: if isSignedIn() && userIdUnchanged()
+                        && holdingSplitOnlyInHolding()
                         && (wsEditable() || legacyAccess());
       allow delete: if isSignedIn() && (wsEditable() || legacyAccess());
     }
@@ -300,6 +410,65 @@ service cloud.firestore {
       allow update: if isSignedIn() && userIdUnchanged()
                         && (wsEditable() || legacyAccess());
       allow delete: if isSignedIn() && (wsEditable() || legacyAccess());
+    }
+
+    // ── /holding_members/{memberId} ──────────────────────────────────────────
+    // The sócios of a Holding Carteira — effectively its cap table.
+    //
+    // Reads follow ordinary Carteira membership: a viewer must see the split
+    // they are part of. WRITES ARE OWNER-ONLY, deliberately narrower than
+    // every other ledger collection above, because a sócio's quotaBps decides
+    // how much of the patrimônio is theirs. An editor collaborator who could
+    // write here would hand themselves a bigger slice — or quietly shrink
+    // someone else's — with one field edit, and the change would look exactly
+    // like a legitimate one. Recording money stays open to editors (aportes,
+    // below); deciding who owns what belongs to whoever owns the Carteira.
+    match /holding_members/{memberId} {
+      allow read:   if isSignedIn() && wsReadable();
+
+      allow create: if isSignedIn()
+                    && 'workspaceId' in request.resource.data
+                    && wsOwnedByCaller(request.resource.data.workspaceId)
+                    && request.resource.data.userId
+                         == wsOwner(request.resource.data.workspaceId)
+                    && validHoldingMember();
+
+      // workspaceId is pinned alongside userId: moving a sócio to another
+      // Carteira would carry their aportes' history with them.
+      allow update: if isSignedIn()
+                    && isWorkspaceOwnerOfExistingDoc()
+                    && userIdUnchanged()
+                    && request.resource.data.workspaceId == resource.data.workspaceId
+                    && validHoldingMember();
+
+      allow delete: if isSignedIn() && isWorkspaceOwnerOfExistingDoc();
+    }
+
+    // ── /holding_contributions/{contributionId} ──────────────────────────────
+    // The money trail behind "sei que coloquei cada centavo": every aporte and
+    // retirada, append-only.
+    //
+    // An EDITOR may create one — recording "eu coloquei R$ 5.000" is the whole
+    // point of a shared Holding, and an aporte moves equity only through the
+    // same arithmetic everyone can see. After creation ONLY `note` may change:
+    // a wrong amount is corrected with an opposing entry, never by rewriting
+    // history, which is what keeps the saldo auditable. Deleting is owner-only
+    // — it exists for the Carteira-delete cascade and for account deletion
+    // (LGPD), not as an undo button for collaborators.
+    match /holding_contributions/{contributionId} {
+      allow read:   if isSignedIn() && wsReadable();
+
+      allow create: if isSignedIn() && wsCreatable()
+                    && validHoldingContribution();
+
+      allow update: if isSignedIn() && wsEditable()
+                    && request.resource.data.diff(resource.data)
+                         .affectedKeys().hasOnly(['note'])
+                    && (!('note' in request.resource.data)
+                        || (request.resource.data.note is string
+                            && request.resource.data.note.size() <= 500));
+
+      allow delete: if isSignedIn() && isWorkspaceOwnerOfExistingDoc();
     }
 
     // ── /subscriptions/{userId} ───────────────────────────────────────────────

@@ -398,7 +398,13 @@ class _FeaturesCard extends StatelessWidget {
               icon: Icons.business_center_rounded,
               title: 'Carteiras Pessoal + Empresarial (PF/PJ)',
               description:
-                  'Separe sua vida pessoal da empresa: cada Carteira tem lançamentos, contas e orçamentos próprios, com troca rápida na tela inicial e visão consolidada.',
+                  'Separe sua vida pessoal da empresa: cada Carteira tem lançamentos, contas e orçamentos próprios, com troca rápida no topo de todas as telas e visão consolidada.',
+            ),
+            const _FeatureRow(
+              icon: Icons.account_balance_rounded,
+              title: 'Holding: sócios e divisão de patrimônio',
+              description:
+                  'Numa Carteira Holding, registre o aporte de cada sócio e veja quanto cada um tem do patrimônio. As despesas são divididas em partes iguais e o app mostra quem deve para quem.',
             ),
             const _FeatureRow(
               icon: Icons.account_balance_wallet_rounded,
@@ -458,7 +464,7 @@ class _FeaturesCard extends StatelessWidget {
               icon: Icons.ios_share_rounded,
               title: 'Exportação de relatórios',
               description:
-                  'Gere extratos em PDF ou Excel por período para compartilhar com contador, parceiro ou arquivar.',
+                  'Gere extratos em PDF ou Excel por período e mande seus gráficos como imagem ou PDF — um deles ou todos de uma vez.',
             ),
             const _FeatureRow(
               icon: Icons.monitor_heart_rounded,
