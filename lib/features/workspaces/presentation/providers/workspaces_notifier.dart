@@ -62,6 +62,10 @@ class WorkspacesNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Every collection whose docs carry a `workspaceId`. Anything missing here
+  /// survives the Carteira: investment docs kept summing into "Todas juntas"
+  /// and a Holding's sócios/aportes stayed behind as orphaned PII
+  /// (auditoria 2026-09-08 #6).
   static const _ledgerCollections = [
     'transactions',
     'categories',
@@ -71,6 +75,10 @@ class WorkspacesNotifier extends StateNotifier<AsyncValue<void>> {
     'recurring_transactions',
     'category_rules',
     'bills',
+    'investment_assets',
+    'investment_trades',
+    'holding_members',
+    'holding_contributions',
   ];
 
   /// Deletes a NON-default workspace and all its ledger docs (cascade,
@@ -94,6 +102,23 @@ class WorkspacesNotifier extends StateNotifier<AsyncValue<void>> {
           await batch.commit();
           if (snap.docs.length < 400) break;
         }
+      }
+      // Invitations scoped to this Carteira would otherwise outlive it: the
+      // invitee keeps a banner for a Carteira that no longer exists (accepting
+      // fails in the Cloud Function) and the owner has no selector entry left
+      // to cancel it from (auditoria 2026-09-08 #18). `masterUserId` is what
+      // makes the list query provable; the owner may delete their own invites.
+      final invites = await _fs
+          .collection('invitations')
+          .where('masterUserId', isEqualTo: _uid)
+          .where('workspaceId', isEqualTo: workspace.id)
+          .get();
+      if (invites.docs.isNotEmpty) {
+        final batch = _fs.batch();
+        for (final d in invites.docs) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
       }
       await _fs.collection('workspaces').doc(workspace.id).delete();
       return true;

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
 import '../../../wallets/presentation/providers/wallets_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
@@ -83,6 +84,11 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
               final color = isIncome ? _kGreen : _kRed;
               final sign = isIncome ? '+' : '−';
               final isHovered = _hoveredId == tx.id;
+              // The Extrato half of a Holding aporte: no delete here (it is
+              // undone on the Holding screen, both halves at once). "Editar"
+              // stays — the dialog it opens explains and offers the way there.
+              final locked = isContributionMirror(
+                  tx, ref.watch(holdingMirrorTransactionIdsProvider));
 
               final dateLabel = DateFormat('dd/MM/yyyy', dateLoc).format(tx.date);
               final timeLabel = DateFormat('HH:mm', dateLoc).format(tx.date);
@@ -326,6 +332,7 @@ class _TransactionTableState extends ConsumerState<TransactionTable> {
                                       ],
                                     ),
                                   ),
+                                  if (!locked)
                                   const PopupMenuItem(
                                     value: 'delete',
                                     child: Row(

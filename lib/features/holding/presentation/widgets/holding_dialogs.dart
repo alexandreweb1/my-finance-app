@@ -8,6 +8,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/money_input_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../sharing/presentation/providers/sharing_provider.dart';
+import '../../../transactions/presentation/providers/transactions_provider.dart';
 import '../../../workspaces/domain/workspace_entity.dart';
 import '../../domain/holding_entities.dart';
 import '../../domain/holding_math.dart';
@@ -191,6 +192,14 @@ class _SocioDialogState extends ConsumerState<_SocioDialog> {
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
     if (name.isEmpty) return;
+    // "150" or "abc" must not silently become 0% (auditoria 2026-09-08 #11).
+    if (_isFixedMode &&
+        _quota.text.trim().isNotEmpty &&
+        _bpsFromPercent(_quota.text) == null) {
+      messenger.showSnackBar(
+          SnackBar(content: Text(l10n.holdingInvalidQuotaValue)));
+      return;
+    }
     setState(() => _loading = true);
 
     final notifier = ref.read(holdingNotifierProvider.notifier);
@@ -422,7 +431,16 @@ class _SocioDialogState extends ConsumerState<_SocioDialog> {
 /// Live "do the percentages add up?" line under the quota field.
 class _QuotaSumHint extends StatelessWidget {
   final FixedQuotaValidation validation;
-  const _QuotaSumHint({required this.validation});
+
+  /// Whether to add the "you can save now and fix the others next" line. True
+  /// in the single-sócio dialog (where saving an invalid total is allowed on
+  /// purpose), false in the batch editor (where the button is disabled).
+  final bool showSaveAnywayHint;
+
+  const _QuotaSumHint({
+    required this.validation,
+    this.showSaveAnywayHint = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -455,7 +473,7 @@ class _QuotaSumHint extends StatelessWidget {
             color: ok ? const Color(0xFF10B981) : cs.error,
           ),
         ),
-        if (!ok)
+        if (!ok && showSaveAnywayHint)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
@@ -463,6 +481,376 @@ class _QuotaSumHint extends StatelessWidget {
               style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
             ),
           ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sócio actions (editar · marcar saída · remover)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum _PartnerAction { contribute, edit, markLeft, remove }
+
+/// Owner-only menu for one sócio. Owner-gated like every other write here.
+///
+/// Before this menu existed a typo in a name or quota was permanent and nobody
+/// could ever leave a Holding (auditoria 2026-09-08 #5): `updateMember`,
+/// `setMemberLeft` and `deleteMember` had no caller.
+Future<void> showPartnerActionsSheet(
+  BuildContext context,
+  WidgetRef ref,
+  HoldingMemberEntity member,
+) async {
+  if (!_ownsActiveHolding(context, ref)) return;
+  final l10n = AppLocalizations.of(context);
+  final cs = Theme.of(context).colorScheme;
+  final action = await showModalBottomSheet<_PartnerAction>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(
+              member.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.savings_outlined),
+            title: Text(l10n.holdingAddContribution),
+            onTap: () => Navigator.of(ctx).pop(_PartnerAction.contribute),
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: Text(l10n.holdingEditPartner),
+            onTap: () => Navigator.of(ctx).pop(_PartnerAction.edit),
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout_rounded),
+            title: Text(l10n.holdingMarkLeft),
+            subtitle: Text(l10n.holdingMarkLeftHint,
+                style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant)),
+            onTap: () => Navigator.of(ctx).pop(_PartnerAction.markLeft),
+          ),
+          ListTile(
+            leading: Icon(Icons.person_remove_outlined, color: cs.error),
+            title: Text(l10n.holdingRemovePartner,
+                style: TextStyle(color: cs.error)),
+            onTap: () => Navigator.of(ctx).pop(_PartnerAction.remove),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+  if (action == null || !context.mounted) return;
+  switch (action) {
+    case _PartnerAction.contribute:
+      await showAddContributionDialog(context, ref, memberId: member.id);
+    case _PartnerAction.edit:
+      await showAddSocioDialog(context, ref, member: member);
+    case _PartnerAction.markLeft:
+      await _markPartnerLeft(context, ref, member);
+    case _PartnerAction.remove:
+      await _removePartner(context, ref, member);
+  }
+}
+
+/// Picks the date a sócio stopped participating, confirms, writes `leftAt`.
+///
+/// This — not deletion — is how someone with history leaves: past rateios stay
+/// frozen as they were and only expenses from that day on stop being theirs.
+Future<void> _markPartnerLeft(
+  BuildContext context,
+  WidgetRef ref,
+  HoldingMemberEntity member,
+) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final now = DateTime.now();
+  // Nobody leaves before joining, and a future date would describe an exit
+  // that has not happened.
+  final first = member.joinedAt.isAfter(now) ? now : member.joinedAt;
+  final picked = await showDatePicker(
+    context: context,
+    initialDate: now,
+    firstDate: first,
+    lastDate: now,
+    helpText: l10n.holdingMarkLeft,
+  );
+  if (picked == null || !context.mounted) return;
+  final day =
+      CurrencyFormatter.formatDate(picked, ref.read(dateLocaleProvider));
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(l10n.holdingMarkLeft),
+      content: Text(l10n.holdingMarkLeftConfirm(member.name, day)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(l10n.holdingMarkLeft),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final done = await ref
+      .read(holdingNotifierProvider.notifier)
+      .setMemberLeft(member.id, picked);
+  if (!done) {
+    messenger.showSnackBar(SnackBar(content: Text(l10n.holdingSaveError)));
+  }
+}
+
+/// Hard-deletes a sócio who has no history; anyone with aportes or frozen
+/// rateios is pointed at "Marcar saída" instead.
+///
+/// The notifier refuses a sócio with contributions on its own, but it does not
+/// look at frozen splits — deleting somebody who appears in one would leave
+/// shares pointing at an id nothing resolves, so the UI checks both. Only
+/// splits STORED on a transaction count: the dynamic projection puts every
+/// current sócio into every unsplit expense, so a duplicate added by mistake
+/// would otherwise be unremovable the moment the Holding had one expense.
+Future<void> _removePartner(
+  BuildContext context,
+  WidgetRef ref,
+  HoldingMemberEntity member,
+) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final contributions = ref.read(holdingContributionsStreamProvider).value;
+  if (contributions == null) {
+    // Cannot PROVE the sócio is clean yet; guessing wrong is irreversible.
+    messenger.showSnackBar(SnackBar(content: Text(l10n.holdingSaveError)));
+    return;
+  }
+  final transactions = ref.read(transactionsStreamProvider).value ?? const [];
+  final inSplits = transactions.any((t) =>
+      (t.holdingSplit?.containsKey(member.id) ?? false) ||
+      t.holdingPaidBy == member.id);
+  if (inSplits || contributions.any((c) => c.memberId == member.id)) {
+    messenger.showSnackBar(
+        SnackBar(content: Text(l10n.holdingRemoveHasHistory)));
+    return;
+  }
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(l10n.holdingRemovePartner),
+      content: Text(l10n.holdingRemovePartnerConfirm(member.name)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error),
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(l10n.delete),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final done =
+      await ref.read(holdingNotifierProvider.notifier).deleteMember(member.id);
+  if (!done) {
+    messenger.showSnackBar(SnackBar(content: Text(l10n.holdingSaveError)));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixed quotas editor (every sócio at once)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Edits every active sócio's fixed percentage in one go. Owner-gated.
+///
+/// One dialog for the whole table because that is the only shape in which the
+/// constraint can be met at all: percentages must total exactly 100%, and
+/// editing them one sócio at a time makes every intermediate step invalid.
+Future<void> showFixedQuotasDialog(BuildContext context, WidgetRef ref) async {
+  if (!_ownsActiveHolding(context, ref)) return;
+  final l10n = AppLocalizations.of(context);
+  if (ref.read(holdingActiveMembersProvider).isEmpty) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l10n.holdingNeedPartnerFirst)));
+    return;
+  }
+  await showDialog<void>(
+    context: context,
+    builder: (_) => const _FixedQuotasDialog(),
+  );
+}
+
+class _FixedQuotasDialog extends ConsumerStatefulWidget {
+  const _FixedQuotasDialog();
+
+  @override
+  ConsumerState<_FixedQuotasDialog> createState() => _FixedQuotasDialogState();
+}
+
+class _FixedQuotasDialogState extends ConsumerState<_FixedQuotasDialog> {
+  late final List<HoldingMemberEntity> _members;
+  late final Map<String, TextEditingController> _ctrls;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Snapshot the roster once: a stream update mid-edit must not reorder or
+    // drop the fields under the user's fingers.
+    _members = [...ref.read(holdingActiveMembersProvider)]..sort((a, b) {
+        final c = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        return c != 0 ? c : a.id.compareTo(b.id);
+      });
+    _ctrls = {
+      for (final m in _members)
+        m.id: TextEditingController(
+            text: m.quotaBps > 0 ? _percentText(m.quotaBps) : ''),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final c in _ctrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  /// Basis points per sócio as typed, or null when any field is not a usable
+  /// percentage (an empty field reads as 0%).
+  Map<String, int>? _bps() {
+    final out = <String, int>{};
+    for (final m in _members) {
+      final text = _ctrls[m.id]!.text;
+      final v = text.trim().isEmpty ? 0 : _bpsFromPercent(text);
+      if (v == null) return null;
+      out[m.id] = v;
+    }
+    return out;
+  }
+
+  /// 100% in equal integer shares, the remainder going to the first sócios —
+  /// seven of them get 14,29 / 14,29 / … / 14,28, never 14,285714.
+  void _splitEqually() {
+    final n = _members.length;
+    if (n == 0) return;
+    final base = 10000 ~/ n;
+    var rem = 10000 - base * n;
+    for (final m in _members) {
+      final v = rem > 0 ? base + 1 : base;
+      if (rem > 0) rem--;
+      _ctrls[m.id]!.text = _percentText(v);
+    }
+    setState(() {});
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final bps = _bps();
+    if (bps == null || !validateFixedQuotas(bps).isValid) return;
+    setState(() => _loading = true);
+    final ok =
+        await ref.read(holdingNotifierProvider.notifier).setFixedQuotas(bps);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (!ok) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.holdingSaveError)));
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final bps = _bps();
+    final validation = bps == null ? null : validateFixedQuotas(bps);
+    final canSave = !_loading && validation != null && validation.isValid;
+
+    return AlertDialog(
+      title: Text(l10n.holdingAdjustQuotas),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.holdingAdjustQuotasHint,
+              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            for (final m in _members)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  controller: _ctrls[m.id],
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: m.name,
+                    suffixText: '%',
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _loading ? null : _splitEqually,
+                icon: const Icon(Icons.balance_rounded, size: 16),
+                label: Text(l10n.holdingSplitEqually),
+                style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact),
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (validation == null)
+              Text(
+                l10n.holdingInvalidQuotaValue,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: cs.error),
+              )
+            else
+              _QuotaSumHint(validation: validation, showSaveAnywayHint: false),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: canSave ? _save : null,
+          child: _loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(l10n.save),
+        ),
       ],
     );
   }

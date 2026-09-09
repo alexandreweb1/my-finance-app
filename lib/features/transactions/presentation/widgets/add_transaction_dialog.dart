@@ -30,6 +30,8 @@ import '../../../../core/utils/money_input_formatter.dart';
 import '../../../../core/utils/icon_data_utils.dart';
 import '../../../goals/presentation/providers/goals_provider.dart';
 import '../../../holding/domain/holding_stamp.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
+import '../../../holding/presentation/screens/holding_screen.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../../domain/transaction_suggestions.dart';
 import '../providers/transactions_provider.dart';
@@ -947,6 +949,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         // would leave captures pending forever.
         holdingSplit: resplit ?? original.holdingSplit,
         holdingPaidBy: original.holdingPaidBy,
+        holdingContributionId: original.holdingContributionId,
         title: _titleController.text.trim(),
         amount: amount,
         type: _type,
@@ -1105,6 +1108,16 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // The Extrato half of a Holding aporte is locked here (auditoria
+    // 2026-09-08 #4): editing or deleting it alone would leave the cap table
+    // describing money the ledger no longer has. Every entry point (tile,
+    // table, backlog, search) opens THIS dialog, so one check covers them all.
+    final editing = widget.transaction;
+    if (editing != null &&
+        isContributionMirror(
+            editing, ref.watch(holdingMirrorTransactionIdsProvider))) {
+      return _LockedContributionDialog(l10n: l10n, transaction: editing);
+    }
     final isLoading = ref.watch(transactionsNotifierProvider).isLoading;
     final categories = _categoryNames();
     final wallets = ref.watch(walletsStreamProvider).value ?? [];
@@ -1671,6 +1684,61 @@ class _AttachmentThumb extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Replaces the editor for the Extrato half of a Holding aporte/retirada.
+///
+/// Explains why nothing here can be changed and offers the one place where it
+/// can: the Holding screen, whose "desfazer" removes both halves in one batch.
+class _LockedContributionDialog extends ConsumerWidget {
+  final AppLocalizations l10n;
+  final TransactionEntity transaction;
+  const _LockedContributionDialog({
+    required this.l10n,
+    required this.transaction,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.lock_outline_rounded, size: 20, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(child: Text(l10n.holdingMirrorTitle)),
+        ],
+      ),
+      content: Text(l10n.holdingMirrorBody),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.dismiss),
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            // Grab the navigator BEFORE popping: this context is gone once the
+            // dialog closes.
+            final nav = Navigator.of(context);
+            // The mirror may be on screen in "Todas juntas" or in another
+            // Carteira; HoldingScreen only shows the Holding that is ACTIVE,
+            // so select the mirror's Carteira first or the button would land
+            // on "this is not a Holding".
+            final wsId = transaction.workspaceId;
+            if (wsId != null &&
+                wsId.isNotEmpty &&
+                ref.read(activeWorkspaceIdProvider) != wsId) {
+              ref.read(activeWorkspaceIdProvider.notifier).select(wsId);
+            }
+            nav.pop();
+            nav.push(MaterialPageRoute(builder: (_) => const HoldingScreen()));
+          },
+          icon: const Icon(Icons.account_balance_rounded, size: 18),
+          label: Text(l10n.holdingOpenHolding),
+        ),
+      ],
     );
   }
 }

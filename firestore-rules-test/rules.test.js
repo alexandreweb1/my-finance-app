@@ -27,6 +27,10 @@ import {
   Timestamp,
   deleteField,
   arrayRemove,
+  collection,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,9 +40,13 @@ const A = 'master_A';
 const C = 'collab_C';
 const D = 'stranger_D';
 const V = 'viewer_V';
+// L is an account-wide (pre-Carteira) collaborator of A: profile carries
+// masterUserId = A but L is NOT in any workspace's memberUids.
+const L = 'legacy_L';
 const A_EMAIL = 'master@example.com';
 const C_EMAIL = 'collab@example.com';
 const V_EMAIL = 'viewer@example.com';
+const L_EMAIL = 'legacy@example.com';
 const INV = 'inv_AC';
 
 // Holding fixtures: one Holding Carteira (A owns, C edits, V only reads) and
@@ -75,6 +83,15 @@ const asC = () => env.authenticatedContext(C, { email: C_EMAIL }).firestore();
 // Stranger D shares C's email-less identity; give D a distinct email.
 const asD = () => env.authenticatedContext(D, { email: 'd@example.com' }).firestore();
 const asV = () => env.authenticatedContext(V, { email: V_EMAIL }).firestore();
+const asL = () => env.authenticatedContext(L, { email: L_EMAIL }).firestore();
+
+// The app's list queries. A list is granted only when the rule can be PROVEN
+// from the query's own filters, so `getDoc` tests alone never exercise the
+// real code path (that is how auditoria 2026-09-08 #1 slipped past 67 tests).
+const listBy = (db, col, field, value) =>
+  getDocs(query(collection(db, col), where(field, '==', value)));
+const listByUserAndWs = (db, col, uid, wid) =>
+  getDocs(query(collection(db, col), where('userId', '==', uid), where('workspaceId', '==', wid)));
 // Mixed-case email to prove callerEmail().lower() normalisation.
 const asCUpper = () =>
   env.authenticatedContext(C, { email: 'Collab@Example.com' }).firestore();
@@ -128,6 +145,12 @@ async function seedHolding() {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'users', V), { userId: V, email: V_EMAIL });
+    await setDoc(doc(db, 'users', L), {
+      userId: L,
+      email: L_EMAIL,
+      masterUserId: A,
+      masterInvitationId: 'inv_AL',
+    });
     await setDoc(doc(db, 'workspaces', WS_H), {
       ownerId: A,
       name: 'Holding da Família',
@@ -816,6 +839,265 @@ async function main() {
         title: 'Mercado',
         amount: 200,
       }),
+    );
+  });
+
+  console.log('\n── transactions: mover lançamentos com rateio para fora da Holding ──');
+
+  // A frozen split lives on a Holding expense; the app moves docs between
+  // Carteiras with batch.update({workspaceId, holdingSplit: delete, holdingPaidBy: delete}).
+  const seedSplitTx = async () => {
+    await seedHolding();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'transactions', 'tx_h_split'), {
+        userId: A, workspaceId: WS_H, title: 'Luz', amount: 100, type: 'expense',
+        holdingSplit: { [M1]: 10000 }, holdingPaidBy: M1,
+      });
+      await setDoc(doc(db, 'transactions', 'tx_h_plain'), {
+        userId: A, workspaceId: WS_H, title: 'Água', amount: 50, type: 'expense',
+      });
+    });
+  };
+
+  await seedSplitTx();
+  await test('HAPPY (moveToWorkspace): split expense → PF with holdingSplit/holdingPaidBy dropped → allowed', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'transactions', 'tx_h_split'), {
+        workspaceId: WS_PF,
+        holdingSplit: deleteField(),
+        holdingPaidBy: deleteField(),
+      }),
+    );
+  });
+
+  await seedSplitTx();
+  await test('EXPECTED: split expense → PF WITHOUT dropping the split → denied (client must strip it)', async () => {
+    await assertFails(
+      updateDoc(doc(asA(), 'transactions', 'tx_h_split'), { workspaceId: WS_PF }),
+    );
+  });
+
+  await seedSplitTx();
+  await test('HAPPY (moveToWorkspace): batch of split + plain docs, both stripped → allowed', async () => {
+    const db = asA();
+    const b = writeBatch(db);
+    for (const id of ['tx_h_split', 'tx_h_plain']) {
+      b.update(doc(db, 'transactions', id), {
+        workspaceId: WS_PF,
+        holdingSplit: deleteField(),
+        holdingPaidBy: deleteField(),
+      });
+    }
+    await assertSucceeds(b.commit());
+  });
+
+  await seedSplitTx();
+  await test('REGRESSION: plain expense moved Holding → PF (no split fields at all) → allowed', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asA(), 'transactions', 'tx_h_plain'), { workspaceId: WS_PF }),
+    );
+  });
+
+  console.log('\n── Holding: queries de lista (o que o app realmente executa) ──');
+
+  await seedHolding();
+  await test('HAPPY (build 171 query): owner A lists holding_members where userId==A → allowed', async () => {
+    await assertSucceeds(listBy(asA(), 'holding_members', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('HAPPY (build 171 query): owner A lists holding_contributions where userId==A → allowed', async () => {
+    await assertSucceeds(listBy(asA(), 'holding_contributions', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('HAPPY (current app query): owner A lists holding_members where userId==A AND workspaceId==WS_H → allowed', async () => {
+    await assertSucceeds(listByUserAndWs(asA(), 'holding_members', A, WS_H));
+  });
+
+  await seedHolding();
+  await test('HAPPY (current app query): owner A lists holding_contributions where userId==A AND workspaceId==WS_H → allowed', async () => {
+    await assertSucceeds(listByUserAndWs(asA(), 'holding_contributions', A, WS_H));
+  });
+
+  await seedHolding();
+  await test('HAPPY: legacy collaborator L lists holding_members where userId==A → allowed', async () => {
+    await assertSucceeds(listBy(asL(), 'holding_members', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('HAPPY: legacy collaborator L lists holding_contributions where userId==A → allowed', async () => {
+    await assertSucceeds(listBy(asL(), 'holding_contributions', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('HAPPY: editor C lists holding_members where workspaceId==WS_H → allowed', async () => {
+    await assertSucceeds(listBy(asC(), 'holding_members', 'workspaceId', WS_H));
+  });
+
+  await seedHolding();
+  await test('HAPPY: viewer V lists holding_contributions where workspaceId==WS_H → allowed', async () => {
+    await assertSucceeds(listBy(asV(), 'holding_contributions', 'workspaceId', WS_H));
+  });
+
+  await seedHolding();
+  await test('EXPECTED: editor C lists holding_members where userId==A without workspaceId → denied (members query by Carteira)', async () => {
+    await assertFails(listBy(asC(), 'holding_members', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('ATTACK: stranger D lists holding_members where workspaceId==WS_H → denied', async () => {
+    await assertFails(listBy(asD(), 'holding_members', 'workspaceId', WS_H));
+  });
+
+  await seedHolding();
+  await test('ATTACK: stranger D lists holding_members where userId==A → denied', async () => {
+    await assertFails(listBy(asD(), 'holding_members', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('ATTACK: stranger D lists holding_contributions where userId==A → denied', async () => {
+    await assertFails(listBy(asD(), 'holding_contributions', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('REGRESSION: owner A lists transactions where userId==A → allowed', async () => {
+    await assertSucceeds(listBy(asA(), 'transactions', 'userId', A));
+  });
+
+  await seedHolding();
+  await test('REGRESSION: legacy collaborator L lists transactions where userId==A → allowed', async () => {
+    await assertSucceeds(listBy(asL(), 'transactions', 'userId', A));
+  });
+
+  console.log('\n── subscription: carimbo lastReferralRewardAt da Cloud Function ──');
+
+  // The referrer's doc AFTER grantReferralReward ran (Admin SDK, bypasses
+  // rules). Two shapes: on top of a paid sub, and with no prior sub at all
+  // (the CF then invents productId 'referral_reward' and an empty token).
+  const seedStamped = async (over = {}) => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subscriptions', A), {
+        status: 'active',
+        type: 'monthly',
+        productId: 'pro_monthly',
+        purchaseToken: 'tok',
+        expiryDate: days(30),
+        updatedAt: serverTimestamp(),
+        lastReferralRewardAt: serverTimestamp(),
+        ...over,
+      });
+    });
+  };
+
+  await seedStamped();
+  await test('HAPPY: stamped referrer clears subscription (set merge) → allowed', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(asA(), 'subscriptions', A),
+        { status: 'expired', updatedAt: serverTimestamp() },
+        { merge: true },
+      ),
+    );
+  });
+
+  await seedStamped();
+  await test('HAPPY: stamped referrer saves a legit purchase (set merge) → allowed', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(asA(), 'subscriptions', A),
+        {
+          type: 'annual',
+          status: 'active',
+          purchaseToken: 'tok2',
+          productId: 'pro_annual',
+          expiryDate: days(300),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    );
+  });
+
+  await seedStamped({ productId: 'referral_reward', purchaseToken: '' });
+  await test('HAPPY: referrer who never paid (CF-shaped doc) clears subscription → allowed', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(asA(), 'subscriptions', A),
+        { status: 'expired', updatedAt: serverTimestamp() },
+        { merge: true },
+      ),
+    );
+  });
+
+  await seedStamped({ productId: 'referral_reward', purchaseToken: '' });
+  await test('HAPPY: referrer who never paid then buys Pro (set merge) → allowed', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(asA(), 'subscriptions', A),
+        {
+          type: 'monthly',
+          status: 'active',
+          purchaseToken: 'tok3',
+          productId: 'pro_monthly',
+          expiryDate: days(32),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    );
+  });
+
+  await seedStamped();
+  await test('ATTACK: client rewrites lastReferralRewardAt → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asA(), 'subscriptions', A),
+        { lastReferralRewardAt: days(-1), updatedAt: serverTimestamp() },
+        { merge: true },
+      ),
+    );
+  });
+
+  await seedStamped();
+  await test('ATTACK: client drops the stamp with a non-merge set → denied', async () => {
+    await assertFails(
+      setDoc(doc(asA(), 'subscriptions', A), {
+        type: 'monthly',
+        status: 'active',
+        purchaseToken: 'tok',
+        productId: 'pro_monthly',
+        expiryDate: days(30),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  await seed();
+  await test('ATTACK: client invents lastReferralRewardAt on a fresh doc → denied', async () => {
+    await assertFails(
+      setDoc(doc(asA(), 'subscriptions', A), {
+        type: 'monthly',
+        status: 'active',
+        purchaseToken: 'tok',
+        productId: 'pro_monthly',
+        expiryDate: days(30),
+        updatedAt: serverTimestamp(),
+        lastReferralRewardAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  await seedStamped();
+  await test('REGRESSION: stamped doc still rejects a junk extra field → denied', async () => {
+    await assertFails(
+      setDoc(
+        doc(asA(), 'subscriptions', A),
+        { status: 'expired', updatedAt: serverTimestamp(), hacked: true },
+        { merge: true },
+      ),
     );
   });
 

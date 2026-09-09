@@ -1091,6 +1091,63 @@ class AppLocalizations {
       'Tags are free labels you attach to a transaction so you can filter later (e.g., "trip-2026", "birthday-gift").',
       'Las etiquetas son marcadores libres que añades a una transacción para filtrar después (ej.: "viaje-2026", "regalo-cumpleaños").');
 
+  // ── Holding — gestão de sócios, cotas fixas, trilha de aportes ────────────
+  String get holdingMarkLeft => _t('Marcar saída', 'Mark as left', 'Marcar salida');
+  String get holdingMarkLeftHint => _t(
+      'As cotas passadas ficam como estão; gastos a partir da data escolhida deixam de ser deste sócio.',
+      'Past shares stay as they were; expenses from the chosen date on are no longer this partner’s.',
+      'Las cuotas pasadas quedan como están; los gastos desde la fecha elegida dejan de ser de este socio.');
+  String holdingMarkLeftConfirm(String name, String date) => _t(
+      '$name deixa de participar da Holding a partir de $date. Confirmar?',
+      '$name stops taking part in the Holding from $date. Confirm?',
+      '$name deja de participar en la Holding a partir del $date. ¿Confirmar?');
+  String holdingLeftOn(String date) =>
+      _t('Saiu em $date', 'Left on $date', 'Salió el $date');
+  String get holdingReinstate => _t('Reativar', 'Reinstate', 'Reactivar');
+  String holdingFormerPartners(int n) => _t(
+      'Sócios que saíram ($n)', 'Former partners ($n)', 'Socios que salieron ($n)');
+  String get holdingRemovePartner =>
+      _t('Remover sócio', 'Remove partner', 'Eliminar socio');
+  String holdingRemovePartnerConfirm(String name) => _t(
+      'Remover $name da Holding? Isso só é possível enquanto não há aportes nem rateios registrados para este sócio.',
+      'Remove $name from the Holding? This is only possible while no contributions or splits are recorded for this partner.',
+      '¿Eliminar a $name de la Holding? Solo es posible mientras no haya aportes ni repartos registrados para este socio.');
+  String get holdingRemoveHasHistory => _t(
+      'Este sócio já participa de aportes ou rateios. Para preservar o histórico, use “Marcar saída”.',
+      'This partner already appears in contributions or splits. To keep the history intact, use “Mark as left”.',
+      'Este socio ya participa en aportes o repartos. Para conservar el historial, usa “Marcar salida”.');
+  String get holdingAdjustQuotas =>
+      _t('Ajustar cotas', 'Adjust shares', 'Ajustar cuotas');
+  String get holdingAdjustQuotasHint => _t(
+      'Defina a porcentagem de cada sócio. Só dá para salvar quando a soma for exatamente 100%.',
+      'Set each partner’s percentage. Saving is only possible when they add up to exactly 100%.',
+      'Define el porcentaje de cada socio. Solo se puede guardar cuando la suma sea exactamente 100%.');
+  String get holdingSplitEqually =>
+      _t('Dividir igualmente', 'Split equally', 'Dividir en partes iguales');
+  String get holdingInvalidQuotaValue => _t(
+      'Cota inválida: use um número entre 0 e 100.',
+      'Invalid share: use a number between 0 and 100.',
+      'Cuota inválida: usa un número entre 0 y 100.');
+  String get holdingContributionsSection => _t(
+      'Aportes e resgates', 'Contributions and withdrawals', 'Aportes y retiros');
+  String get holdingUndoContribution => _t('Desfazer', 'Undo', 'Deshacer');
+  String holdingUndoContributionConfirm(String amount, String name) => _t(
+      'Desfazer o registro de $amount de $name? O lançamento correspondente no Extrato também será removido.',
+      'Undo the $amount entry for $name? The matching statement entry will be removed too.',
+      '¿Deshacer el registro de $amount de $name? El movimiento correspondiente en el extracto también se eliminará.');
+  String holdingShowMore(int n) =>
+      _t('Mostrar mais $n', 'Show $n more', 'Mostrar $n más');
+  String get holdingShowLess =>
+      _t('Mostrar menos', 'Show less', 'Mostrar menos');
+  String get holdingMirrorTitle =>
+      _t('Lançamento de aporte', 'Contribution entry', 'Movimiento de aporte');
+  String get holdingMirrorBody => _t(
+      'Este lançamento espelha um aporte ou resgate registrado na Holding e não pode ser editado nem excluído por aqui. Para corrigir, desfaça o registro na tela Holding e faça outro.',
+      'This entry mirrors a contribution or withdrawal recorded in the Holding and cannot be edited or deleted here. To fix it, undo the entry on the Holding screen and record a new one.',
+      'Este movimiento refleja un aporte o retiro registrado en la Holding y no puede editarse ni eliminarse aquí. Para corregirlo, deshaz el registro en la pantalla Holding y crea otro.');
+  String get holdingOpenHolding =>
+      _t('Abrir Holding', 'Open Holding', 'Abrir Holding');
+
   // ── Review prompt ────────────────────────────────────────────────────────
   String get reviewPromptTitle => _t(
       'Está gostando do Fintab?', 'Enjoying Fintab?', '¿Te gusta Fintab?');

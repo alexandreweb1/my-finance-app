@@ -617,6 +617,15 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<bool> update(TransactionEntity updated) async {
+    // The Extrato half of a Holding aporte changes only by undoing the aporte
+    // (Holding screen). Every UI path already refuses to open the editor for
+    // it; this is the last line in case a new one forgets.
+    final mirrorOf = updated.holdingContributionId;
+    if (mirrorOf != null && mirrorOf.isNotEmpty) {
+      state = AsyncValue.error(
+          'Aportes são alterados na tela Holding.', StackTrace.current);
+      return false;
+    }
     state = const AsyncValue.loading();
     final result = await _updateTransaction(
         UpdateTransactionParams(transaction: updated));

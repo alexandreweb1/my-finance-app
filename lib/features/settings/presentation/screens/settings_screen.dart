@@ -1915,7 +1915,70 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                   ],
                 ),
                 children: [
-                  // Invite field (bloqueado para usuários free)
+                  // ── Qual Carteira — SEMPRE visível. A lista "quem tem
+                  // acesso" e revogar/cancelar dependem dela e NÃO são recurso
+                  // Pro: um dono com Pro expirado precisa continuar podendo
+                  // tirar um colaborador (as rules não checam Pro; o acesso
+                  // dele seguiria valendo para sempre — auditoria 2026-09-08
+                  // #7). Só CONVIDAR fica atrás do gate.
+                  if (selectedWs != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedWs,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Carteira a compartilhar',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            items: own
+                                .map((w) => DropdownMenuItem(
+                                      value: w.id,
+                                      child: Row(children: [
+                                        Icon(workspaceIcon(w.type),
+                                            size: 16,
+                                            color: workspaceColor(
+                                                w.type, colorScheme)),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                              w.archived
+                                                  ? '${w.name} (arquivada)'
+                                                  : w.name,
+                                              overflow:
+                                                  TextOverflow.ellipsis),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(accessLabel(w.id),
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: colorScheme
+                                                    .onSurfaceVariant)),
+                                      ]),
+                                    ))
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _inviteWorkspaceId = v),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, bottom: 4),
+                            child: Text(
+                              'O convite dá acesso só à Carteira escolhida. '
+                              'Trocar aqui também troca a lista de quem tem acesso.',
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // ── Convidar (bloqueado para usuários free) ──
                   if (!ref.watch(isProProvider))
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -1942,79 +2005,26 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                       ),
                     )
                   else ...[
-                    // ── Qual Carteira + qual papel ──
+                    // ── Qual papel ──
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (selectedWs != null)
-                            DropdownButtonFormField<String>(
-                              initialValue: selectedWs,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Carteira a compartilhar',
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                              ),
-                              items: own
-                                  .map((w) => DropdownMenuItem(
-                                        value: w.id,
-                                        child: Row(children: [
-                                          Icon(workspaceIcon(w.type),
-                                              size: 16,
-                                              color: workspaceColor(
-                                                  w.type, colorScheme)),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            child: Text(
-                                                w.archived
-                                                    ? '${w.name} (arquivada)'
-                                                    : w.name,
-                                                overflow:
-                                                    TextOverflow.ellipsis),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(accessLabel(w.id),
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: colorScheme
-                                                      .onSurfaceVariant)),
-                                        ]),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) =>
-                                  setState(() => _inviteWorkspaceId = v),
-                            ),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6, bottom: 10),
-                            child: Text(
-                              'O convite dá acesso só à Carteira escolhida. '
-                              'Trocar aqui também troca a lista de quem tem acesso.',
-                              style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: colorScheme.onSurfaceVariant),
-                            ),
-                          ),
-                          SegmentedButton<String>(
-                            style: const ButtonStyle(
-                                visualDensity: VisualDensity.compact),
-                            segments: const [
-                              ButtonSegment(
-                                  value: 'editor',
-                                  icon: Icon(Icons.edit_outlined, size: 15),
-                                  label: Text('Pode editar')),
-                              ButtonSegment(
-                                  value: 'viewer',
-                                  icon: Icon(Icons.visibility_outlined,
-                                      size: 15),
-                                  label: Text('Só ver')),
-                            ],
-                            selected: {_inviteRole},
-                            onSelectionChanged: (v) =>
-                                setState(() => _inviteRole = v.first),
-                          ),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      child: SegmentedButton<String>(
+                        style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact),
+                        segments: const [
+                          ButtonSegment(
+                              value: 'editor',
+                              icon: Icon(Icons.edit_outlined, size: 15),
+                              label: Text('Pode editar')),
+                          ButtonSegment(
+                              value: 'viewer',
+                              icon: Icon(Icons.visibility_outlined,
+                                  size: 15),
+                              label: Text('Só ver')),
                         ],
+                        selected: {_inviteRole},
+                        onSelectionChanged: (v) =>
+                            setState(() => _inviteRole = v.first),
                       ),
                     ),
                     Padding(
@@ -2047,33 +2057,35 @@ class _SharingSectionState extends ConsumerState<_SharingSection> {
                         ],
                       ),
                     ),
+                  ],
 
-                    // ── Quem tem acesso à Carteira selecionada ──
-                    // Sem Carteira nenhuma (conta ainda não migrada) não há
-                    // recorte possível: tudo cai em "Outros acessos" abaixo.
-                    if (selectedWs != null) ...[
-                      const Divider(height: 1, indent: 16),
+                  // ── Quem tem acesso à Carteira selecionada (fora do gate) ──
+                  // Sem Carteira nenhuma (conta ainda não migrada) não há
+                  // recorte possível: tudo cai em "Outros acessos" abaixo.
+                  if (selectedWs != null) ...[
+                    const Divider(height: 1, indent: 16),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                      child: Text('Quem tem acesso a "${selectedName ?? ''}"',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurfaceVariant)),
+                    ),
+                    if (wsMembers.isEmpty && wsInvites.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                        child: Text('Quem tem acesso a "${selectedName ?? ''}"',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurfaceVariant)),
-                      ),
-                      if (wsMembers.isEmpty && wsInvites.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                          child: Text(
-                            'Ninguém além de você. Convide alguém pelo campo acima.',
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurfaceVariant),
-                          ),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                        child: Text(
+                          ref.watch(isProProvider)
+                              ? 'Ninguém além de você. Convide alguém pelo campo acima.'
+                              : 'Ninguém além de você.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant),
                         ),
-                      ...wsMembers.map((inv) => _accessTile(inv, pending: false)),
-                      ...wsInvites.map((inv) => _accessTile(inv, pending: true)),
-                    ],
+                      ),
+                    ...wsMembers.map((inv) => _accessTile(inv, pending: false)),
+                    ...wsInvites.map((inv) => _accessTile(inv, pending: true)),
                   ],
 
                   // ── Acessos fora do seletor (conta inteira / Carteira apagada) ──

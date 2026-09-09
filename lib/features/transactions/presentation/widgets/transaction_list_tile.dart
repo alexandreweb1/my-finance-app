@@ -5,6 +5,7 @@ import '../../../../core/utils/animated_dialog.dart';
 import '../../../../core/utils/category_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../categories/presentation/providers/categories_provider.dart';
+import '../../../holding/presentation/providers/holding_provider.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../providers/transactions_provider.dart';
 import 'add_transaction_dialog.dart';
@@ -56,9 +57,15 @@ class TransactionListTile extends ConsumerWidget {
     final isCompact = screenWidth < 390;
     final hMargin = isCompact ? 12.0 : 20.0;
 
+    // The Extrato half of a Holding aporte is undone on the Holding screen
+    // (both halves in one batch), never swiped away here. Tapping still opens
+    // the dialog, which explains and offers the way there.
+    final locked = isContributionMirror(
+        transaction, ref.watch(holdingMirrorTransactionIdsProvider));
+
     return Dismissible(
       key: Key(transaction.id),
-      direction: DismissDirection.endToStart,
+      direction: locked ? DismissDirection.none : DismissDirection.endToStart,
       background: Container(
         margin: EdgeInsets.fromLTRB(hMargin, 0, hMargin, 10),
         decoration: BoxDecoration(

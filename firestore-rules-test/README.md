@@ -29,7 +29,7 @@ firebase emulators:exec --project demo-fintab --only firestore \
   "node firestore-rules-test/rules.test.js"
 ```
 
-Saída esperada: `RESULT: 67 passed, 0 failed`. Exit code ≠ 0 se algo falhar
+Saída esperada: `RESULT: 93 passed, 0 failed`. Exit code ≠ 0 se algo falhar
 (útil para CI). Não precisa de login no Firebase — usa o projeto fake
 `demo-fintab`.
 
@@ -56,5 +56,18 @@ Saída esperada: `RESULT: 67 passed, 0 failed`. Exit code ≠ 0 se algo falhar
   gravado (virar Holding/PF depois de ter dados abandonaria ou inventaria
   patrimônio); `holdingSplit` congelado só entra em transação de Holding.
   Inclui regressões de renomear, arquivar e remover colaborador.
+
+- **Queries de lista (o que o app executa de verdade)**: `getDocs(query(...))`
+  para dono, colaborador legado (`masterUserId`), membro por Carteira, viewer e
+  estranho em `holding_members`, `holding_contributions` e `transactions`. Uma
+  lista só é concedida quando a rule é PROVÁVEL pelos filtros da query — por
+  isso `getDoc` sozinho nunca pegou a auditoria 2026-09-08 #1 (dono negado na
+  própria Holding).
+- **Carimbo `lastReferralRewardAt`** (gravado pela Cloud Function de
+  indicação): quem já ganhou recompensa continua conseguindo salvar/limpar a
+  assinatura com `set(merge)`; o cliente não cria, altera nem apaga o carimbo.
+- **Mover lançamentos com rateio para fora da Holding**: passa quando o
+  cliente remove `holdingSplit`/`holdingPaidBy` no mesmo update (é o que
+  `moveToWorkspace` faz); sem remover, é negado.
 
 > Ao mudar `firestore.rules`, rode esta suíte **antes** de `firebase deploy`.

@@ -70,6 +70,13 @@ class TransactionEntity extends Equatable {
   /// out of a Conta of the Holding itself.
   final String? holdingPaidBy;
 
+  /// Set when this transaction is the Extrato half of an aporte/retirada
+  /// (`holding_contributions/{id}`), written in the same batch. Such a
+  /// transaction is changed ONLY by undoing the contribution on the Holding
+  /// screen: the contribution trail is append-only, and the two halves must
+  /// never drift apart. Null for every ordinary transaction.
+  final String? holdingContributionId;
+
   const TransactionEntity({
     required this.id,
     required this.userId,
@@ -88,6 +95,7 @@ class TransactionEntity extends Equatable {
     this.workspaceId,
     this.holdingSplit,
     this.holdingPaidBy,
+    this.holdingContributionId,
   });
 
   bool get isIncome => type == TransactionType.income;
@@ -113,5 +121,6 @@ class TransactionEntity extends Equatable {
         workspaceId,
         holdingSplit,
         holdingPaidBy,
+        holdingContributionId,
       ];
 }

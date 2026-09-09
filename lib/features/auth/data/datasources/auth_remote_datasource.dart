@@ -340,6 +340,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   /// Collections holding user-owned documents keyed by a `userId` field.
+  ///
+  /// Every ledger collection must be here: a doc left behind is PII the user
+  /// asked us to erase (a sócio's name in `holding_members` is a THIRD
+  /// PARTY's name), and `price_alerts` left behind keep a scheduled Cloud
+  /// Function polling quotes for an account that no longer exists.
   static const _userDataCollections = [
     'transactions',
     'categories',
@@ -352,6 +357,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     'category_rules',
     'investment_assets',
     'investment_trades',
+    'holding_members',
+    'holding_contributions',
+    'price_alerts',
   ];
 
   /// Deletes every Firestore document belonging to [uid] (LGPD/GDPR and
@@ -423,10 +431,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         .get();
     await _deleteDocsInChunks(workspaces.docs);
 
-    // Subscription doc (id == uid) and the profile itself go last, so a
-    // partial failure above leaves the account in a retryable state.
+    // Docs keyed by uid (subscription, push tokens) and the profile itself go
+    // last, so a partial failure above leaves the account in a retryable
+    // state. Deleting a missing doc is a no-op, so no existence check.
     final batch = _firestore.batch();
     batch.delete(_firestore.collection('subscriptions').doc(uid));
+    batch.delete(_firestore.collection('fcm_tokens').doc(uid));
     batch.delete(_firestore.collection('users').doc(uid));
     await batch.commit();
   }

@@ -35,6 +35,10 @@ class HoldingScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final holding = ref.watch(activeHoldingProvider);
     final membersAsync = ref.watch(holdingMembersStreamProvider);
+    // The empty state is for a Holding that never had a sócio. One whose
+    // sócios have ALL left still has history (aportes to undo, people to
+    // reinstate) that only the full body renders.
+    final everHadMembers = (membersAsync.value ?? const []).isNotEmpty;
     final members = ref.watch(holdingActiveMembersProvider);
     final uid = ref.watch(authStateProvider).value?.id;
     final isOwner = holding != null && uid != null && holding.ownerId == uid;
@@ -68,7 +72,7 @@ class HoldingScreen extends ConsumerWidget {
           ? _NotAHolding(l10n: l10n)
           : loading
               ? const Center(child: CircularProgressIndicator())
-              : members.isEmpty
+              : !everHadMembers
                   ? _EmptyPartners(l10n: l10n, isOwner: isOwner)
                   : _HoldingBody(isOwner: isOwner),
     );
@@ -156,6 +160,8 @@ class _HoldingBody extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         _PartnersSection(isOwner: isOwner),
+        const SizedBox(height: 16),
+        _ContributionsSection(isOwner: isOwner),
         const SizedBox(height: 16),
         const _BalancesSection(),
       ],
@@ -400,6 +406,23 @@ class _QuotaModeCard extends ConsumerWidget {
                   : l10n.holdingQuotaProportionalHint,
               style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
             ),
+            // Fixed mode is unusable without a way to type the percentages:
+            // switching to it starts at 0% for everyone (auditoria 2026-09-08
+            // #5), so the editor lives right where the mode is chosen.
+            if (mode == HoldingQuotaMode.fixed) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed:
+                      busy ? null : () => showFixedQuotasDialog(context, ref),
+                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  label: Text(l10n.holdingAdjustQuotas),
+                  style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -446,6 +469,13 @@ class _PartnersSection extends ConsumerWidget {
     final table = ref.watch(holdingQuotaTableProvider);
     final patrimony = ref.watch(holdingPatrimonyProvider);
     final gaps = ref.watch(holdingContributionGapsProvider);
+    // Sócios who left stay out of every calculation but must stay REACHABLE:
+    // a wrong "saída" would otherwise be permanent.
+    final former = _byName(
+      (ref.watch(holdingMembersStreamProvider).value ?? const [])
+          .where((m) => !m.isActive)
+          .toList(),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,6 +504,8 @@ class _PartnersSection extends ConsumerWidget {
                   ? () =>
                       showAddContributionDialog(context, ref, memberId: m.id)
                   : null,
+              onMore:
+                  isOwner ? () => showPartnerActionsSheet(context, ref, m) : null,
             )),
         // Explained ONCE, under the table: repeating the reason on every row
         // would drown the numbers, and the cause is always the Holding's, not
@@ -486,7 +518,107 @@ class _PartnersSection extends ConsumerWidget {
               style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
             ),
           ),
+        // "Ajuste as cotas" must come with somewhere to do it.
+        if (patrimony == null &&
+            isOwner &&
+            table.status == QuotaStatus.invalidFixed)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => showFixedQuotasDialog(context, ref),
+              icon: const Icon(Icons.tune_rounded, size: 16),
+              label: Text(l10n.holdingAdjustQuotas),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ),
+        if (former.isNotEmpty)
+          _FormerPartners(members: former, isOwner: isOwner),
       ],
+    );
+  }
+}
+
+/// Collapsed list of sócios who left, with "Reativar" for the owner.
+class _FormerPartners extends ConsumerWidget {
+  final List<HoldingMemberEntity> members;
+  final bool isOwner;
+  const _FormerPartners({required this.members, required this.isOwner});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final locale = ref.watch(dateLocaleProvider);
+    final busy = ref.watch(holdingNotifierProvider).isLoading;
+
+    Future<void> reinstate(HoldingMemberEntity m) async {
+      final messenger = ScaffoldMessenger.of(context);
+      final ok = await ref
+          .read(holdingNotifierProvider.notifier)
+          .setMemberLeft(m.id, null);
+      if (!ok) {
+        messenger
+            .showSnackBar(SnackBar(content: Text(l10n.holdingSaveError)));
+      }
+    }
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+        dense: true,
+        title: Text(
+          l10n.holdingFormerPartners(members.length),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        children: [
+          for (final m in members)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  _Avatar(name: m.name, seed: m.id),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(m.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        if (m.leftAt != null)
+                          Text(
+                            l10n.holdingLeftOn(
+                                CurrencyFormatter.formatDate(m.leftAt!, locale)),
+                            style: TextStyle(
+                                fontSize: 11.5, color: cs.onSurfaceVariant),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (isOwner)
+                    TextButton(
+                      onPressed: busy ? null : () => reinstate(m),
+                      style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact),
+                      child: Text(l10n.holdingReinstate),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -510,6 +642,11 @@ class _PartnerTile extends ConsumerWidget {
   final ContributionGap? gap;
   final VoidCallback? onTap;
 
+  /// Owner-only actions for this sócio (edit, mark as left, remove). Also
+  /// reachable by long-press — a menu that exists only behind a tiny icon is a
+  /// menu half the owners never find.
+  final VoidCallback? onMore;
+
   const _PartnerTile({
     required this.member,
     required this.contributed,
@@ -517,6 +654,7 @@ class _PartnerTile extends ConsumerWidget {
     required this.patrimony,
     required this.gap,
     required this.onTap,
+    this.onMore,
   });
 
   @override
@@ -538,6 +676,7 @@ class _PartnerTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
+        onLongPress: onMore,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           child: Column(
@@ -602,6 +741,18 @@ class _PartnerTile extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  if (onMore != null) ...[
+                    const SizedBox(width: 2),
+                    IconButton(
+                      onPressed: onMore,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Icon(Icons.more_vert_rounded,
+                          size: 20, color: cs.onSurfaceVariant),
+                    ),
+                  ],
                 ],
               ),
               // Fixed mode only — in proportional mode the quota IS the
@@ -657,6 +808,219 @@ class _GapRow extends ConsumerWidget {
             style: TextStyle(
                 fontSize: 11.5, fontWeight: FontWeight.w700, color: color),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Aportes e resgates — a trilha do dinheiro, com "desfazer" para o dono
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Rows shown before the rest collapses into "e mais N".
+const _kContributionRows = 10;
+
+/// The Holding's aportes/retiradas, newest first.
+///
+/// This is the ONLY place a contribution can be undone. The trail is
+/// append-only (rules allow the client to change nothing but `note`), and its
+/// Extrato mirror is locked, so without this list a wrong aporte would be
+/// permanent (auditoria 2026-09-08 #4). Undo removes both halves in one batch.
+class _ContributionsSection extends ConsumerStatefulWidget {
+  final bool isOwner;
+  const _ContributionsSection({required this.isOwner});
+
+  @override
+  ConsumerState<_ContributionsSection> createState() =>
+      _ContributionsSectionState();
+}
+
+class _ContributionsSectionState extends ConsumerState<_ContributionsSection> {
+  /// Collapsed by default so the screen stays short; every row must remain
+  /// reachable, though — an aporte the owner cannot see is one they cannot
+  /// undo, which is the very problem this section exists to solve.
+  bool _showAll = false;
+
+  bool get isOwner => widget.isOwner;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final all =
+        ref.watch(holdingContributionsStreamProvider).value ?? const [];
+    // Names from EVERY sócio, including those who left — their aportes are
+    // still part of the trail.
+    final members = ref.watch(holdingMembersStreamProvider).value ?? const [];
+    final names = {for (final m in members) m.id: m.name};
+    final shown = _showAll
+        ? all
+        : all.take(_kContributionRows).toList(growable: false);
+    final hidden = all.length - shown.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel(l10n.holdingContributionsSection),
+        if (all.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+            child: Text(
+              l10n.holdingNoContributionsYet,
+              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+            ),
+          )
+        else ...[
+          ...shown.map((c) => _ContributionTile(
+                contribution: c,
+                name: names[c.memberId] ?? l10n.holdingPartner,
+                onUndo: isOwner
+                    ? () => _undo(context, ref, c,
+                        names[c.memberId] ?? l10n.holdingPartner)
+                    : null,
+              )),
+          if (hidden > 0 || _showAll && all.length > _kContributionRows)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _showAll = !_showAll),
+                icon: Icon(
+                  _showAll
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 16,
+                ),
+                label: Text(_showAll
+                    ? l10n.holdingShowLess
+                    : l10n.holdingShowMore(hidden)),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _undo(
+    BuildContext context,
+    WidgetRef ref,
+    HoldingContributionEntity c,
+    String name,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final amount =
+        ref.read(currencyFormatterProvider)(toReais(c.amountCents.abs()));
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.holdingUndoContribution),
+        content: Text(l10n.holdingUndoContributionConfirm(amount, name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.holdingUndoContribution),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final done = await ref
+        .read(holdingNotifierProvider.notifier)
+        .deleteContribution(c.id);
+    if (!done) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.holdingSaveError)));
+    }
+  }
+}
+
+class _ContributionTile extends ConsumerWidget {
+  final HoldingContributionEntity contribution;
+  final String name;
+  final VoidCallback? onUndo;
+
+  const _ContributionTile({
+    required this.contribution,
+    required this.name,
+    required this.onUndo,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final fmt = ref.watch(currencyFormatterProvider);
+    final locale = ref.watch(dateLocaleProvider);
+    final out = contribution.isWithdrawal;
+    final color = out ? cs.error : _kGreen;
+    final day = CurrencyFormatter.formatDate(contribution.date, locale);
+    final note = contribution.note;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              out ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              size: 16,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  (note == null || note.isEmpty) ? day : '$day · $note',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${out ? '-' : '+'}${fmt(toReais(contribution.amountCents.abs()))}',
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w700, color: color),
+          ),
+          if (onUndo != null)
+            IconButton(
+              tooltip: l10n.holdingUndoContribution,
+              onPressed: onUndo,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: Icon(Icons.undo_rounded,
+                  size: 18, color: cs.onSurfaceVariant),
+            ),
         ],
       ),
     );

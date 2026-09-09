@@ -21,6 +21,7 @@ class TransactionModel extends TransactionEntity {
     super.workspaceId,
     super.holdingSplit,
     super.holdingPaidBy,
+    super.holdingContributionId,
   });
 
   factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
@@ -45,6 +46,7 @@ class TransactionModel extends TransactionEntity {
       workspaceId: data['workspaceId'] as String?,
       holdingSplit: _splitFromFirestore(data['holdingSplit']),
       holdingPaidBy: data['holdingPaidBy'] as String?,
+      holdingContributionId: data['holdingContributionId'] as String?,
     );
   }
 
@@ -81,6 +83,8 @@ class TransactionModel extends TransactionEntity {
       if (workspaceId != null) 'workspaceId': workspaceId,
       if (holdingSplit != null) 'holdingSplit': holdingSplit,
       if (holdingPaidBy != null) 'holdingPaidBy': holdingPaidBy,
+      if (holdingContributionId != null)
+        'holdingContributionId': holdingContributionId,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -104,6 +108,7 @@ class TransactionModel extends TransactionEntity {
       workspaceId: entity.workspaceId,
       holdingSplit: entity.holdingSplit,
       holdingPaidBy: entity.holdingPaidBy,
+      holdingContributionId: entity.holdingContributionId,
     );
   }
 }

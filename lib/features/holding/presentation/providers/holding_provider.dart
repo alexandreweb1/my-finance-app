@@ -103,10 +103,17 @@ final holdingMembersStreamProvider =
   // firing the query anyway would read the wrong account.
   if (userId.isEmpty) return Stream.value(const []);
 
+  // BOTH clauses on purpose. A list query is granted only when the rules can
+  // be proven from the query's own filters: `userId` proves the owner /
+  // legacy-collaborator path, `workspaceId` proves the membership path. With
+  // `userId` alone the whole query was denied for the owner (auditoria
+  // 2026-09-08 #1) and the Holding looked permanently empty. Two equality
+  // filters need no composite index.
   return ref
       .watch(firestoreProvider)
       .collection(_kMembersCollection)
       .where('userId', isEqualTo: userId)
+      .where('workspaceId', isEqualTo: holding.id)
       .snapshots()
       .map((snap) {
     final all = snap.docs
@@ -159,10 +166,12 @@ final holdingContributionsStreamProvider =
   final userId = ref.watch(ledgerQueryUserIdProvider);
   if (userId.isEmpty) return Stream.value(const []);
 
+  // Same two clauses as holdingMembersStreamProvider, same reason.
   return ref
       .watch(firestoreProvider)
       .collection(_kContributionsCollection)
       .where('userId', isEqualTo: userId)
+      .where('workspaceId', isEqualTo: holding.id)
       .snapshots()
       .map((snap) {
     final all = snap.docs
@@ -205,6 +214,69 @@ final holdingContributionTotalsProvider = Provider<Map<String, Cents>>((ref) {
   }
   return out;
 });
+
+/// EVERY aporte/retirada the current scope can see, regardless of which
+/// Carteira is active.
+///
+/// [holdingContributionsStreamProvider] is empty outside a Holding by design,
+/// but a mirror transaction shows up in "Todas juntas" and — after a move — in
+/// any Carteira's Extrato, and it must stay locked there too. Same dual query
+/// as the Holding streams: `where userId` for the owner / legacy collaborator
+/// (granted by the legacyAccess() read path), `where workspaceId` for a
+/// Carteira member. Almost every account has zero docs here, so the listener
+/// costs one empty query.
+final allVisibleContributionsStreamProvider =
+    StreamProvider<List<HoldingContributionEntity>>((ref) {
+  final scope = ref.watch(activeLedgerScopeProvider);
+  final fs = ref.watch(firestoreProvider);
+  List<HoldingContributionEntity> parse(QuerySnapshot<Map<String, dynamic>> s) =>
+      s.docs
+          .map(HoldingContributionModel.fromFirestore)
+          .cast<HoldingContributionEntity>()
+          .toList();
+
+  if (scope is MemberScope) {
+    return workspaceCollectionQuery(
+            fs, _kContributionsCollection, scope.workspaceId)
+        .snapshots()
+        .map(parse);
+  }
+  final userId = ref.watch(ledgerQueryUserIdProvider);
+  if (userId.isEmpty) return Stream.value(const []);
+  return fs
+      .collection(_kContributionsCollection)
+      .where('userId', isEqualTo: userId)
+      .snapshots()
+      .map(parse);
+});
+
+/// Ids of the transactions that mirror an aporte/retirada — the Extrato half
+/// of each `holding_contributions` doc the current scope can see.
+///
+/// Complements [TransactionEntity.holdingContributionId]: mirrors written
+/// before that field existed (build 171) are still recognised through the
+/// contribution's own `linkedTransactionId`, so no data migration is needed.
+final holdingMirrorTransactionIdsProvider = Provider<Set<String>>((ref) {
+  final contributions =
+      ref.watch(allVisibleContributionsStreamProvider).value ?? const [];
+  return {
+    for (final c in contributions)
+      if (c.linkedTransactionId != null && c.linkedTransactionId!.isNotEmpty)
+        c.linkedTransactionId!,
+  };
+});
+
+/// True when [t] is the Extrato half of an aporte/retirada.
+///
+/// Such a transaction is locked in the Extrato (no swipe-to-delete, no edit
+/// dialog): the contribution trail is append-only, so the only correct way to
+/// change it is to undo the contribution on the Holding screen, which removes
+/// both halves in one batch. Editing the mirror alone would leave the cap
+/// table describing money the ledger no longer has (auditoria 2026-09-08 #4).
+bool isContributionMirror(TransactionEntity t, Set<String> mirrorIds) {
+  final id = t.holdingContributionId;
+  return (id != null && id.isNotEmpty) || mirrorIds.contains(t.id);
+}
 
 /// Sócios who have not left, sorted by id.
 ///
@@ -717,6 +789,9 @@ class HoldingNotifier extends StateNotifier<AsyncValue<void>> {
         description: note,
         walletId: _defaultWalletId(),
         sourceWalletId: null,
+        // Back-reference that locks this row in the Extrato: it can only be
+        // undone through deleteContribution, which removes both halves.
+        holdingContributionId: id,
       );
 
       final batch = _fs.batch();
@@ -766,7 +841,12 @@ class HoldingNotifier extends StateNotifier<AsyncValue<void>> {
       batch.delete(docRef);
       final txId = contribution.linkedTransactionId;
       if (txId != null && txId.isNotEmpty) {
-        batch.delete(_fs.collection('transactions').doc(txId));
+        // Deleting a doc that no longer exists makes the rules dereference
+        // `resource.data` on null → PERMISSION_DENIED for the WHOLE batch, and
+        // an aporte whose mirror was already swiped away (builds ≤ 171) could
+        // never be undone. One read decides whether the mirror is still there.
+        final txRef = _fs.collection('transactions').doc(txId);
+        if ((await txRef.get()).exists) batch.delete(txRef);
       }
       await batch.commit();
       state = const AsyncValue.data(null);

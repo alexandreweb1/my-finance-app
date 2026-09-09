@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../holding/presentation/providers/holding_provider.dart';
 import '../../transactions/domain/entities/transaction_entity.dart';
 import '../../transactions/presentation/providers/transactions_provider.dart';
 import '../domain/workspace_entity.dart';
@@ -43,6 +44,9 @@ class _MoveTransactionsScreenState
   Future<void> _move(List<WorkspaceEntity> own) async {
     final target = own.firstWhere((w) => w.id == _targetId);
     final count = _selected.length;
+    // Leaving a Holding drops the frozen rateios (see moveToWorkspace); the
+    // user is told before confirming, not after the numbers changed.
+    final fromHolding = own.any((w) => w.id == _sourceId && w.isHolding);
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -51,7 +55,10 @@ class _MoveTransactionsScreenState
           'Mover $count lançamento(s) para "${target.name}"?\n\n'
           'As Contas são específicas de cada Carteira; os lançamentos movidos '
           'aparecerão em "${target.name}" e você pode reatribuí-los a uma Conta '
-          'de lá depois. A ação pode ser desfeita movendo de volta.',
+          'de lá depois. A ação pode ser desfeita movendo de volta.'
+          '${fromHolding ? '\n\nOs rateios entre sócios já congelados nesses '
+              'lançamentos serão removidos — na Carteira de destino eles '
+              'passam a ser lançamentos comuns.' : ''}',
         ),
         actions: [
           TextButton(
@@ -121,8 +128,15 @@ class _MoveTransactionsScreenState
     }
 
     final all = ref.watch(allOwnerTransactionsProvider).value ?? const [];
+    // The Extrato half of a Holding aporte is welded to its contribution and
+    // never moves: in another Carteira it would still count as capital of the
+    // Holding while the Holding's net worth no longer had the money.
+    final mirrors = ref.watch(holdingMirrorTransactionIdsProvider);
+    final inSource = all.where((t) => _belongs(t, _sourceId, defaultWs));
+    final lockedCount =
+        inSource.where((t) => isContributionMirror(t, mirrors)).length;
     final srcTxns = [
-      ...all.where((t) => _belongs(t, _sourceId, defaultWs))
+      ...inSource.where((t) => !isContributionMirror(t, mirrors))
     ]..sort((a, b) => b.date.compareTo(a.date));
 
     final allSelected =
@@ -163,6 +177,28 @@ class _MoveTransactionsScreenState
               ],
             ),
           ),
+          if (lockedCount > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline_rounded,
+                      size: 14, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      lockedCount == 1
+                          ? '1 lançamento de aporte da Holding não pode ser '
+                              'movido — desfaça-o na tela Holding se precisar.'
+                          : '$lockedCount lançamentos de aporte da Holding não '
+                              'podem ser movidos — desfaça-os na tela Holding '
+                              'se precisar.',
+                      style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (srcTxns.isNotEmpty)
             CheckboxListTile(
               dense: true,

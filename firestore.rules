@@ -229,9 +229,25 @@ service cloud.firestore {
     // lapsed subscription) may legitimately carry just {status, updatedAt}, so we
     // must not dereference the purchase fields unconditionally — doing so would
     // raise an evaluation error and deny the clear.
+    //
+    // lastReferralRewardAt is stamped by the grantReferralReward Cloud Function
+    // (Admin SDK, bypasses rules). The client always writes with set(merge), so
+    // request.resource.data is the MERGED doc and carries the stamp along —
+    // listing it in hasOnly is what lets a referrer who already earned a reward
+    // keep saving/clearing their subscription (auditoria 2026-09-08 #2). The
+    // client itself may neither add, change nor drop it (referralStampUntouched).
+    function referralStampUntouched() {
+      let d = request.resource.data;
+      let had = resource != null && 'lastReferralRewardAt' in resource.data;
+      return (!had && !('lastReferralRewardAt' in d))
+          || (had && 'lastReferralRewardAt' in d
+              && d.lastReferralRewardAt == resource.data.lastReferralRewardAt);
+    }
+
     function validSubscription() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['type', 'status', 'purchaseToken', 'productId', 'expiryDate', 'updatedAt'])
+      return d.keys().hasOnly(['type', 'status', 'purchaseToken', 'productId', 'expiryDate', 'updatedAt', 'lastReferralRewardAt'])
+          && referralStampUntouched()
           && d.get('status', '') in ['active', 'expired']
           && d.updatedAt == request.time
           && (d.get('status', '') != 'active' || (
@@ -423,8 +439,15 @@ service cloud.firestore {
     // someone else's — with one field edit, and the change would look exactly
     // like a legitimate one. Recording money stays open to editors (aportes,
     // below); deciding who owns what belongs to whoever owns the Carteira.
+    //
+    // Read takes the SAME dual path as every other ledger collection. The
+    // owner's app queries `where userId == uid` (no workspaceId clause), and a
+    // list query is only granted when the rule can be PROVEN from the query's
+    // own filters: wsReadable() alone cannot be (workspaceId is unconstrained),
+    // so without legacyAccess() the owner — and the account-wide collaborator
+    // — were denied their own cap table (auditoria 2026-09-08 #1).
     match /holding_members/{memberId} {
-      allow read:   if isSignedIn() && wsReadable();
+      allow read:   if isSignedIn() && (wsReadable() || legacyAccess());
 
       allow create: if isSignedIn()
                     && 'workspaceId' in request.resource.data
@@ -455,8 +478,10 @@ service cloud.firestore {
     // history, which is what keeps the saldo auditable. Deleting is owner-only
     // — it exists for the Carteira-delete cascade and for account deletion
     // (LGPD), not as an undo button for collaborators.
+    //
+    // Read: dual path, for the same reason as holding_members above.
     match /holding_contributions/{contributionId} {
-      allow read:   if isSignedIn() && wsReadable();
+      allow read:   if isSignedIn() && (wsReadable() || legacyAccess());
 
       allow create: if isSignedIn() && wsCreatable()
                     && validHoldingContribution();
